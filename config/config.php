@@ -4,7 +4,7 @@
  */
 
 // Ruta pública del proyecto dentro de htdocs (sin diagonal final).
-define('URL_BASE', getenv('URL_BASE') ?: '/');
+define('URL_BASE', getenv('URL_BASE') !== false ? getenv('URL_BASE') : '/');
 // Origen público para los enlaces de los correos (no se toma de la cabecera Host, que se puede falsificar)
 define('URL_ORIGEN', getenv('URL_ORIGEN') ?: 'http://localhost');
 
