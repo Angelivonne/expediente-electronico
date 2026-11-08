@@ -1,10 +1,11 @@
 FROM php:8.2-apache
 
-# Find and disable ALL MPM-related config files
-RUN find /etc/apache2 -name "*mpm*" -type f && echo "---" && ls /etc/apache2/mods-enabled/ | grep mpm
+# Check what MPM configs exist
+RUN find /etc/apache2 -name "*.load" -path "*mpm*" 2>/dev/null; echo "==="; find /etc/apache2 -name "*.conf" | xargs grep -l "mpm_" 2>/dev/null | head -5
 
-# Remove all MPM module symlinks
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf
+# Remove MPM module files entirely
+RUN find /etc/apache2/mods-enabled -name "mpm_*" -delete
+RUN find /etc/apache2/mods-available -name "mpm_*" -delete
 
 # Enable only prefork
 RUN a2enmod mpm_prefork
