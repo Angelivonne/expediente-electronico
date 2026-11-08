@@ -24,23 +24,28 @@ $sql = preg_replace('/USE\s+\w+\s*;/i', '', $sql);
 // Remove IF NOT EXISTS from all ALTER TABLE patterns
 $sql = preg_replace('/ADD (COLUMN|INDEX|UNIQUE INDEX|UNIQUE KEY|FOREIGN KEY|KEY|CONSTRAINT) IF NOT EXISTS/i', 'ADD $1', $sql);
 $sql = preg_replace('/ADD (INDEX|UNIQUE INDEX|UNIQUE KEY|KEY) (\w+) IF NOT EXISTS/i', 'ADD $1 $2', $sql);
-// Handle: ADD CONSTRAINT name IF NOT EXISTS FOREIGN KEY
-$sql = preg_replace('/ADD CONSTRAINT (\w+) IF NOT EXISTS/i', 'ADD CONSTRAINT $1', $sql);
-// Handle: ADD FOREIGN KEY IF NOT EXISTS
-$sql = preg_replace('/ADD FOREIGN KEY IF NOT EXISTS/i', 'ADD FOREIGN KEY', $sql);
+// Handle: FOREIGN KEY IF NOT EXISTS anywhere
 $sql = preg_replace('/FOREIGN KEY IF NOT EXISTS/i', 'FOREIGN KEY', $sql);
+// Handle: ADD CONSTRAINT name IF NOT EXISTS
+$sql = preg_replace('/ADD CONSTRAINT (\w+) IF NOT EXISTS/i', 'ADD CONSTRAINT $1', $sql);
 
 $mysqli->multi_query($sql);
 $count = 0;
 $errors = 0;
 do {
-    if ($result = $mysqli->store_result()) {
-        $result->free();
+    try {
+        if ($result = $mysqli->store_result()) {
+            $result->free();
+        }
+    } catch (Throwable $e) {
+        // ignore store_result errors
     }
     $count++;
     if ($mysqli->error) {
         $errors++;
-        echo "Error #$errors: " . $mysqli->error . "\n";
+        if ($errors <= 5) {
+            echo "Error #$errors: " . $mysqli->error . "\n";
+        }
     }
     try {
         $hasMore = $mysqli->more_results();
@@ -52,8 +57,10 @@ do {
             $mysqli->next_result();
         } catch (Throwable $e) {
             $errors++;
-            echo "Next result error: " . $e->getMessage() . "\n";
-            break;
+            if ($errors <= 5) {
+                echo "Next result error: " . $e->getMessage() . "\n";
+            }
+            // Don't break, try to continue
         }
     }
 } while ($hasMore);
