@@ -19,6 +19,9 @@ $tituloPagina = $tituloPagina ?? 'Acceso';
 <?php foreach ($hojasAcceso ?? [] as $hoja): ?>
   <link rel="stylesheet" href="<?= recurso($hoja) ?>">
 <?php endforeach; ?>
+<?php if (RECAPTCHA_SITE_KEY !== ''): ?>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<?php endif; ?>
 </head>
 <body class="acceso" data-base="<?= URL_BASE ?>">
 

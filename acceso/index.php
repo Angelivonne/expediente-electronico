@@ -37,6 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!csrfValido()) {
         $error = 'La sesión expiró. Vuelve a intentarlo.';
+    } elseif (RECAPTCHA_SITE_KEY !== '' && $correo !== '' && !recaptchaVerificar((string) ($_POST['g-recaptcha-response'] ?? ''))) {
+        $error = 'Verifica que no eres un robot (reCAPTCHA).';
     } elseif ($correo === '' || $clave === '' || mb_strlen($correo) > 160 || strlen($clave) > 1024) {
         $error = 'Escribe tu correo y tu contraseña.';
     } elseif (!dentroDelLimite('acceso:ip:' . ipCliente(), INTENTOS_POR_IP, VENTANA_SEGUNDOS)
@@ -111,6 +113,10 @@ require __DIR__ . '/../app/vistas/plantilla/acceso_encabezado.php';
       <a class="acceso__olvide" href="<?= URL_BASE ?>/acceso/recuperar.php">¿Olvidaste tu contraseña?</a>
     </div>
   </div>
+
+<?php if (RECAPTCHA_SITE_KEY !== '' && $correo !== ''): ?>
+  <div class="g-recaptcha" data-sitekey="<?= e(RECAPTCHA_SITE_KEY) ?>" style="margin:12px 0;"></div>
+<?php endif; ?>
 
   <button type="submit" class="acceso__boton acceso__boton--claro" data-texto-final="Iniciar sesión">
     <?= $correo !== '' ? 'Iniciar sesión' : 'Continuar con correo' ?>

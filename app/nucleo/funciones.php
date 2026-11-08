@@ -381,3 +381,33 @@ function sinAlergiasRegistradas(?string $alergias): bool
     return $alergias === null || trim($alergias) === ''
         || (bool) preg_match('/^\s*(ninguna|niega|negad[oa]s?|sin alergias)/iu', $alergias);
 }
+/* ---------- reCAPTCHA ---------- */
+/** Verifica el token de reCAPTCHA v2 contra la API de Google. Devuelve true si es v?lido. */
+function recaptchaVerificar(string $token): bool
+{
+    if (RECAPTCHA_SECRET_KEY === '') {
+        return true; // sin clave configurada, se omite (modo desarrollo)
+    }
+    if ($token === '' || !function_exists('curl_init')) {
+        return false;
+    }
+    $curl = curl_init('https://www.google.com/recaptcha/api/siteverify');
+    curl_setopt_array($curl, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => http_build_query(['secret' => RECAPTCHA_SECRET_KEY, 'response' => $token, 'remoteip' => ipCliente()]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 4,
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $cuerpo = curl_exec($curl);
+    $error  = curl_errno($curl);
+    curl_close($curl);
+    if ($cuerpo === false || $error) {
+        return false;
+    }
+    $datos = json_decode((string) $cuerpo, true);
+    return is_array($datos) && !empty($datos['success']);
+}
+
+

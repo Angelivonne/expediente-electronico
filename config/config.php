@@ -32,6 +32,11 @@ define('MAIL_REMITENTE', 'no-responder@expediente.local');
 // Inicio de sesión con Google: el botón aparece solo cuando hay credenciales OAuth configuradas.
 define('GOOGLE_CLIENT_ID', '');
 
+// reCAPTCHA v2 (checkbox): protege el inicio de sesi?n y el registro contra bots.
+// Obt?n tus claves en https://www.google.com/recaptcha/admin (tipo: reCAPTCHA v2 "No soy un robot")
+define('RECAPTCHA_SITE_KEY', getenv('RECAPTCHA_SITE_KEY') ?: '');
+define('RECAPTCHA_SECRET_KEY', getenv('RECAPTCHA_SECRET_KEY') ?: '');
+
 // Acceso directo en este equipo: true = se entra como administrador sin escribir contraseña ni código
 // (sirve en equipo propio/local). Ponlo en false para exigir el inicio de sesión normal con clave y código.
 define('ACCESO_AUTOMATICO', filter_var(getenv('ACCESO_AUTOMATICO') ?: 'false', FILTER_VALIDATE_BOOLEAN));
