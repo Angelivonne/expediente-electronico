@@ -39,6 +39,7 @@ function configurarErrores(): void
             echo '<!DOCTYPE html><meta charset="utf-8"><title>Error</title>'
                . '<body style="background:#111;color:#e3e3e3;font-family:system-ui;padding:48px">'
                . '<h1 style="font-size:20px">Ocurrió un error interno</h1>'
+               . '<p style="color:#9b9b9b">' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</p>'
                . '<p style="color:#9b9b9b">Se registró para revisarlo. Vuelve a intentarlo en unos momentos.</p></body>';
         }
     });
@@ -56,33 +57,15 @@ function enviarCabecerasSeguridad(): void
     if (headers_sent()) {
         return;
     }
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443'
-        || (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
-    $ipCliente = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
-    $esLoopback = in_array($ipCliente, ['127.0.0.1', '::1'], true)
-        || str_starts_with($ipCliente, '::ffff:127.');
-    if (!$https && !$esLoopback) {
-        http_response_code(403);
-        header('Content-Type: ' . (defined('RESPUESTA_JSON') ? 'application/json' : 'text/plain') . '; charset=UTF-8');
-        header('Cache-Control: no-store, max-age=0');
-        echo defined('RESPUESTA_JSON')
-            ? json_encode(['ok' => false, 'error' => 'El acceso desde otros equipos requiere HTTPS.'], JSON_UNESCAPED_UNICODE)
-            : 'El acceso desde otros equipos requiere HTTPS.';
-        exit;
-    }
     $nonce = nonceCsp();
-    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-$nonce' https://www.google.com https://www.gstatic.com; "
-         . "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://www.google.com; "
-         . "frame-src https://www.google.com; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-$nonce'; "
+         . "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; "
+         . "media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: same-origin');
     header('Cross-Origin-Opener-Policy: same-origin');
     header('Permissions-Policy: microphone=(self), camera=(), geolocation=(), payment=(), usb=()');
-    if ($https && !in_array(strtolower((string) ($_SERVER['HTTP_HOST'] ?? '')), ['localhost', '127.0.0.1', '[::1]'], true)) {
-        header('Strict-Transport-Security: max-age=15552000');
-    }
     // Los datos clínicos no deben quedar en la caché del navegador ni de intermediarios
     header('Cache-Control: no-store, max-age=0');
     header_remove('X-Powered-By');
@@ -91,8 +74,8 @@ function enviarCabecerasSeguridad(): void
 /* ---------- Sesión ---------- */
 function iniciarSesionSegura(): void
 {
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] ?? '') === '443' || (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
-    session_name('expediente_sesion');
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] ?? '') === '443';
+    session_name('femeci_sesion');
     session_start([
         'cookie_httponly' => true,
         'cookie_path'     => URL_BASE . '/',
@@ -158,12 +141,11 @@ function ipCliente(): string
 
 /* ---------- Permisos por rol (NOM-024 6.6.4) ---------- */
 const PERMISOS = [
-    'ver_expediente'   => ['administrador', 'medico', 'enfermeria'],
-    'editar_paciente'  => ['administrador', 'medico', 'enfermeria'],
+    'ver_expediente'   => ['administrador', 'medico', 'enfermeria', 'recepcion'],
+    'editar_paciente'  => ['administrador', 'medico', 'enfermeria', 'recepcion'],
     'historial'        => ['administrador', 'medico'],
     'asistente'        => ['administrador', 'medico', 'enfermeria'],
     'agenda'           => ['administrador', 'medico', 'enfermeria', 'recepcion'],
-    'conexiones'       => ['administrador', 'medico'],
     'configurar'       => ['administrador'],
     'importar_exportar' => ['administrador', 'medico'],
     'finanzas'         => ['administrador', 'medico', 'recepcion'],
@@ -175,7 +157,6 @@ const DESCRIPCION_PERMISOS = [
     'editar_paciente' => 'Registrar pacientes y actualizar su ficha de identificación',
     'historial'       => 'Agregar notas, recetas, hospitalizaciones, estudios y consentimientos al historial clínico',
     'agenda'          => 'Agendar, mover y cancelar citas',
-    'conexiones'      => 'Consultar expedientes compartidos con autorización vigente de otra clínica',
     'asistente'       => 'Usar el asistente de IA',
     'configurar'      => 'Invitar personas, aprobar cuentas, asignar roles y configurar el sistema',
     'importar_exportar' => 'Importar y exportar bases de datos (pacientes y bases del espacio de trabajo)',
@@ -186,14 +167,14 @@ const DESCRIPCION_PERMISOS = [
 const ROLES = [
     'medico'        => ['nombre' => 'Médico',                'descripcion' => 'Atiende pacientes y firma notas, recetas e historial con su cédula profesional.', 'cedula' => true],
     'enfermeria'    => ['nombre' => 'Enfermería',            'descripcion' => 'Registra pacientes, consulta expedientes y apoya en la atención.', 'cedula' => false],
-    'recepcion'     => ['nombre' => 'Recepción',             'descripcion' => 'Gestiona la agenda y las finanzas sin acceso a expedientes clínicos.', 'cedula' => false],
+    'recepcion'     => ['nombre' => 'Recepción',             'descripcion' => 'Da de alta pacientes y mantiene al día sus datos de identificación y contacto.', 'cedula' => false],
     'administrador' => ['nombre' => 'Administrador',         'descripcion' => 'Gestiona al personal, los permisos y la configuración del expediente.', 'cedula' => false],
 ];
 
 /** Permisos que tiene un rol. */
 /**
  * Permisos vigentes: los que el administrador definió en Personas y permisos (configuración
- * "permisos_roles") o, si no hay, los de PERMISOS. Administración siempre incluye Conexiones y Configurar.
+ * "permisos_roles") o, si no hay, los de PERMISOS. "configurar" siempre incluye al administrador.
  */
 function permisosVigentes(bool $refrescar = false): array
 {
@@ -210,10 +191,8 @@ function permisosVigentes(bool $refrescar = false): array
             }
         }
     }
-    foreach (['configurar', 'conexiones'] as $permisoAdministrativo) {
-        if (!in_array('administrador', $vigentes[$permisoAdministrativo], true)) {
-            $vigentes[$permisoAdministrativo][] = 'administrador';
-        }
+    if (!in_array('administrador', $vigentes['configurar'], true)) {
+        $vigentes['configurar'][] = 'administrador';
     }
     return $vigentes;
 }
@@ -306,23 +285,7 @@ function pacienteDeSesion(): ?int
 /** true si quien tiene la sesión puede leer el expediente $pacienteId (personal con permiso o el propio paciente). */
 function puedeVerExpediente(int $pacienteId): bool
 {
-    if ($pacienteId <= 0) {
-        return false;
-    }
-    if (esPaciente()) {
-        return pacienteDeSesion() === $pacienteId;
-    }
-    if (!puede('ver_expediente')) {
-        return false;
-    }
-    // El expediente también está acotado a la institución de la sesión.
-    static $cache = [];
-    if (!array_key_exists($pacienteId, $cache)) {
-        $c = db()->prepare('SELECT 1 FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL');
-        $c->execute([$pacienteId, institucionId()]);
-        $cache[$pacienteId] = (bool) $c->fetchColumn();
-    }
-    return $cache[$pacienteId];
+    return esPaciente() ? pacienteDeSesion() === $pacienteId : puede('ver_expediente');
 }
 
 /** Corta la petición si una cuenta de paciente intenta abrir una ruta que no es de su portal. */
