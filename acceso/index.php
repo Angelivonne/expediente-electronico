@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!csrfValido()) {
         $error = 'La sesión expiró. Vuelve a intentarlo.';
-    } elseif (false) { // RECAPTCHA temporarily disabled for testing
+    } elseif (RECAPTCHA_SITE_KEY !== '' && $correo !== '' && !recaptchaVerificar((string) ($_POST['g-recaptcha-response'] ?? ''))) {
         $debugToken = substr((string)($_POST['g-recaptcha-response'] ?? ''), 0, 30);
         $error = 'Token: ' . ($debugToken ?: '(vac?o)') . ' | Longitud: ' . strlen((string)($_POST['g-recaptcha-response'] ?? ''));
     } elseif ($correo === '' || $clave === '' || mb_strlen($correo) > 160 || strlen($clave) > 1024) {
@@ -71,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Modo desarrollo (archivo): saltar verificación de código y entrar directamente
             if (MAIL_MODO === 'archivo') {
                 completarAcceso($usuario);
-                echo 'DEBUG_OK';
                 redirigir(rutaInicio());
             } elseif (crearYEnviarCodigo($usuario)) {
                 session_regenerate_id(true);
