@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/config/config.php';
 
-// Drop and recreate database
 $mysqli = new mysqli(DB_HOST, DB_USUARIO, DB_CLAVE, '', DB_PUERTO);
 if ($mysqli->connect_error) {
     die("Connection failed: " . $mysqli->connect_error . "\n");
@@ -22,9 +21,13 @@ $sql = file_get_contents($sqlFile);
 $sql = str_replace('expediente_expediente', DB_NOMBRE, $sql);
 // Remove USE statement
 $sql = preg_replace('/USE\s+\w+\s*;/i', '', $sql);
-// Remove IF NOT EXISTS from ADD COLUMN, ADD INDEX, etc.
+// Remove IF NOT EXISTS from all ALTER TABLE patterns
 $sql = preg_replace('/ADD (COLUMN|INDEX|UNIQUE INDEX|UNIQUE KEY|FOREIGN KEY|KEY|CONSTRAINT) IF NOT EXISTS/i', 'ADD $1', $sql);
 $sql = preg_replace('/ADD (INDEX|UNIQUE INDEX|UNIQUE KEY|KEY) (\w+) IF NOT EXISTS/i', 'ADD $1 $2', $sql);
+// Handle: ADD CONSTRAINT name IF NOT EXISTS FOREIGN KEY
+$sql = preg_replace('/ADD CONSTRAINT (\w+) IF NOT EXISTS/i', 'ADD CONSTRAINT $1', $sql);
+// Handle: ADD FOREIGN KEY IF NOT EXISTS
+$sql = preg_replace('/ADD FOREIGN KEY IF NOT EXISTS/i', 'ADD FOREIGN KEY', $sql);
 
 $mysqli->multi_query($sql);
 $count = 0;
