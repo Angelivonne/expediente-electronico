@@ -12,7 +12,7 @@ $mysqli->set_charset('utf8mb4');
 $sql = file_get_contents(__DIR__ . '/database/esquema.sql');
 
 // Extract CREATE TABLE statements for missing tables
-$missingTables = array('codigos_acceso', 'codigos_acceso_usos', 'imagenes_medicas', 'push_avisos_enviados', 'push_cola', 'push_preferencias', 'push_suscripciones', 'recuperaciones_clave', 'sincronizacion_cola', 'finanzas_movimientos', 'finanzas_cuentas', 'finanzas_categorias');
+$missingTables = array('codigos_acceso', 'codigos_acceso_usos', 'imagenes_medicas', 'push_suscripciones', 'push_avisos_enviados', 'push_cola', 'push_preferencias', 'recuperaciones_clave', 'sincronizacion_cola', 'finanzas_movimientos', 'finanzas_cuentas', 'finanzas_categorias');
 
 // Find each CREATE TABLE block
 foreach ($missingTables as $table) {
