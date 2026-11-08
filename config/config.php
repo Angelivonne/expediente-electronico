@@ -4,19 +4,17 @@
  */
 
 // Ruta pública del proyecto dentro de htdocs (sin diagonal final).
-define('URL_BASE', '/');
+define('URL_BASE', getenv('URL_BASE') ?: '/');
 // Origen público para los enlaces de los correos (no se toma de la cabecera Host, que se puede falsificar)
-define('URL_ORIGEN', 'http://localhost');
+define('URL_ORIGEN', getenv('URL_ORIGEN') ?: 'http://localhost');
 
 // Base de datos MySQL: una sola base (expediente_expediente). La app entra con un usuario de privilegios
 // mínimos (database/usuario_aplicacion.sql) cuyas credenciales viven en privado/bd.php, nunca root.
-$credencialesBd = is_file(__DIR__ . '/../privado/bd.php') ? require __DIR__ . '/../privado/bd.php' : ['usuario' => 'root', 'clave' => ''];
-define('DB_HOST',    '127.0.0.1');
-define('DB_PUERTO',  3306);
-define('DB_NOMBRE',  'expediente');
-define('DB_USUARIO', $credencialesBd['usuario']);
-define('DB_CLAVE',   $credencialesBd['clave']);
-unset($credencialesBd);
+define('DB_HOST',    getenv('DB_HOST') ?: '127.0.0.1');
+define('DB_PUERTO',  (int)(getenv('DB_PUERTO') ?: 3306));
+define('DB_NOMBRE',  getenv('DB_NOMBRE') ?: 'expediente');
+define('DB_USUARIO', getenv('DB_USUARIO') ?: 'root');
+define('DB_CLAVE',   getenv('DB_CLAVE') ?: '');
 // Programas de MySQL para los respaldos (mysqldump) y la restauración (mysql)
 define('MYSQL_BIN', 'C:/xampp/mysql/bin');
 define('PHP_CLI',   'C:/xampp/php/php.exe');   // lanza el respaldo diario en segundo plano
