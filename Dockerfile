@@ -1,10 +1,7 @@
 FROM php:8.2-apache
 
-# Disable ALL MPMs in mods-enabled (but keep mods-available)
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf
-
-# Enable only prefork
-RUN a2enmod mpm_prefork
+# Custom entrypoint to disable extra MPMs before starting Apache
+RUN echo '#!/bin/bash\nfor m in mpm_event mpm_worker; do a2dismod $m 2>/dev/null; done\na2enmod mpm_prefork 2>/dev/null\nexec apache2-foreground' > /usr/local/bin/start-apache.sh && chmod +x /usr/local/bin/start-apache.sh
 
 # Enable Apache modules
 RUN a2enmod rewrite headers
@@ -25,4 +22,5 @@ RUN chown -R www-data:www-data /var/www/html
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
+CMD ["/usr/local/bin/start-apache.sh"]
 EXPOSE 80
