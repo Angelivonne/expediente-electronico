@@ -46,7 +46,7 @@ function puedeAdministrarRespaldos(): bool
 function carpetaRespaldos(): string
 {
     if (!is_dir(CARPETA_RESPALDOS)) {
-        @mkdir(CARPETA_RESPALDOS, 0750, true);
+        @mkdir(CARPETA_RESPALDOS, 0777, true);
     }
     return realpath(CARPETA_RESPALDOS) ?: CARPETA_RESPALDOS;
 }
@@ -85,7 +85,7 @@ function archivoOpcionesMysql(array $credenciales): string
 /** Candado exclusivo de respaldos/restauración. $esperar=false regresa null si otro proceso lo tiene. */
 function candadoRespaldos(bool $esperar = true)
 {
-    $f = fopen(carpetaRespaldos() . '/.candado', 'c');
+    $f = @fopen(carpetaRespaldos() . '/.candado', 'c');
     if (!$f) {
         return null;
     }
