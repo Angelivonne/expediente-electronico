@@ -72,9 +72,9 @@ function enviarCabecerasSeguridad(): void
         exit;
     }
     $nonce = nonceCsp();
-    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-$nonce'; "
-         . "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; "
-         . "media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-$nonce' https://www.google.com https://www.gstatic.com; "
+         . "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://www.google.com; "
+         . "frame-src https://www.google.com; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: same-origin');
