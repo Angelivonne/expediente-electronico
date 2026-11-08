@@ -1,0 +1,36 @@
+<?php
+/** Estado clínico del diagnóstico, declarado por personal y guardado con autor/fecha en el expediente. */
+define('RESPUESTA_JSON', true);
+require_once __DIR__ . '/../../app/nucleo/inicio.php';
+exigirPermiso('historial');
+header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+$responder = static function (int $codigo, array $datos): never { http_response_code($codigo); echo json_encode($datos, JSON_UNESCAPED_UNICODE); exit; };
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') $responder(405, ['ok' => false, 'error' => 'Método no permitido.']);
+$token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!isset($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $token)) $responder(403, ['ok' => false, 'error' => 'La sesión expiró. Recarga la página.']);
+$entrada = json_decode(file_get_contents('php://input'), true) ?: [];
+$pacienteId = filter_var($entrada['paciente'] ?? null, FILTER_VALIDATE_INT) ?: 0;
+$codigo = strtoupper(trim((string) ($entrada['codigo'] ?? '')));
+$estado = (string) ($entrada['estado'] ?? '');
+if (!preg_match('/^[A-Z]\d{2}(\.?[0-9A-Z]{1,4})?$/', $codigo) || !in_array($estado, ['', 'activo', 'resuelto', 'descartado'], true)) $responder(422, ['ok' => false, 'error' => 'Código o estado no válido.']);
+$pdo = db();
+$paciente = $pdo->prepare('SELECT id, extras FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL');
+$paciente->execute([$pacienteId, institucionId()]);
+$fila = $paciente->fetch();
+if (!$fila) $responder(404, ['ok' => false, 'error' => 'El paciente no existe.']);
+$catalogo = $pdo->prepare('SELECT codigo FROM cie10 WHERE codigo = ? AND institucion_id = ? AND activo = 1 LIMIT 1');
+$catalogo->execute([$codigo, institucionId()]);
+if (!$catalogo->fetchColumn()) $responder(422, ['ok' => false, 'error' => 'El código no está en el catálogo CIE-10 activo.']);
+$anteriorExtras = json_decode((string) $fila['extras'], true) ?: [];
+$anterior = $anteriorExtras['_diagnosticos_estado'][$codigo]['estado'] ?? '';
+if ($estado === $anterior) $responder(200, ['ok' => true, 'estado' => $estado, 'sin_cambios' => true]);
+$usuario = usuarioActual();
+$q = $pdo->prepare('SELECT nombre FROM usuarios WHERE id = ?'); $q->execute([(int) $usuario['id']]); $profesional = (string) ($q->fetchColumn() ?: 'Personal clínico');
+if ($estado === '') unset($anteriorExtras['_diagnosticos_estado'][$codigo]);
+else $anteriorExtras['_diagnosticos_estado'][$codigo] = ['estado' => $estado, 'fecha' => date('Y-m-d'), 'profesional' => $profesional, 'profesional_id' => (int) $usuario['id']];
+$pdo->beginTransaction();
+$pdo->prepare('UPDATE pacientes SET extras = ? WHERE id = ? AND institucion_id = ?')->execute([$anteriorExtras ? json_encode($anteriorExtras, JSON_UNESCAPED_UNICODE) : null, $pacienteId, institucionId()]);
+registrarBitacora('pacientes', $pacienteId, 'actualizar', 'estado_diagnostico_' . $codigo, $anterior ?: null, $estado ?: null);
+$pdo->commit();
+$responder(200, ['ok' => true, 'estado' => $estado, 'fecha' => date('Y-m-d'), 'profesional' => $profesional]);

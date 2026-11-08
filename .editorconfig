@@ -1,0 +1,14 @@
+# EditorConfig: fuerza UTF-8 sin BOM en todo el proyecto
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{php,css,js,sql,md,html,xml,json}]
+charset = utf-8
+
+[*.php]
+charset = utf-8-bom  # PHP files can have BOM for charset detection

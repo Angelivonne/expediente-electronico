@@ -1,0 +1,153 @@
+/* Ajustes exclusivos de la lista de pacientes; no alteran otras tablas. */
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .pagina__cabecera,
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__cabecera,
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd > .pagina__descripcion {
+  max-width: 708px !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .pagina__cabecera,
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__cabecera {
+  text-align: left;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .pagina__cabecera {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .pagina__titulo {
+  margin-bottom: 0;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .pagina__subtitulo {
+  line-height: 1.45;
+}
+
+/* Un único encabezado: título de página arriba y acciones alineadas a la derecha. */
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__cabecera {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  min-height: 36px;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__titulo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__herramientas {
+  grid-column: 2;
+  justify-self: end;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  margin-left: 0;
+  white-space: nowrap;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__herramientas > * {
+  flex: 0 0 auto;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__herramientas .boton-icono {
+  width: 30px;
+  height: 30px;
+  color: var(--texto-suave);
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__herramientas .boton-icono:hover {
+  background: var(--bg-hover) !important;
+  color: var(--texto) !important;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__herramientas .boton-icono:focus-visible {
+  outline: 2px solid var(--primario) !important;
+  outline-offset: 2px;
+}
+
+/* Las celdas editables señalan claramente dónde se puede hacer clic. */
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd-tabla td[data-campo] {
+  cursor: text;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd-tabla td[data-campo="sexo"],
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd-tabla td[data-campo="grupo_sanguineo"] {
+  cursor: pointer;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd-tabla td[data-campo]:hover {
+  background: #1a1a1a !important;
+  box-shadow: inset 0 0 0 1px #303030;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd-tabla td.editando {
+  background: var(--bg-elevado) !important;
+  box-shadow: inset 0 0 0 2px var(--primario) !important;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) [data-texto-editable]:focus-visible {
+  outline: 1px solid var(--primario);
+  outline-offset: 3px;
+}
+
+/* No muestres la ayuda de comandos en la nota vacía ni una sección sin contenido. */
+body[data-presencia="pacientes:lista"] .notas-seccion .bloque__texto:empty::before {
+  content: none !important;
+}
+
+body[data-presencia="pacientes:lista"] .notas-seccion:has(.editor > .bloque:only-child .bloque__texto:empty) {
+  display: none !important;
+}
+
+/* La clasificación geográfica conserva su control, sin títulos repetidos. */
+body[data-presencia="pacientes:lista"] .geo__ranking-cabecera > div {
+  display: none;
+}
+
+body[data-presencia="pacientes:lista"] .geo__ranking-cabecera {
+  justify-content: flex-end;
+}
+
+/* Evita animar cientos de filas durante la carga inicial. */
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd-tabla tbody tr {
+  animation: none;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__mas {
+  width: max-content;
+  max-width: 100%;
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__mas:hover {
+  background: #171717;
+}
+
+@container contenido (max-width: 760px) {
+  body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__cabecera {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  body[data-presencia="pacientes:lista"] .pagina--ancha:not(.pagina--agenda) .bd__herramientas {
+    grid-column: 1;
+    justify-self: start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}

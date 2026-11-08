@@ -1,0 +1,1 @@
+{"formato":"csv","tablas":[{"nombre":"filas_descuadradas","columnas":["Nombre","Primer apellido","Fecha de nacimiento","Sexo","Columna 5","Columna 6"],"filas":[["José","Núñez","1985-05-12","H","sobra","otro"],["María","García",null,null,null,null]]}],"avisos":["Codificación UTF-8 · separador: coma"]}

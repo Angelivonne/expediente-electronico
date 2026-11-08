@@ -1,0 +1,5 @@
+# Generado por app/servicios/cuenta/push.php (solo para generar llaves EC)
+[ req ]
+default_bits = 2048
+distinguished_name = dn
+[ dn ]

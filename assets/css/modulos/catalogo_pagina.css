@@ -1,0 +1,32 @@
+/* Visor de catálogos del sistema dentro de su página del espacio de trabajo. */
+
+.catalogo--hoja { padding: 0; }
+.catalogo--hoja .catalogo__caja { max-width: none; }
+.catalogo--hoja .catalogo__marco { max-height: 68vh; }
+
+.catalogo__origen {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-tarjeta);
+  box-shadow: inset 0 0 0 1px var(--borde-fuerte);
+  color: var(--texto-suave);
+  font-size: var(--fs-sm);
+}
+.catalogo__origen p { margin: 0; }
+.catalogo__origen b { color: var(--texto); font-weight: 600; }
+
+.catalogo__paginas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.catalogo__pagina-actual { color: var(--texto-suave); font-size: var(--fs-sm); }
+.catalogo__paginas [aria-disabled="true"] { opacity: .45; pointer-events: none; }

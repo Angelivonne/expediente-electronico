@@ -1,0 +1,1 @@
+{"formato":"csv","tablas":[{"nombre":"pacientes_curp_valida","columnas":["Nombre","Primer apellido","Fecha de nacimiento","Sexo","CURP"],"filas":[["José Ángel","Núñez","1985-05-12","H","NUPA850512HDFXXR06"],["María","García","1990-08-20","M","GALM900820MDFRPR07"]]}],"avisos":["Codificación UTF-8 · separador: coma"]}

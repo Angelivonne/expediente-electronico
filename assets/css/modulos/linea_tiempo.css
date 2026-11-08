@@ -1,0 +1,58 @@
+/* Historial con la misma tabla bd-tabla que usa el listado de Pacientes. */
+.pagina--expediente #historial .historial-tabla {
+  width: 100%;
+  min-width: 910px;
+  table-layout: fixed;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.pagina--expediente #historial .historial-tabla th,
+.pagina--expediente #historial .historial-tabla td { height: auto; min-height: 42px; padding: 5px 8px; vertical-align: middle; }
+.pagina--expediente #historial .historial-tabla th { height: 34px; }
+.pagina--expediente #historial .historial-tabla .bd-tabla__grupos th { height: 30px; }
+.pagina--expediente #historial .historial-tabla .historial__evento { display: table-row; padding: 0; border: 0; }
+.pagina--expediente #historial .historial-tabla .historial__evento[hidden] { display: none !important; }
+.pagina--expediente #historial .historial-tabla .historial__evento[hidden] + .historial-tabla__detalle { display: none !important; }
+.pagina--expediente #historial .historial-tabla .historial__evento > td { background: transparent; }
+.pagina--expediente #historial .historial-tabla .historial__evento:hover > td { background: var(--bg-elevado); }
+.pagina--expediente #historial .historial-tabla__fecha { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+.pagina--expediente #historial .historial-tabla__fecha b { color: var(--texto); font-size: var(--fs-sm); font-weight: 500; }
+.pagina--expediente #historial .historial-tabla__fecha small { color: var(--texto-tenue); font-size: var(--fs-xs); text-transform: capitalize; }
+.pagina--expediente #historial .historial-tabla__tipo { display: inline-flex; align-items: center; gap: 6px; color: var(--texto-suave); font-size: var(--fs-sm); }
+.pagina--expediente #historial .historial-tabla__tipo svg { width: 15px; height: 15px; color: var(--texto-tenue); }
+.pagina--expediente #historial .historial-tabla__abrir { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 34px; padding: 3px 4px; border: 0; border-radius: 5px; background: transparent; color: var(--texto); font: inherit; text-align: left; cursor: pointer; }
+.pagina--expediente #historial .historial-tabla__abrir:hover { background: var(--bg-hover); }
+.pagina--expediente #historial .historial-tabla__registro { display: flex; min-width: 0; max-width: 100%; overflow: hidden; flex-direction: column; gap: 2px; }
+.pagina--expediente #historial .historial-tabla__registro b { overflow: hidden; color: var(--texto-fuerte); font-size: var(--fs-sm); font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.pagina--expediente #historial .historial-tabla__registro small { display: block; max-width: 100%; overflow: hidden; color: var(--texto-tenue); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.pagina--expediente #historial .historial-tabla__registro .historial-tabla__alerta { color: #ff9b9b; }
+.pagina--expediente #historial .historial-tabla__abrir .acordeon__chevron { flex: 0 0 14px; width: 14px; height: 14px; color: var(--texto-tenue); }
+.pagina--expediente #historial .historial-tabla .historial-tabla__detalle { display: none; }
+.pagina--expediente #historial .historial-tabla .historial__evento.abierto + .historial-tabla__detalle { display: table-row; }
+.pagina--expediente #historial .historial-tabla .historial-tabla__detalle > td { padding: 0; white-space: normal; }
+.pagina--expediente #historial .historial-tabla__detalle-contenido { padding: 16px 20px 18px; border-top: 1px solid var(--borde); white-space: normal; }
+.pagina--expediente #historial .historial-tabla__marco { margin-top: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .pagina--expediente #historial .historial-tabla__abrir,
+  .pagina--expediente #historial .historial-tabla .acordeon__chevron { transition: none; }
+}
+
+
+
+/* Filtro único, con todos los documentos clínicos disponibles y sin contadores redundantes. */
+.pagina--expediente #historial .historial__filtros { display: flex; align-items: center; gap: 10px; margin: 12px 0 8px; padding: 0; border: 0; }
+.pagina--expediente #historial .historial__filtros label { color: var(--texto-tenue); font-size: var(--fs-sm); }
+.pagina--expediente #historial .historial__filtros select { max-width: min(100%, 320px); height: 34px; padding: 0 30px 0 10px; border: 1px solid var(--borde-fuerte); border-radius: 7px; background: var(--bg-tarjeta); color: var(--texto); font: inherit; font-size: var(--fs-sm); }
+.pagina--expediente #historial .historial__filtros select:focus-visible { outline: 1px solid var(--texto-tenue); outline-offset: 1px; }
+@media (max-width: 560px) {
+  .pagina--expediente #historial .historial__filtros { align-items: flex-start; flex-direction: column; }
+  .pagina--expediente #historial .historial__filtros select { width: 100%; max-width: none; }
+}
+
+/* El historial es ancho: que la barra de desplazamiento se vea siempre (sin quedar recortado en silencio) */
+.pagina--expediente #historial .historial-tabla__marco { scrollbar-width: thin; scrollbar-color: #2c2c2c transparent; }
+.pagina--expediente #historial .historial-tabla__marco::-webkit-scrollbar { height: 10px; }
+.pagina--expediente #historial .historial-tabla__marco::-webkit-scrollbar-thumb { background: #2c2c2c; border-radius: 6px; }

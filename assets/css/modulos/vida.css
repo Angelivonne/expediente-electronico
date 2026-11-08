@@ -1,0 +1,109 @@
+/* ==========================================================================
+   Vida de la interfaz: microinteracciones y estados visibles.
+   Duraciones cortas (100–240 ms) y curvas suaves, como la referencia.
+   Todo respeta «reducir movimiento».
+   ========================================================================== */
+
+:root {
+  --vida-rapida: 120ms var(--curva-suave, cubic-bezier(.4, 0, .2, 1));
+  --vida-media: 200ms var(--curva-salida, cubic-bezier(.16, 1, .3, 1));
+}
+
+/* Entrada suave de las vistas de base de datos (tabla, tablero, calendario, formulario) */
+@keyframes vista-aparecer {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.bdp__marco,
+.bdp-tablero,
+.bdp-cal,
+.bdp-form {
+  animation: vista-aparecer 220ms var(--curva-salida, cubic-bezier(.16, 1, .3, 1)) both;
+}
+
+/* Pestañas: subrayado y color con transición */
+.bdp__pestana { transition: background var(--vida-rapida), color var(--vida-rapida); }
+.bdp__pestana[aria-selected="true"]::after { transition: left var(--vida-media), right var(--vida-media), opacity var(--vida-rapida); }
+.bdp__pestana:hover svg { transform: translateY(-1px); }
+.bdp__pestana svg { transition: transform var(--vida-rapida); }
+
+/* Filas: fondo suave al pasar */
+.bdp-tabla tbody tr td { transition: background var(--vida-rapida); }
+.bdp-tabla tbody tr:hover td { background: #1d1d1d; }
+
+/* Tarjetas del tablero: se levantan al pasar y se atenúan al arrastrar */
+.bdp-tarjeta {
+  transition: transform var(--vida-rapida), background var(--vida-rapida), box-shadow var(--vida-rapida);
+  will-change: transform;
+}
+.bdp-tarjeta:hover {
+  transform: translateY(-1px);
+  background: #222;
+  box-shadow: inset 0 0 0 1px #333, 0 2px 6px rgba(0, 0, 0, .35);
+}
+.bdp-tarjeta:active { transform: translateY(0); }
+.bdp-tarjeta[data-arrastrando="1"] { opacity: .55; }
+.bdp-tablero__columna { transition: box-shadow var(--vida-rapida), background var(--vida-rapida); }
+.bdp-tablero__tarjetas--activa { background: rgba(255, 255, 255, .03); outline: 1px dashed #3a3a3a; }
+
+/* Calendario: eventos y celdas */
+.bdp-cal__evento { transition: background var(--vida-rapida), color var(--vida-rapida); }
+.bdp-cal__evento:hover { background: #2f2f2f; color: var(--texto-fuerte); }
+.bdp-cal__dia { transition: box-shadow var(--vida-rapida); }
+.bdp-cal__dia:hover { box-shadow: inset 0 0 0 1px #333; }
+
+/* Formulario: foco claro en cada campo */
+.bdp-form__campo input,
+.bdp-form__campo select { transition: border-color var(--vida-rapida), box-shadow var(--vida-rapida), background var(--vida-rapida); }
+.bdp-form__campo input:hover,
+.bdp-form__campo select:hover { border-color: #3a3a3a; }
+.bdp-form__campo input:focus,
+.bdp-form__campo select:focus {
+  outline: none;
+  border-color: #4a4a4a;
+}
+
+/* Botones e iconos: respuesta al presionar */
+.boton, .boton-icono, .bdp__pestana, .bdp__nueva-fila { transition: background var(--vida-rapida), color var(--vida-rapida), transform var(--vida-rapida); }
+.boton:active, .boton-icono:active, .bdp__nueva-fila:active { transform: scale(.97); }
+
+/* Menús flotantes y desplegables: aparecen con un gesto corto */
+@keyframes menu-aparecer {
+  from { opacity: 0; transform: translateY(-3px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.menu-flotante,
+.menu-mas__lista,
+.tabla-herramientas__panel { animation: menu-aparecer 120ms var(--curva-suave, cubic-bezier(.4, 0, .2, 1)) both; }
+.menu-flotante button { transition: background var(--vida-rapida), color var(--vida-rapida); }
+
+/* Foco visible accesible */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #4a4a4a;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Enlaces del menú lateral: respuesta al pasar (sin mover el diseño) */
+.barra-lateral a, .barra-lateral button { transition: background var(--vida-rapida), color var(--vida-rapida); }
+
+/* Carga de datos: una línea tenue que recorre mientras se pide algo */
+.bdp-cargando {
+  position: relative;
+  overflow: hidden;
+}
+.bdp-cargando::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .04), transparent);
+  animation: brillo-cargando 1.1s linear infinite;
+}
+@keyframes brillo-cargando { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bdp__marco, .bdp-tablero, .bdp-cal, .bdp-form,
+  .menu-flotante, .menu-mas__lista, .tabla-herramientas__panel { animation: none !important; }
+  .bdp-tarjeta, .bdp-tarjeta:hover,
+  .boton, .boton-icono, .boton:active, .boton-icono:active { transform: none !important; }
+  .bdp-cargando::after { animation: none !important; }
+}

@@ -1,0 +1,9 @@
+﻿Archivos retirados del proyecto el 1 de noviembre de 2026.
+
+- arreglar_notas_catalogos.php: script suelto que reescribía las notas de catálogo desde las tablas.
+  Los catálogos ya no se guardan en notas: cada uno tiene su tabla del proyecto y su página la muestra.
+
+Las 34 tablas catalogo_* se conservan (diseño de database/migracion_catalogos_admin.sql) y se poblaron
+con database/llenar_catalogos_completo.sql. Respaldo completo previo en privado/respaldos/.
+- actualizar_catalogos.php: endpoint que editaba las celdas de CIE-10 y medicamentos. Lo reemplazó
+  api/motor/actualizar.php, que sirve a todas las entidades del motor.

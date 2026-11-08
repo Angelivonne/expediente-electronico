@@ -1,0 +1,23 @@
+﻿# Basura y datos locales
+models/
+transcribe-cpp/
+backups/
+privado/respaldos/
+privado/cache/
+privado/conexiones/
+*.sql
+*.sql.gz
+*.gguf
+
+# Config local
+config/local.php
+privado/bd.php
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.vscode/
+.idea/

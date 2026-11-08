@@ -1,0 +1,85 @@
+/* Tablero personal: jerarquía y distribución de la hoja del paciente. */
+.tablero__cabecera {
+  max-width: none !important;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.tablero__cabecera .pagina__meta { margin: 0 0 10px; }
+.tablero__identidad { display: flex; align-items: center; gap: 16px; }
+.tablero__avatar { width: 72px; height: 72px; flex: 0 0 72px; font-size: 1.25rem; }
+.tablero__identidad .hoja-paciente__identidad { padding: 0; }
+.tablero__identidad .hoja-paciente__linea { margin: 0 0 5px; }
+.tablero__identidad .hoja-paciente__linea span::before { content: none; }
+.tablero__rol { color: var(--texto-suave); font-size: var(--fs-sm); }
+.tablero__identidad .hoja-paciente__nombre { overflow-wrap: anywhere; }
+.tablero__resumen {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 24px 0 8px;
+}
+.tablero__resumen > div { min-width: 0; padding-top: 13px; padding-bottom: 13px; }
+.tablero__resumen dt { line-height: 1.35; }
+.tablero__resumen dd { white-space: normal; overflow-wrap: anywhere; }
+.tablero__cuerpo { grid-template-columns: minmax(0, 1fr) minmax(250px, 300px); gap: 0 44px; }
+.tablero__principal,
+.tablero__lado { min-width: 0; }
+.tablero__seccion { min-width: 0; padding-top: 24px; }
+.tablero__enlace,
+.tablero__lista > li > a { flex-shrink: 0; color: var(--texto-suave); font-size: var(--fs-sm); text-decoration: none; }
+.tablero__enlace:hover,
+.tablero__lista > li > a:hover { color: var(--texto); }
+.tablero__lista { display: grid; gap: 0; margin: 10px 0 0; padding: 0; list-style: none; }
+.tablero__lista li {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 0;
+  border-top: 1px solid var(--borde-fuerte);
+}
+.tablero__lista time { color: var(--texto-tenue); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tablero__lista li > span { display: grid; min-width: 0; gap: 3px; }
+.tablero__lista strong,
+.tablero__lista small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tablero__lista strong { color: var(--texto); font-size: var(--fs-sm); font-weight: 550; }
+.tablero__lista small { color: var(--texto-tenue); font-size: var(--fs-xs); }
+.tablero__lista > li > a { font-size: var(--fs-xs); }
+.tablero__vacio { margin: 12px 0 0; color: var(--texto-tenue); font-size: var(--fs-sm); }
+.tablero__accesos { display: grid; margin-top: 8px; }
+.tablero__acceso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--borde);
+  color: var(--texto-suave);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  transition: color 120ms ease;
+}
+.tablero__acceso:last-child { border-bottom: 0; }
+.tablero__acceso:hover,
+.tablero__acceso:focus-visible { color: var(--texto-fuerte); }
+.tablero__acceso svg.icono { width: 16px; height: 16px; flex: 0 0 16px; color: var(--texto-tenue); }
+.tablero__acceso span { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 1180px) {
+  .tablero__cuerpo { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .tablero__lado { position: static; }
+  .tablero__resumen { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tablero__resumen > div:nth-child(3n + 1) { padding-left: 0; border-left: 0; }
+  .tablero__resumen > div:nth-child(n + 4) { border-top: 1px solid var(--borde-fuerte); }
+}
+@media (max-width: 640px) {
+  .tablero__avatar { width: 58px; height: 58px; flex-basis: 58px; }
+  .tablero__identidad { gap: 12px; }
+  .tablero__resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tablero__resumen > div:nth-child(3n + 1) { padding-left: 12px; border-left: 1px solid var(--borde-fuerte); }
+  .tablero__resumen > div:nth-child(2n + 1) { padding-left: 0; border-left: 0; }
+  .tablero__resumen > div:nth-child(n + 3) { border-top: 1px solid var(--borde-fuerte); }
+  .tablero__lista li { grid-template-columns: 76px minmax(0, 1fr); gap: 8px; }
+  .tablero__lista > li > a { grid-column: 2; }
+}

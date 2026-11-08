@@ -1,0 +1,53 @@
+/* «Ver todas las notas»: todo sobre el fondo negro de la app, sin tarjetas ni cajas grises. */
+.notas-inicio__cabecera { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+
+.notas-inicio__cabecera .pagina__subtitulo { margin-bottom: 0; }
+
+.notas-inicio__herramientas { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; }
+
+.notas-inicio__buscar { display: flex; align-items: center; gap: 9px; flex: 1 1 300px; max-width: 520px; height: 38px; padding: 0 12px; border: 1px solid #292929; border-radius: 8px; background: #141414; color: var(--texto-tenue); }
+
+.notas-inicio__buscar:focus-within { border-color: #454545; }
+
+.notas-inicio__buscar svg { width: 15px; height: 15px; }
+
+.notas-inicio__buscar input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--texto); font: inherit; font-size: var(--fs-sm); }
+
+.notas-inicio__columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(20px, 3vw, 40px); align-items: start; }
+
+/* Sin caja: la sección vive directamente sobre el fondo negro */
+.notas-inicio__seccion { min-width: 0; padding: 0; border: 0; background: none; }
+
+.notas-inicio__seccion > header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 0 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--borde-fuerte); }
+
+.notas-inicio__seccion h2 { margin: 0; color: var(--texto-fuerte); font-size: var(--fs-md); font-weight: 600; }
+
+.notas-inicio__seccion header p { margin: 3px 0 0; color: var(--texto-tenue); font-size: var(--fs-xs); line-height: 1.45; }
+
+.notas-inicio__seccion header > span { color: var(--texto-tenue); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+
+.notas-inicio__lista, .notas-inicio__nodo ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+.notas-inicio__nodo ul { margin: 2px 0 2px 16px; padding-left: 9px; border-left: 1px solid #262626; }
+
+.notas-inicio__nodo a { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 34px; padding: 5px 8px; border-radius: 7px; color: var(--texto-suave); text-decoration: none; transition: background 120ms ease, color 120ms ease; }
+
+.notas-inicio__nodo a:hover { background: #1d1d1d; color: var(--texto-fuerte); text-decoration: none; }
+
+.notas-inicio__nodo a > svg { width: 15px; height: 15px; flex: 0 0 15px; color: #8a8a8a; }
+
+.notas-inicio__nodo a > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.notas-inicio__nodo a > small { margin-left: auto; color: #6f6f6f; font-size: var(--fs-xs); white-space: nowrap; }
+
+.notas-inicio__vacio { margin: 14px 4px; color: var(--texto-tenue); }
+
+.notas-inicio__sin-resultados { margin: 10px 4px; color: var(--texto-tenue); }
+
+/* Favoritos: separa del listado anterior sin caja */
+.notas-inicio__favoritos { margin: 26px 0 0; }
+
+@media (max-width: 760px) {
+  .notas-inicio__columnas { grid-template-columns: 1fr; }
+  .notas-inicio__cabecera { flex-direction: column; align-items: flex-start; }
+}

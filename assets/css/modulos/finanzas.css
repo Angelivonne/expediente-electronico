@@ -1,0 +1,105 @@
+/* Finanzas: presentación plana, compacta y coherente con el expediente. */
+body:has(.finanzas__nav) .pagina--ancha {
+  width: 100% !important;
+  max-width: 1240px !important;
+  margin-inline: auto;
+  padding: 28px clamp(16px, 3vw, 38px) 56px;
+}
+body:has(.finanzas__nav) .pagina__cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: none !important;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+body:has(.finanzas__nav) .pagina__titulo {
+  margin: 0;
+  color: var(--texto-fuerte, #f5f5f5);
+  font-size: 2rem;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+}
+.finanzas__fecha { color: var(--texto-tenue, #929292); font-size: var(--fs-sm, .875rem); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.finanzas__nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: block !important;
+  overflow-x: auto;
+  margin: 8px 0 22px;
+  padding: 5px 0 8px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--borde-fuerte, #292929) !important;
+  background: color-mix(in srgb, var(--bg, #111) 90%, transparent) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(8px);
+  scrollbar-width: none;
+}
+.finanzas__nav::-webkit-scrollbar { display: none; }
+.finanzas__nav-enlaces { display: flex; align-items: center; gap: 3px; width: max-content; min-width: 100%; }
+.finanzas__nav-enlaces a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 31px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--texto-tenue, #929292);
+  font-size: var(--fs-sm, .875rem);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.finanzas__nav-enlaces a:hover { background: #1b1b1b; color: var(--texto, #dedede); }
+.finanzas__nav-enlaces a[aria-current="page"] { background: #222; color: var(--texto-fuerte, #f5f5f5); }
+
+.finanzas__accion { display: flex; justify-content: flex-end; margin: 0 0 16px; }
+.finanzas__resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0;
+  margin: 0 0 22px;
+  border-block: 1px solid var(--borde-fuerte, #292929);
+}
+.finanzas__resumen > div { min-width: 0; padding: 13px 14px; }
+.finanzas__resumen dt { margin: 0 0 5px; color: var(--texto-tenue, #929292); font-size: var(--fs-xs, .75rem); }
+.finanzas__resumen dd { margin: 0; overflow: hidden; color: var(--texto-fuerte, #f5f5f5); font-size: clamp(1rem, 1.4vw, 1.3rem); font-weight: 600; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+
+.finanzas__cuerpo { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .85fr); align-items: start; gap: 30px; }
+.finanzas__datos, .finanzas__lado { min-width: 0; }
+.finanzas__seccion-limpio { padding: 17px 0; border-top: 1px solid var(--borde-fuerte, #292929); background: none; border-radius: 0; box-shadow: none; }
+.finanzas__titulo-fila-limpio { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px; }
+.finanzas__titulo-limpio { margin: 0; color: var(--texto-fuerte, #f5f5f5); font-size: 1rem; font-weight: 600; }
+.finanzas__fuente-limpio, .finanzas__titulo-fila-limpio .bd__contador { color: var(--texto-tenue, #929292); font-size: var(--fs-xs, .75rem); white-space: nowrap; }
+.finanzas__plano { width: 100%; overflow-x: auto; }
+.finanzas__plano .bd-tabla { min-width: 100%; }
+.finanzas__etiqueta { display: inline-flex; align-items: center; gap: 6px; padding: 2px 7px; border: 0; border-radius: 4px; font-size: var(--fs-xs, .75rem); font-weight: 600; }
+.finanzas__etiqueta--exito { color: #3fb950; }
+.finanzas__etiqueta--peligro { color: #e5534b; }
+.finanzas__etiqueta--advertencia { color: #d29922; }
+body:has(.finanzas__nav) .bd { margin-top: 18px; }
+body:has(.finanzas__nav) .bd__cabecera { max-width: none; margin: 0 0 8px; }
+body:has(.finanzas__nav) .bd-tabla th { background: transparent; color: var(--texto-tenue, #929292); font-size: var(--fs-xs, .75rem); font-weight: 550; text-transform: none; letter-spacing: 0; }
+body:has(.finanzas__nav) .bd-tabla td { color: var(--texto, #dedede); font-size: var(--fs-sm, .875rem); font-weight: 400; }
+body:has(.finanzas__nav) .boton-icono { width: 32px; height: 32px; }
+.finanzas__orientacion, .finanzas__ayuda, .finanzas__periodo-nota,
+.finanzas__resumen-detalle, .finanzas__nav-descripcion { display: none !important; }
+
+@media (max-width: 900px) {
+  .finanzas__cuerpo { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}
+@media (max-width: 680px) {
+  body:has(.finanzas__nav) .pagina--ancha { padding: 22px 16px 42px; }
+  body:has(.finanzas__nav) .pagina__titulo { font-size: 1.65rem; }
+  .finanzas__resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finanzas__resumen > div { padding: 11px 8px; border-top: 1px solid var(--borde-fuerte, #292929); }
+  .finanzas__resumen > div:nth-child(2n) { border-right: 0; }
+  .finanzas__resumen dd { font-size: 1rem; white-space: normal; }
+}
+body:has(.finanzas__nav) .finanzas__cuerpo--simple { grid-template-columns: minmax(0, 1fr); }
+body:has(.finanzas__nav) .finanzas__nota { margin: 12px 0 0; color: var(--texto-tenue, #929292); font-size: var(--fs-xs, .75rem); line-height: 1.45; }
+

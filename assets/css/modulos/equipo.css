@@ -1,0 +1,371 @@
+/* Personal: listado y perfil con el look de la hoja de paciente. */
+
+/* ---------- Listado compacto del equipo ---------- */
+.equipo__cabecera { align-items: center; margin-bottom: 12px; }
+.equipo__cabecera .pagina__titulo { display: flex; align-items: center; gap: 9px; }
+.equipo__total { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: #252525; color: var(--texto-tenue); font-size: var(--fs-xs); font-weight: 550; }
+.equipo__invitar { min-height: 34px; padding: 0 11px; font-size: var(--fs-sm); }
+.equipo__lista { display: flex; flex-direction: column; max-width: 720px; margin: 0; padding: 0; list-style: none; }
+.equipo__lista > li { border: 0; }
+.equipo__persona { display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 5px 9px; border-radius: 5px; color: inherit; text-decoration: none; transition: background 120ms ease; }
+.equipo__persona:hover, .equipo__persona:focus-visible { background: #232428; outline: 0; }
+.equipo__foto { position: relative; display: inline-flex; flex: 0 0 36px; width: 36px; height: 36px; }
+.equipo__foto > .avatar { width: 36px; height: 36px; }
+.equipo__presencia { position: absolute; right: -1px; bottom: -1px; display: grid; place-items: center; width: 13px; height: 13px; border: 2px solid #171717; border-radius: 50%; background: #73767d; }
+.equipo__presencia i { width: 100%; height: 100%; border-radius: 50%; background: #73767d; }
+.equipo__presencia--en-linea i { background: #43b581; }
+.equipo__identidad { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.equipo__identidad b { overflow: hidden; color: #e4e5e9; font-size: var(--fs-sm); font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.equipo__identidad small { overflow: hidden; color: #92949c; font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.equipo__meta { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 2px; margin-left: auto; text-align: right; }
+.equipo__meta > small { color: #92949c; font-size: var(--fs-xs); white-space: nowrap; }
+.equipo__meta > .equipo__cuenta { color: #d7b06a; }
+
+/* ---------- Panel flotante de personas ---------- */
+.equipo__panel { position: fixed; z-index: 1200; display: flex; flex-direction: column; width: min(320px, calc(100vw - 16px)); max-height: min(560px, calc(100dvh - 16px)); overflow: hidden; border: 1px solid #303136; border-radius: 9px; background: #1c1d22; box-shadow: 0 14px 36px rgba(0, 0, 0, .48); }
+.equipo__panel[hidden] { display: none; }
+.equipo__panel-cabecera { display: flex; align-items: center; justify-content: space-between; min-height: 42px; padding: 0 10px 0 14px; border-bottom: 1px solid #303136; color: #e5e6e9; font-size: var(--fs-sm); font-weight: 600; }
+.equipo__panel-todas { margin-left: auto; margin-right: 6px; color: #92949c; font-size: var(--fs-xs); font-weight: 500; text-decoration: none; }
+.equipo__panel-todas:hover { color: #e5e6e9; text-decoration: underline; }
+.equipo__panel-cerrar { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 5px; background: transparent; color: #a6a8ae; font-size: 20px; cursor: pointer; }
+.equipo__panel-cerrar:hover { background: #2a2b31; color: #fff; }
+.equipo__panel-lista { overflow-y: auto; padding: 5px; }
+.equipo__panel-persona { display: flex; align-items: center; gap: 9px; min-height: 48px; padding: 5px 7px; border-radius: 5px; color: inherit; text-decoration: none; }
+.equipo__panel-persona:hover, .equipo__panel-persona:focus-visible { outline: 0; background: #292a30; }
+.equipo__panel-avatar { position: relative; display: grid; flex: 0 0 34px; place-items: center; width: 34px; height: 34px; overflow: hidden; border-radius: 50%; background: #34363d; color: #e5e6e9; font-size: 11px; font-weight: 600; }
+.equipo__panel-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.equipo__panel-nombre { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.equipo__panel-nombre b { overflow: hidden; color: #e5e6e9; font-size: var(--fs-sm); font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.equipo__panel-nombre small { color: #92949c; font-size: var(--fs-xs); }
+.equipo__panel-estado { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; color: #92949c; font-size: 11px; white-space: nowrap; }
+.equipo__panel-estado i { width: 7px; height: 7px; border-radius: 50%; background: #73767d; }
+.equipo__panel-estado--en-linea { color: #a6d9ba; }
+.equipo__panel-estado--en-linea i { background: #43b581; }
+.equipo__panel-vacio { margin: 0; padding: 18px 12px; color: #92949c; font-size: var(--fs-sm); text-align: center; }
+
+/* ---------- Perfil individual ---------- */
+.persona { position: relative; display: block; }
+.persona__banner { height: 150px; margin: 0 -32px -78px; border-radius: 12px 12px 0 0; background:
+    radial-gradient(600px 220px at 20% 0%, rgba(64, 90, 160, .55), transparent 70%),
+    radial-gradient(520px 240px at 85% 30%, rgba(140, 70, 40, .45), transparent 75%),
+    #100f0d; }
+.persona__arriba { position: relative; display: flex; align-items: flex-end; gap: 20px; padding: 28px 0 0; }
+.persona__arriba avatar, .persona__arriba .avatar { width: 104px; height: 104px; border: 4px solid #111; }
+.persona__arriba .equipo__foto--perfil { flex-basis: 104px; width: 104px; height: 104px; }
+.persona__arriba .equipo__foto--perfil .equipo__presencia { right: 3px; bottom: 3px; width: 17px; height: 17px; border-width: 3px; border-color: #111; }
+.persona__arriba .hoja-paciente__nombre { margin: 0 0 4px; }
+.persona__arriba .hoja-paciente__nombre small { color: var(--texto-tenue); font-size: .5em; font-weight: 500; }
+.hoja-paciente__rol { color: var(--texto); }
+
+/* Cuerpo a dos columnas (hereda .hoja-paciente__cuerpo; en móvil apila solo) */
+.persona__banca { min-width: 0; }
+
+.persona__conteos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 18px 0 8px; border-block: 1px solid var(--borde-fuerte); }
+.persona__conteos div { min-width: 0; padding: 12px 14px; background: none; }
+.persona__conteos div + div { border-left: 1px solid var(--borde-fuerte); }
+.persona__conteos dt { color: var(--texto-tenue); font-size: var(--fs-xs); line-height: 1.4; }
+.persona__conteos dd { margin: 5px 0 0; font-size: 1.25rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.persona__actividad-lista { margin: 0; padding: 0 0 0 18px; }
+.persona__actividad-lista li { margin: 8px 0; color: var(--texto-suave); }
+.persona__actividad-lista li > span, .persona__actividad-lista li > a { color: inherit; text-decoration: none; }
+.persona__actividad-lista li > a:hover { text-decoration: underline; color: var(--texto-fuerte); }
+.persona__actividad-lista li > small { color: var(--texto-tenue); }
+.persona__actividad-detalle { margin: 4px 0 0; color: var(--texto-tenue); font-size: var(--fs-xs); line-height: 1.5; overflow-wrap: anywhere; }
+
+.persona__paginas { margin: 10px 0 0; }
+
+.persona__sin-datos { margin: 8px 0 0; color: var(--texto-tenue); }
+
+.persona__datos { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px 14px; margin: 12px 0 0; }
+.persona__datos dt { color: var(--texto-tenue); }
+.persona__datos dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.persona__datos dd b { color: var(--texto-fuerte); }
+.persona__datos dd small { color: var(--texto-tenue); }
+
+.persona__cta { margin: 16px 0 0; display: inline-flex; }
+
+/* ---------- Firma (trazada en pantalla) ---------- */
+.firma-caja { width: min(100%, 280px); padding: 12px; border: 1px solid var(--borde-fuerte); border-radius: 8px; background: #fff; }
+.firma-caja--vista img { display: block; width: 100%; }
+.firma-lienzo { margin: 12px 0 0; }
+.firma-lienzo__lienzo { display: block; width: min(100%, 280px); height: 130px; border: 1px dashed #3a3a3a; border-radius: 8px; background: #fff; touch-action: none; cursor: crosshair; }
+.firma-lienzo__acciones { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; flex-wrap: wrap; }
+.persona__aviso-firma { color: var(--texto-tenue); font-size: var(--fs-xs); }
+
+/* Responsive: apilar conteos y ocultar colapsos de la jerarquía del lado */
+@media (max-width: 1180px) {
+  .persona__conteos { grid-template-columns: repeat(2, 1fr); }
+  .persona__banner { margin-left: -20px; margin-right: -20px; }
+}
+@media (max-width: 900px) {
+  .persona__banner { height: 120px; margin: 0 -20px -64px; }
+  .persona__arriba { padding-top: 20px; }
+  .persona__arriba .avatar { width: 88px; height: 88px; }
+  .persona__arriba .equipo__foto--perfil { flex-basis: 88px; width: 88px; height: 88px; }
+}
+@media (max-width: 640px) {
+  .persona__conteos { grid-template-columns: 1fr 1fr; }
+  .persona__conteos div:nth-child(3) { border-left: 0; border-top: 1px solid var(--borde-fuerte); }
+  .persona__conteos div:nth-child(4) { border-top: 1px solid var(--borde-fuerte); }
+  .persona__datos { grid-template-columns: 120px minmax(0, 1fr); }
+  .equipo__meta > small { max-width: 112px; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Perfil y panel del equipo: afinado al marco oscuro de la app. */
+.equipo__panel {
+  width: min(300px, calc(100vw - 16px));
+  max-height: min(480px, calc(100dvh - 16px));
+  border-color: var(--borde-fuerte);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .34);
+}
+.equipo__panel-cabecera { min-height: 38px; padding: 0 8px 0 12px; border-color: var(--borde); color: var(--texto); font: inherit; font-size: var(--fs-sm); font-weight: 600; }
+.equipo__panel-cerrar { width: 26px; height: 26px; color: var(--texto-tenue); }
+.equipo__panel-cerrar:hover { background: var(--bg-hover); color: var(--texto); }
+.equipo__panel-lista { padding: 4px; }
+.equipo__panel-persona { min-height: 44px; gap: 8px; padding: 4px 6px; border-radius: 6px; }
+.equipo__panel-persona:hover, .equipo__panel-persona:focus-visible { background: var(--bg-hover); }
+.equipo__panel-avatar { flex-basis: 32px; width: 32px; height: 32px; background: var(--bg-elevado); color: var(--texto); }
+.equipo__panel-nombre b { color: var(--texto); font-weight: 550; }
+.equipo__panel-nombre small { color: var(--texto-tenue); font-size: var(--fs-xs); }
+.equipo__panel-estado { max-width: 96px; overflow: hidden; color: var(--texto-tenue); font-size: var(--fs-xs); text-overflow: ellipsis; }
+.equipo__panel-estado--en-linea { color: #8fc6a0; }
+.equipo__panel-estado--en-linea i { background: var(--exito); }
+.equipo__panel-vacio { padding: 14px 10px; color: var(--texto-tenue); font-size: var(--fs-sm); }
+
+.persona { margin-bottom: 16px; }
+.persona__banner {
+  height: 132px;
+  margin: 0 -32px -66px;
+  border-radius: 10px 10px 0 0;
+  background:
+    radial-gradient(560px 190px at 14% 0%, rgba(35, 131, 226, .16), transparent 72%),
+    radial-gradient(480px 190px at 86% 14%, rgba(139, 92, 246, .10), transparent 76%),
+    #151515;
+}
+.persona__arriba { gap: 16px; padding-top: 14px; }
+.persona__arriba .equipo__foto--perfil,
+.persona__arriba .avatar { width: 92px; height: 92px; }
+.persona__arriba .equipo__foto--perfil { flex-basis: 92px; }
+.persona__arriba .avatar { border: 3px solid var(--bg); }
+.persona__arriba .equipo__foto--perfil .equipo__presencia { right: 2px; bottom: 2px; border-color: var(--bg); }
+.persona__arriba .hoja-paciente__nombre { font-size: clamp(1.45rem, 2.4vw, 1.9rem); letter-spacing: -.025em; }
+.persona__arriba .hoja-paciente__linea { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; color: var(--texto-suave); font-size: var(--fs-sm); }
+.persona__arriba .hoja-paciente__linea > span + span::before { content: none; }
+.persona__arriba .equipo__ultima { color: var(--texto-tenue); }
+.persona__cuerpo { grid-template-columns: minmax(0, 1fr) minmax(250px, 300px); gap: 0 44px; }
+.persona__conteos { margin: 0 0 10px; }
+.persona__conteos div { padding: 11px 10px 10px; }
+.persona__conteos dt { font-size: var(--fs-xs); }
+.persona__conteos dd { margin-top: 4px; font-size: 1.3rem; line-height: 1.2; }
+.persona__banca > .ficha__seccion { padding-top: 22px; }
+.persona__actividad-lista { padding: 4px 0 0; list-style: none; }
+.persona__actividad-lista li { position: relative; margin: 0; padding: 0 0 14px 15px; border-left: 1px solid var(--borde-fuerte); color: var(--texto-suave); line-height: 1.5; }
+.persona__actividad-lista li::before { position: absolute; top: 6px; left: -3px; width: 5px; height: 5px; border-radius: 50%; background: #686868; content: ""; }
+.persona__actividad-lista li:last-child { padding-bottom: 0; border-left-color: transparent; }
+.persona__actividad-lista li > a { color: var(--texto); }
+.persona__actividad-lista li > small { display: inline-block; margin-left: 5px; color: var(--texto-tenue); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.persona__actividad-detalle { margin-top: 3px; }
+.persona__paginas { margin-top: 8px; }
+.persona__paginas a { min-height: 36px; gap: 8px; padding: 6px 7px; border-bottom: 1px solid var(--borde); border-radius: 4px; font-size: var(--fs-sm); }
+.persona__paginas a:hover { background: #171717; }
+.persona__paginas a > small { font-size: var(--fs-xs); white-space: nowrap; }
+.persona__datos { grid-template-columns: 112px minmax(0, 1fr); gap: 9px 12px; margin-top: 10px; font-size: var(--fs-sm); }
+.persona__datos dt { color: var(--texto-tenue); }
+.persona__datos dd { color: var(--texto); }
+.persona__cta { margin-top: 14px; }
+.persona__lado > .ficha__seccion { padding-top: 20px; }
+
+.asistente-boton {
+  z-index: 75;
+  border-color: var(--borde-fuerte);
+  background: var(--bg-elevado);
+  color: var(--texto);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .32);
+  pointer-events: auto;
+  touch-action: manipulation;
+  transform: none;
+}
+.asistente-boton:hover { border-color: #3a3a3a; background: var(--bg-hover); transform: none; }
+.asistente-boton:focus-visible { outline: 2px solid var(--primario); outline-offset: 3px; }
+
+@media (max-width: 1180px) {
+  .persona__banner { margin-left: -20px; margin-right: -20px; }
+}
+@media (max-width: 900px) {
+  .persona__banner { height: 116px; margin: 0 -20px -58px; }
+  .persona__cuerpo { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .persona__arriba { padding-top: 12px; }
+  .persona__arriba .equipo__foto--perfil,
+  .persona__arriba .avatar { width: 82px; height: 82px; }
+  .persona__arriba .equipo__foto--perfil { flex-basis: 82px; }
+}
+@media (max-width: 640px) {
+  .persona__conteos div { padding: 10px 8px; }
+  .persona__datos { grid-template-columns: 108px minmax(0, 1fr); }
+}
+
+/* Panel de Personas: misma jerarquia visual que el menu lateral. */
+.equipo__panel {
+  width: min(300px, calc(100vw - 16px));
+  max-height: min(480px, calc(100dvh - 16px));
+  padding: 8px;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg-lateral);
+  box-shadow: none;
+}
+.equipo__panel-cabecera {
+  min-height: 28px;
+  padding: 0 4px 2px 10px;
+  border: 0;
+  color: var(--texto-tenue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+.equipo__panel-cerrar {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--texto-tenue);
+  font-size: 17px;
+}
+.equipo__panel-cerrar:hover,
+.equipo__panel-cerrar:focus-visible { background: #262626; color: #fff; }
+.equipo__panel-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 0 2px;
+}
+.equipo__panel-persona {
+  min-height: 38px;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  color: #b8b8b8;
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1.25;
+  transition: background var(--transicion), color var(--transicion);
+}
+.equipo__panel-persona:hover,
+.equipo__panel-persona:focus-visible {
+  outline: 0;
+  background: #262626;
+  color: #fff;
+}
+.equipo__panel-persona:focus-visible { box-shadow: inset 0 0 0 1px var(--primario); }
+.equipo__panel-avatar {
+  flex-basis: 28px;
+  width: 28px;
+  height: 28px;
+  background: #252525;
+  color: #d6d6d6;
+  font-size: 10px;
+  font-weight: 500;
+}
+.equipo__panel-nombre { gap: 1px; }
+.equipo__panel-nombre b {
+  color: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.25;
+}
+.equipo__panel-nombre small {
+  color: var(--texto-tenue);
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+}
+.equipo__panel-estado {
+  min-width: 0;
+  max-width: 82px;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--texto-tenue);
+  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+}
+.equipo__panel-estado i { width: 6px; height: 6px; flex: 0 0 6px; }
+.equipo__panel-estado--en-linea { color: #9a9a9a; }
+.equipo__panel-estado--en-linea i { background: var(--exito); }
+.equipo__panel-vacio {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--texto-tenue);
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+
+/* Panel del equipo: esquinas suaves y el mismo tono de avatar del perfil. */
+.equipo__panel {
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 12px;
+}
+.equipo__panel-avatar {
+  background: var(--avatar, #252525);
+  color: #252525;
+  font-weight: 600;
+}
+.asistente-boton { text-decoration: none; }
+
+/* Ajustes finales: el perfil usa el ancho real del área, no solo el ancho de la ventana. */
+.equipo__lista { width: min(100%, 900px); max-width: none; border-top: 1px solid var(--borde-fuerte); }
+.equipo__persona {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(130px, auto);
+  gap: 12px;
+  min-height: 62px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--borde);
+  border-radius: 0;
+}
+.equipo__persona:hover,
+.equipo__persona:focus-visible { background: #181818; }
+.equipo__persona--yo { background: #151515; }
+.equipo__identidad b { color: var(--texto); font-size: var(--fs-base); }
+.equipo__identidad small { color: var(--texto-suave); }
+.equipo__meta > small { color: var(--texto-tenue); }
+.equipo__meta > .equipo__cuenta { color: #e3a6a0; }
+.equipo__vacio { padding: 14px 10px; color: var(--texto-tenue); list-style: none; }
+
+.persona__cuerpo { grid-template-columns: minmax(0, 1fr) minmax(250px, 300px); gap: 0 44px; }
+.persona__banca,
+.persona__lado { min-width: 0; }
+.persona__conteos { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 22px 0 0; }
+.persona__conteos dd { overflow-wrap: anywhere; }
+.persona__datos { grid-template-columns: minmax(88px, 112px) minmax(0, 1fr); }
+.persona__datos dd { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.equipo__panel {
+  left: 8px;
+  width: min(calc(var(--ancho-lateral) - 16px), calc(100vw - 16px));
+  max-height: min(480px, calc(100dvh - 16px));
+}
+@media (max-width: 1180px) {
+  .persona__cuerpo { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .persona__lado { position: static; }
+  .persona__conteos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .persona__conteos div:nth-child(3) { padding-left: 10px; border-left: 0; border-top: 1px solid var(--borde-fuerte); }
+  .persona__conteos div:nth-child(4) { border-top: 1px solid var(--borde-fuerte); }
+}
+@media (max-width: 640px) {
+  .equipo__persona { grid-template-columns: 36px minmax(0, 1fr); gap: 8px 10px; }
+  .equipo__meta { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; margin: 0; text-align: left; }
+  .equipo__meta > small { white-space: normal; }
+  .persona__datos { grid-template-columns: minmax(84px, 108px) minmax(0, 1fr); }
+}
+
+/* ---------- Firma dibujada (canvas) ---------- */
+.persona__firma { margin-top: 18px; }
+.persona__firma-img { display: block; max-width: 220px; max-height: 72px; margin: 2px 0 10px; object-fit: contain; }
+.persona__firma-lienzo { position: relative; height: 130px; overflow: hidden; border: 1px dashed #4a4c55; border-radius: 8px; background: #fdfdfb; }
+.persona__firma-lienzo .firma__lienzo { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.firma__rastro { position: absolute; inset: 0; display: grid; place-items: center; color: #9aa0ad; font-size: var(--fs-sm); letter-spacing: .02em; pointer-events: none; transition: opacity .18s ease; }
+.firma__rastro--oculto { opacity: 0; }
+.firma__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.firma__aviso { flex-basis: 100%; margin: 0; color: var(--texto-suave); font-size: var(--fs-xs); }
+.firma__aviso--error { color: #e3a6a0; }
+.firma__borrar { color: #e3a6a0; }

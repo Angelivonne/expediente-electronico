@@ -1,0 +1,1 @@
+{"formato":"csv","tablas":[{"nombre":"pacientes_coma","columnas":["Nombre","Primer apellido","Segundo apellido","Fecha de nacimiento","Sexo","CURP","Telefono","Correo"],"filas":[["Pérez, Juan","Pérez","Martínez","1978-07-22","H",null,"5544332211","juan@example.com"]]}],"avisos":["Codificación UTF-8 · separador: coma"]}

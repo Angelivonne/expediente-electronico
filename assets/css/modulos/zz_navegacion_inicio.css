@@ -1,0 +1,28 @@
+/* Inicio y accesos rápidos comparten ancho; Inicio se reconoce por su icono y tooltip. */
+.lateral-inicio {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+}
+.lateral-inicio__inicio,
+.lateral-inicio > .boton-icono {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #9a9a9a;
+  text-decoration: none;
+}
+.lateral-inicio__inicio:hover,
+.lateral-inicio > .boton-icono:hover { background: #262626; color: #ededed; }
+.lateral-inicio__inicio.activo,
+.lateral-inicio > .boton-icono.activo { background: #2a2a2a; color: #fff; }
+.lateral-inicio__inicio svg.ir,
+.lateral-inicio > .boton-icono svg.ir { width: 17px; height: 17px; }

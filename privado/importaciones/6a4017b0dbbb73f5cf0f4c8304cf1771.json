@@ -1,0 +1,1 @@
+{"formato":"sqlite","tablas":[{"nombre":"pacientes","columnas":["id","nombre","primer_apellido","fecha_nacimiento","sexo"],"filas":[[1,"José Ángel","Núñez","1985-05-12","H"],[2,"María Fernanda","García","1990-08-20","M"]],"tipos":["INTEGER","TEXT","TEXT","TEXT","TEXT"]}],"avisos":["1 tablas en la base SQLite (abierta en solo lectura)"]}

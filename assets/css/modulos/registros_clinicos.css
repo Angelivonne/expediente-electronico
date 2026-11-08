@@ -1,0 +1,285 @@
+/* =====================================================================
+   Registros clínicos (NOM-004): formulario completo pacientes/nuevo_registro.php,
+   detalle de cualquier entrada (app/vistas/historial_detalle.php) y documento imprimible
+   (pacientes/evento.php). Mismo lenguaje que el registro de pacientes: secciones con icono
+   relleno, campos de línea, sin tarjetas ni sombras.
+   ===================================================================== */
+
+/* ---------- Cabecera: paciente y norma ---------- */
+.registro-clinico__paciente { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 6px 0 0; color: #a3a3a3; font-size: .9375rem; }
+.registro-clinico__paciente span + span::before { content: "·"; margin: 0 10px; color: #555; }
+.registro-clinico__alergias { color: #ffb4ab; }
+
+/* ---------- Formulario ---------- */
+.registro-clinico.historial__form { margin: 0; animation: none; }
+.registro-clinico .seccion { padding: 18px 0 16px; }
+.registro-clinico .seccion__titulo { font-size: .875rem; }
+.registro-clinico .seccion__titulo svg.ir { width: 18px; height: 18px; }
+.registro-clinico .rejilla { gap: 12px 22px; }
+.registro-clinico .rejilla + .rejilla { margin-top: 12px; }
+.registro-clinico .campo__etiqueta { margin-bottom: 3px; font-size: .8125rem; color: var(--texto-etiqueta); }
+.registro-clinico .campo input,
+.registro-clinico .campo textarea,
+.registro-clinico .campo .selector { font-size: .875rem; }
+.registro-clinico .campo textarea { min-height: 64px; }
+.registro-clinico .campo__ayuda { font-size: .8125rem; }
+.registro-clinico .campo input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(.8); opacity: .8; cursor: pointer; }
+.registro-clinico .campo input[readonly] { color: #a3a3a3; }
+
+/* Sugerencias de CIE-10 y medicamentos durante la captura */
+.campo--catalogo { position: relative; z-index: 3; }
+.campo--catalogo:focus-within { z-index: 100; }
+.registro-clinico__sugerencias { position: absolute; z-index: 101; top: calc(100% - 1px); left: 0; right: 0; min-width: min(260px, calc(100vw - 32px)); max-height: 260px; overflow: auto; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--borde-fuerte); border-radius: 8px; background: #171717; box-shadow: 0 12px 28px #0009; }
+.registro-clinico__sugerencia { display: flex; width: 100%; flex-direction: column; gap: 3px; padding: 9px 10px; border: 0; border-radius: 5px; background: transparent; color: #ededed; text-align: left; cursor: pointer; }
+.registro-clinico__sugerencia:hover, .registro-clinico__sugerencia[aria-selected="true"] { background: #282828; }
+.registro-clinico__sugerencia span { font-size: .875rem; line-height: 1.4; }
+.registro-clinico__sugerencia small { color: #929292; font-size: .75rem; line-height: 1.35; }
+.registro-clinico__subtitulo { margin: 4px 0 6px; color: #a3a3a3; font-size: .875rem; font-weight: 500; }
+.registro-clinico__subtitulo:not(:first-child) { margin-top: 18px; }
+
+/* Renglones repetibles (medicamentos, diagnósticos) */
+.registro-clinico__filas { margin-top: 14px; }
+.registro-clinico__fila + .registro-clinico__fila { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--borde-fuerte); }
+.registro-clinico__fila-cabecera { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: #a3a3a3; font-size: .875rem; font-weight: 500; }
+.registro-clinico__fila--linea { display: grid; grid-template-columns: minmax(0, 1fr) 28px; align-items: end; gap: 10px; }
+.registro-clinico__fila--linea + .registro-clinico__fila--linea { margin-top: 10px; padding-top: 0; border-top: 0; }
+.registro-clinico__quitar { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; color: #6f6f6f; cursor: pointer; transition: background 140ms ease, color 140ms ease; }
+.registro-clinico__quitar:hover { background: #1f1f1f; color: #e5e5e5; }
+.registro-clinico__quitar:focus-visible { outline: 0; box-shadow: inset 0 0 0 1px #4a4a4a; }
+.registro-clinico__quitar svg.icono { width: 14px; height: 14px; }
+.registro-clinico__filas > [data-fila]:only-child [data-fila-quitar] { visibility: hidden; }
+.registro-clinico .historial__otro { margin: 10px 0 2px; font-size: .875rem; }
+
+.registro-clinico__casillas { margin-top: 14px; }
+.registro-clinico .casilla { font-size: .875rem; line-height: 1.45; }
+.casilla--error { color: var(--peligro); }
+.registro-clinico .pie-formulario__legal .campo__ayuda,
+.registro-clinico__casillas .campo__ayuda { display: block; margin-top: 4px; color: var(--peligro); font-size: .8125rem; }
+.registro-clinico .nota-privacidad { font-size: .8125rem; line-height: 1.45; }
+.registro-clinico .boton[disabled] { opacity: .6; cursor: progress; }
+
+/* Cuerpo de la nota con el editor de bloques, dentro del formulario de registro */
+.registro-clinico__cuerpo.notas-seccion { margin: 0 0 22px; padding-top: 0; }
+.registro-clinico__cuerpo .notas-seccion__hoja { max-width: none; }
+.registro-clinico__cuerpo .editor { min-height: 72px; padding: 10px 12px; border: 1px solid #242424; border-radius: 8px; background: #191919; }
+.registro-clinico__cuerpo .editor:focus-within { border-color: #343434; }
+.seccion.seccion--catalogo-activo { position: relative; z-index: 120; }
+.ficha__seccion.seccion--catalogo-activo,
+.bd-tabla tr.seccion--catalogo-activo { position: relative; z-index: 120; }
+
+/* ---------- Detalle de una entrada (acordeón del perfil) ---------- */
+.detalle-clinico { display: flex; flex-direction: column; gap: 10px; }
+.detalle-clinico__bloque { margin: 0; }
+.detalle-clinico__titulo { margin: 0 0 2px; color: #9a9a9a; font-size: .8125rem; font-weight: 500; }
+.detalle-clinico__texto { margin: 0; color: #e5e5e5; font-size: .9375rem; line-height: 1.6; overflow-wrap: anywhere; }
+.detalle-clinico__datos { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 24px; margin: 0; }
+.detalle-clinico__datos dt { color: #8a8a8a; font-size: .8125rem; }
+.detalle-clinico__datos dd { margin: 2px 0 0; color: #ececec; font-size: .9375rem; }
+.detalle-clinico__signos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 24px; margin: 4px 0 0; }
+.detalle-clinico__signos dt { color: #8a8a8a; font-size: .8125rem; }
+.detalle-clinico__signos dd { margin: 2px 0 0; color: #f2f2f2; font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.detalle-clinico__signos small { color: #7a7a7a; font-size: .8125rem; font-weight: 400; }
+.detalle-clinico__diagnosticos { margin: 0; padding-left: 20px; color: #e5e5e5; font-size: .9375rem; line-height: 1.6; }
+.detalle-clinico__diagnosticos li { padding: 1px 0; }
+.detalle-clinico__cie { margin-left: 10px; color: #8a8a8a; font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.detalle-clinico__medicamentos { margin: 0; padding-left: 20px; }
+.detalle-clinico__medicamentos li { padding: 4px 0; color: #e5e5e5; font-size: .9375rem; }
+.detalle-clinico__medicamentos b { color: #f5f5f5; font-weight: 600; }
+.detalle-clinico__presentacion { color: #b5b5b5; }
+.detalle-clinico__indicacion { display: block; color: #a3a3a3; }
+.detalle-clinico__bloque--alerta .detalle-clinico__texto { color: #ffb4ab; }
+
+/* Cuerpo libre de la nota: mismos bloques del editor, en tipografía de lectura */
+.detalle-clinico__cuerpo .bloques-nota { margin-top: 4px; }
+.detalle-clinico__cuerpo .bloque { padding: 0; }
+.detalle-clinico__cuerpo .bloque__texto { color: #e5e5e5; font-size: .9375rem; line-height: 1.6; }
+.detalle-clinico__cuerpo .bloque[data-t="h1"] .bloque__texto { font-size: 1.125rem; font-weight: 600; }
+.detalle-clinico__cuerpo .bloque[data-t="h2"] .bloque__texto { font-size: 1rem; font-weight: 600; }
+.detalle-clinico__cuerpo .bloque[data-t="h3"] .bloque__texto { font-size: .9375rem; font-weight: 600; }
+.detalle-clinico__cuerpo .bloque[data-t="h1"],
+.detalle-clinico__cuerpo .bloque[data-t="h2"],
+.detalle-clinico__cuerpo .bloque[data-t="h3"] { margin-top: 10px; }
+.detalle-clinico__cuerpo .bloque:first-child { margin-top: 0; }
+.detalle-clinico--documento .detalle-clinico__cuerpo .bloque__texto { font-size: 1.0625rem; line-height: 1.7; }
+.detalle-clinico--documento .detalle-clinico__cuerpo .bloque[data-t="h1"] .bloque__texto { font-size: 1.375rem; }
+.detalle-clinico--documento .detalle-clinico__cuerpo .bloque[data-t="h2"] .bloque__texto { font-size: 1.125rem; }
+.detalle-clinico--documento .detalle-clinico__cuerpo .bloque[data-t="h3"] .bloque__texto { font-size: 1rem; }
+
+/* ---------- Documento a cuerpo completo (evento.php) ---------- */
+.documento__domicilio { margin: -2px 0 8px; color: #7a7a7a; font-size: .875rem; }
+.documento__fecha small { display: block; margin-top: 2px; color: #8a8a8a; font-size: .875rem; text-align: right; }
+.documento__contenido { margin-top: 30px; }
+.detalle-clinico--documento { gap: 0; }
+.detalle-clinico--documento .detalle-clinico__bloque { margin-top: 26px; }
+.detalle-clinico--documento > :first-child { margin-top: 0; }
+.detalle-clinico--documento .detalle-clinico__titulo { margin: 0 0 8px; color: #9a9a9a; font-size: .875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.detalle-clinico--documento .detalle-clinico__texto { font-size: 1.0625rem; line-height: 1.7; }
+.detalle-clinico--documento .detalle-clinico__datos { gap: 16px 24px; margin-top: 26px; padding-bottom: 22px; border-bottom: 1px solid #222; }
+.detalle-clinico--documento > .detalle-clinico__datos:first-child { margin-top: 0; }
+.detalle-clinico--documento .detalle-clinico__datos dt { font-size: .875rem; }
+.detalle-clinico--documento .detalle-clinico__datos dd { margin-top: 4px; font-size: 1rem; }
+.detalle-clinico--documento .detalle-clinico__signos { gap: 14px 24px; margin-top: 0; }
+.detalle-clinico--documento .detalle-clinico__signos dt { font-size: .875rem; }
+.detalle-clinico--documento .detalle-clinico__signos dd { font-size: 1.25rem; }
+.detalle-clinico--documento .detalle-clinico__diagnosticos { font-size: 1.0625rem; line-height: 1.7; }
+.detalle-clinico--documento .detalle-clinico__cie { font-size: .875rem; }
+.detalle-clinico--documento .detalle-clinico__medicamentos { padding-left: 22px; }
+.detalle-clinico--documento .detalle-clinico__medicamentos li { padding: 12px 0; border-bottom: 1px solid #222; font-size: 1.0625rem; }
+.detalle-clinico--documento .detalle-clinico__indicacion { margin-top: 2px; color: #b5b5b5; }
+
+/* Receta: bloque de quien prescribe */
+.documento__prescriptor { margin-top: 48px; padding-top: 22px; border-top: 1px solid #262626; }
+.documento__prescriptor-datos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 24px; margin: 0; }
+.documento__prescriptor-datos dt { color: #8a8a8a; font-size: .875rem; }
+.documento__prescriptor-datos dd { margin: 4px 0 0; color: #ececec; font-size: 1rem; }
+.documento__prescriptor .documento__firma { margin-top: 56px; }
+
+/* Consentimiento: quien otorga, médico y dos testigos */
+.documento__firmas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px 48px; margin-top: 72px; }
+.documento__firma-celda { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #b5b5b5; font-size: .9375rem; text-align: center; }
+.documento__firma-celda b { color: #f2f2f2; font-size: 1rem; font-weight: 600; }
+.documento__firma-celda .documento__linea { width: 100%; max-width: 260px; }
+.documento__registro { grid-column: 1 / -1; color: #6f6f6f; font-size: .8125rem; text-align: center; }
+
+@media (max-width: 760px) {
+  .registro-clinico__norma { display: none; }
+  .registro-clinico__fila--linea { grid-template-columns: minmax(0, 1fr) 28px; }
+  .documento__prescriptor-datos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .documento__firmas { grid-template-columns: 1fr; gap: 44px; }
+}
+
+@media print {
+  .registro-clinico__tipos { display: none !important; }
+  .detalle-clinico--documento .detalle-clinico__datos,
+  .detalle-clinico--documento .detalle-clinico__medicamentos li,
+  .documento__prescriptor { border-color: #bbb; }
+  .detalle-clinico__bloque, .documento__firmas, .documento__firma-celda, .documento__prescriptor { break-inside: avoid; }
+}
+@media (min-width: 761px) and (max-width: 980px) {
+  .registro-clinico__fila--linea .rejilla > .campo.col-3 {
+    grid-column: span 3;
+  }
+}
+
+/* Documento clínico: lectura compacta y jerarquía tipográfica app-native. */
+.documento { width: min(100%, 840px); max-width: 840px; margin: 18px auto 0; padding: 10px 0 24px; }
+.documento__cabecera { align-items: flex-start; gap: 20px; padding-bottom: 16px; }
+.documento__establecimiento { margin-bottom: 4px; color: var(--texto-tenue); font-size: var(--fs-sm); }
+.documento__titulo { font-size: clamp(1.45rem, 2.2vw, 1.7rem); font-weight: 650; letter-spacing: -.025em; line-height: 1.2; }
+.documento__fecha { padding-top: 2px; color: var(--texto-suave); font-size: var(--fs-sm); white-space: nowrap; }
+.documento__fecha small { font-size: var(--fs-xs); }
+.documento__paciente { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px 20px; margin-top: 17px; }
+.documento__paciente dt, .documento__prescriptor-datos dt { color: var(--texto-tenue); font-size: var(--fs-xs); }
+.documento__paciente dd, .documento__prescriptor-datos dd { margin-top: 3px; color: var(--texto); font-size: var(--fs-sm); line-height: 1.45; overflow-wrap: anywhere; }
+.documento__contenido { margin-top: 22px; }
+.detalle-clinico--documento .detalle-clinico__bloque { margin-top: 20px; }
+.detalle-clinico--documento .detalle-clinico__bloque:first-child,
+.detalle-clinico--documento > :first-child { margin-top: 0; }
+.detalle-clinico--documento .detalle-clinico__titulo { margin-bottom: 5px; color: var(--texto-suave); font-size: var(--fs-sm); font-weight: 600; letter-spacing: 0; text-transform: none; }
+.detalle-clinico--documento .detalle-clinico__texto,
+.detalle-clinico--documento .detalle-clinico__diagnosticos { color: #e5e5e5; font-size: .9375rem; line-height: 1.65; }
+.detalle-clinico--documento .detalle-clinico__datos { gap: 12px 20px; margin-top: 20px; padding-bottom: 16px; }
+.detalle-clinico--documento .detalle-clinico__datos dd { font-size: var(--fs-sm); }
+.detalle-clinico--documento .detalle-clinico__signos { gap: 12px 20px; }
+.detalle-clinico--documento .detalle-clinico__signos dd { font-size: 1.05rem; }
+.detalle-clinico--documento .detalle-clinico__cie { font-size: var(--fs-xs); }
+.detalle-clinico--documento .detalle-clinico__medicamentos { padding-left: 19px; }
+.detalle-clinico--documento .detalle-clinico__medicamentos li { padding: 8px 0; border-color: var(--borde); font-size: .9375rem; line-height: 1.5; }
+.detalle-clinico--documento .detalle-clinico__medicamentos b { font-weight: 600; }
+.detalle-clinico--documento .detalle-clinico__indicacion { margin-top: 2px; color: var(--texto-suave); font-size: var(--fs-sm); line-height: 1.55; }
+.documento__prescriptor { margin-top: 30px; padding-top: 16px; border-color: var(--borde-fuerte); }
+.documento__prescriptor-datos { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 20px; }
+.documento__prescriptor .documento__firma { margin-top: 30px; }
+.documento__firma { gap: 3px; margin-top: 30px; font-size: var(--fs-sm); }
+.documento__firma small { margin-top: 5px; font-size: var(--fs-xs); }
+.documento__linea { width: min(220px, 100%); margin-bottom: 7px; }
+.documento__firmas { gap: 38px 32px; margin-top: 44px; }
+.documento__registro { font-size: var(--fs-xs); }
+.documento__acciones { max-width: 840px; justify-content: flex-start; gap: 6px; margin: 12px auto 28px; flex-wrap: wrap; }
+.historial-comentarios--documento { max-width: 840px; margin: 4px auto 0; padding: 12px 0; border-color: var(--borde-fuerte); }
+.historial-comentarios__titulo { margin-bottom: 8px; color: var(--texto); font-size: var(--fs-sm); font-weight: 600; letter-spacing: 0; text-transform: none; }
+.historial-comentarios__lista { gap: 0; margin-bottom: 10px; }
+.historial-comentarios__lista li { padding: 7px 0; border-bottom: 1px solid var(--borde); }
+.historial-comentarios__texto { font-size: var(--fs-sm); line-height: 1.5; }
+.historial-comentarios__meta { margin-top: 2px; color: var(--texto-tenue); font-size: var(--fs-xs); }
+.historial-comentarios__form { gap: 8px; }
+.historial-comentarios__form input { min-height: 32px; padding: 0 9px; border-color: var(--borde-fuerte); border-radius: 5px; background: transparent; font-size: var(--fs-sm); }
+.historial-comentarios__form input:focus { border-color: #454545; outline: 0; }
+
+/* Firma: panel delimitado dentro de la hoja; el trazo vive en el mismo espacio oscuro */
+.documento__firma-panel { margin-top: 32px; padding: 14px 16px 16px; border: 1px solid #303030; border-radius: 10px; background: var(--bg-tarjeta); break-inside: avoid; }
+.documento__firma-panel__cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--borde); }
+.documento__firma-panel__titulo { margin: 0; color: var(--texto); font-size: var(--fs-sm); font-weight: 600; }
+.documento__firma-panel__nota { max-width: 58ch; margin: 3px 0 0; color: var(--texto-tenue); font-size: var(--fs-xs); line-height: 1.5; }
+.documento__firma-panel__nota b { color: var(--texto-suave); font-weight: 500; }
+.documento__sello { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 24px; padding: 0 9px; border-radius: 999px; background: #1f1f1f; color: var(--texto-suave); font-size: var(--fs-xs); font-weight: 500; white-space: nowrap; }
+.documento__sello svg.icono { width: 13px; height: 13px; }
+.documento__sello--valida { background: rgba(63, 185, 80, .12); color: #83d98c; }
+.documento__sello--alerta { background: rgba(229, 83, 75, .12); color: #f0a19c; }
+.documento__firma-panel__cuerpo { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 22px 30px; margin-top: 16px; }
+.documento__firma-panel__cuerpo--solo { grid-template-columns: minmax(0, 1fr); }
+.documento__firma-panel .documento__firma { gap: 3px; margin: 0; }
+.documento__firma-img { display: block; width: auto; max-width: 230px; max-height: 62px; margin: 0 0 4px; object-fit: contain; filter: invert(1) hue-rotate(180deg); opacity: .92; }
+.documento__firma-meta { display: grid; gap: 8px; margin: 0; align-content: start; }
+.documento__firma-meta > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; }
+.documento__firma-meta dt { color: var(--texto-tenue); font-size: var(--fs-xs); }
+.documento__firma-meta dd { margin: 0; color: var(--texto-suave); font-size: var(--fs-xs); line-height: 1.5; overflow-wrap: anywhere; }
+.documento__firma-meta code { color: var(--texto-tenue); font: inherit; font-variant-numeric: tabular-nums; }
+.documento__firma-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--borde); }
+.documento__firma-acciones form { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.documento__firma-acciones input { min-height: 32px; padding: 0 9px; border: 1px solid var(--borde-fuerte); border-radius: 5px; background: transparent; color: var(--texto); font: inherit; font-size: var(--fs-sm); }
+.documento__firma-acciones input:focus { border-color: #454545; outline: 0; }
+@media (max-width: 760px) {
+  .documento__firma-panel__cabecera { flex-wrap: wrap; }
+  .documento__firma-panel__cuerpo { grid-template-columns: 1fr; gap: 18px; }
+  .documento__firma-meta > div { grid-template-columns: 96px minmax(0, 1fr); }
+}
+@media print {
+  .documento__firma-panel { border-color: #999; background: #fff; }
+  .documento__firma-panel__cabecera { border-color: #ddd; }
+  .documento__firma-panel__titulo { color: #000; }
+  .documento__firma-panel__nota, .documento__firma-meta dt, .documento__firma-meta dd, .documento__firma-meta code { color: #444; }
+  .documento__sello { border: 1px solid #bbb; background: #fff; color: #333; }
+  .documento__firma-img { filter: none; opacity: 1; }
+}
+
+@container contenido (max-width: 700px) {
+  .documento { width: 100%; padding: 12px 0 20px; }
+  .documento__cabecera { gap: 12px; }
+  .documento__paciente, .documento__prescriptor-datos { grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); }
+  .historial-comentarios--documento, .documento__acciones { width: 100%; }
+}
+@media (max-width: 760px) {
+  .documento__cabecera { flex-wrap: wrap; }
+  .documento__fecha { padding-top: 0; }
+  .historial-comentarios__form { align-items: stretch; flex-wrap: wrap; }
+  .historial-comentarios__form input { flex-basis: min(100%, 240px); }
+}
+
+/* Acciones complejas de datos dentro del expediente, sin abandonar la página. */
+.datos-contextuales-dialogo:not([open]) { display: none; }
+.datos-contextuales-dialogo[open] {
+  display: flex; flex-direction: column; width: min(920px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 32px)); height: min(760px, calc(100dvh - 32px));
+  max-width: none; max-height: none; margin: auto; padding: 0; overflow: hidden;
+  border: 1px solid var(--borde-fuerte); border-radius: 12px; background: var(--bg); color: var(--texto);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .58);
+}
+.datos-contextuales-dialogo::backdrop { background: rgba(0, 0, 0, .68); backdrop-filter: blur(2px); }
+.datos-contextuales-dialogo__cabecera { display: flex; flex: 0 0 48px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--borde); }
+.datos-contextuales-dialogo__cabecera h2 { margin: 0; color: var(--texto-fuerte); font-size: var(--fs-sm); font-weight: 600; }
+.datos-contextuales-dialogo__cerrar { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--texto-suave); font: inherit; font-size: 22px; cursor: pointer; }
+.datos-contextuales-dialogo__cerrar:hover { background: #222; color: var(--texto); }
+.datos-contextuales-dialogo iframe { display: block; flex: 1; width: 100%; min-height: 0; border: 0; background: var(--bg); }
+@media (max-width: 700px) {
+  .datos-contextuales-dialogo[open] { width: calc(100vw - 16px); height: calc(100vh - 16px); height: calc(100dvh - 16px); border-radius: 8px; }
+}
+
+/* Aviso visible sin barra amarilla; firma alterada requiere atención. */
+.historial-firma__aviso { display: block; max-width: 100%; margin: 8px 0 0; padding: 0; border: 0; color: #e38b8b; font-size: var(--fs-sm); line-height: 1.45; }
+
+/* Comentarios, firma y acciones comparten el ancho del documento. */
+.historial-comentarios--documento, .documento__acciones { width: min(100%, 840px); max-width: 840px; box-sizing: border-box; margin-left: auto; margin-right: auto; }
+.historial-firma { margin-top: 8px; }
+.historial-comentarios__form input { flex: 1 1 280px; min-width: 0; }
+.documento__acciones { justify-content: flex-start; gap: 8px; }

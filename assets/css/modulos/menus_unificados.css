@@ -1,0 +1,136 @@
+/* ==========================================================================
+   Un solo lenguaje para menús, submenús y desplegables: el del menú contextual
+   de la nota (.menu-flotante). Superficie #1c1c1c, borde #2e2e2e, radio 10px,
+   filas de 30px, iconos planos de 16px #a3a3a3 sin mosaico, texto de 14px
+   #e6e6e6, hover #2a2a2a y títulos de grupo en 13px #8c8c8c sin mayúsculas.
+   Se carga después de estilos.css y de los demás módulos; movil.css va después.
+   ========================================================================== */
+
+/* ---------- Superficie ---------- */
+.popover {
+  border-color: #2e2e2e;
+  border-radius: 10px;
+  background: #1c1c1c;
+}
+.popover--compartir { border-radius: 10px; }
+.menu-mas__lista,
+.lateral-popover,
+.datos-lista,
+.geo__opciones,
+.desplegable-ia__lista,
+.cal-sugerencias,
+.cal-hora__lista,
+.tabla-herramientas__panel {
+  border: 1px solid #2e2e2e;
+  border-radius: 10px;
+  background: #1c1c1c;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .6);
+}
+.lateral-popover--panel { border-color: #2e2e2e; background: #1c1c1c; }
+
+/* ---------- Filas: misma métrica que .menu-flotante ---------- */
+.menu-mas__lista button,
+.lateral-popover a,
+.lateral-popover button,
+.datos-lista__opcion,
+.geo__opciones li,
+.desplegable-ia__lista button,
+.cal-sugerencias li,
+.cal-hora__lista li,
+.menu-comandos .menu-flotante button,
+.ia-linea__sugerencias button,
+.impresion-doc,
+.panel-lateral__fila {
+  min-height: 30px;
+  height: auto;
+  padding: 4px 10px 4px 9px;
+  gap: 10px;
+  border-radius: 6px;
+  color: #e6e6e6;
+  font-size: .875rem;
+  line-height: 1.35;
+}
+.menu-mas__lista button,
+.lateral-popover a,
+.lateral-popover button,
+.datos-lista__opcion,
+.desplegable-ia__lista button,
+.ia-linea__sugerencias button,
+.impresion-doc,
+.panel-lateral__fila { background: transparent; }
+
+/* ---------- Hover y selección ---------- */
+.menu-mas__lista button:hover,
+.menu-mas__lista button:focus-visible,
+.lateral-popover a:hover,
+.lateral-popover button:hover,
+.datos-lista__opcion:hover,
+.datos-lista__opcion:focus-visible,
+.datos-lista__opcion.activa,
+.geo__opciones li:hover,
+.desplegable-ia__lista button:hover,
+.cal-sugerencias li[aria-selected="true"],
+.cal-sugerencias li[data-pac]:hover,
+.cal-hora__lista li:hover,
+.cal-hora__lista li[aria-selected="true"],
+.ia-linea__sugerencias button:hover,
+.impresion-doc:hover,
+.panel-lateral__fila:hover,
+.panel-lateral__fila--papelera:hover {
+  background: #2a2a2a;
+  color: #e6e6e6;
+  outline: 0;
+}
+.cal-hora__lista li[aria-selected="true"] { color: #fff; }
+.geo__opciones li[aria-selected="true"] { color: #f0f0f0; }
+.ia-linea__sugerencias button:hover { padding-left: 9px; }
+
+/* ---------- Iconos planos, sin mosaico ---------- */
+.menu-mas__lista svg.icono { width: 16px; height: 16px; color: #a3a3a3; }
+.menu-comandos__icono {
+  flex: 0 0 16px !important;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.menu-comandos__icono svg.icono { width: 16px; height: 16px; color: #a3a3a3; }
+.desplegable-ia__monograma {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: none;
+  color: #a3a3a3;
+  font-size: .75rem;
+  font-weight: 500;
+}
+.panel-lateral__icono { width: 16px; height: 16px; color: #a3a3a3; }
+.panel-lateral__icono svg { width: 16px; height: 16px; }
+.ia-linea__sugerencias svg { width: 16px; height: 16px; color: #a3a3a3; }
+
+/* ---------- Títulos de grupo ---------- */
+.lateral-popover__titulo,
+.datos-lista__grupo,
+.desplegable-ia__titulo,
+.panel-lateral__grupo {
+  padding: 7px 10px 4px 9px;
+  color: #8c8c8c;
+  font-size: .8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.barra-lateral__grupo,
+.lateral-seccion__grupo-titulo,
+.tabla-herramientas__titulo,
+.tabla-grupos__titulo {
+  color: #8c8c8c;
+  font-size: .8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------- Separadores ---------- */
+.impresion-menu__separador { background: #2a2a2a; }

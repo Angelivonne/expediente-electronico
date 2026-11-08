@@ -1,0 +1,54 @@
+/* Marco fijo de la aplicación: solo se desplaza el panel de contenido. */
+html:has(.app),
+body:has(.app) {
+  height: 100%;
+  overflow: hidden !important;
+}
+
+.app {
+  height: var(--alto-pantalla, 100vh) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.barra-lateral {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.barra-lateral__desplazable {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.contenido {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.contenido__cuerpo {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.contenido__pagina {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media print {
+  html:has(.app),
+  body:has(.app),
+  .app,
+  .contenido {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

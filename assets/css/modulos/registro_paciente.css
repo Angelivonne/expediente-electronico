@@ -1,0 +1,14 @@
+/* Formulario de pacientes: evita comprimir los campos en columnas estrechas. */
+#form-paciente .rejilla--5 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@container contenido (max-width: 980px) {
+  #form-paciente .rejilla--5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container contenido (max-width: 600px) {
+  #form-paciente .rejilla--5 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
