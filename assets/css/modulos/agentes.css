@@ -1,0 +1,28 @@
+.agentes-layout{display:flex;gap:12px;min-height:520px}
+.agentes-panel{width:320px;flex:0 0 320px;border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--card)}
+.agentes-main{flex:1;border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--card);min-height:520px}
+.agentes-panel__cabecera{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.agentes-lista{list-style:none;margin:12px 0;padding:0;display:grid;gap:8px}
+.agentes-lista li{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;cursor:pointer}
+.agentes-lista li.activo{background:var(--secondary)}
+.agentes-detalle__cabecera{display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px}
+.agentes-detalle__acciones{margin-left:auto;display:flex;gap:6px}
+.agentes-conversacion{min-height:300px;max-height:52vh;overflow:auto;padding:12px 0;display:grid;gap:10px}
+.agentes-form{display:flex;gap:8px}
+.agentes-form textarea{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border)}
+.agentes-formas{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.forma-boton{width:38px;height:38px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer}
+.forma-boton.sel{outline:2px solid var(--primary)}
+.agent-figure{position:relative;width:48px;height:48px;display:inline-block;flex:0 0 48px}
+.agent-figure__shape{position:absolute;inset:0;display:block}
+.shape-circle{border-radius:50%;background:hsl(var(--hue,205),70%,65%)}
+.shape-triangle{clip-path:polygon(50% 0,100% 90%,0 90%);background:hsl(var(--hue,205),70%,65%)}
+.shape-hexagon{clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);background:hsl(var(--hue,205),70%,65%)}
+.shape-squircle{border-radius:30%;background:hsl(var(--hue,205),70%,65%)}
+.shape-capsule{border-radius:999px;background:hsl(var(--hue,205),70%,65%);height:28px;top:10px}
+.shape-cloud{border-radius:40% 46% 50% 42%;background:hsl(var(--hue,205),70%,65%)}
+.shape-droplet{border-radius:50% 50% 50% 50% / 58% 58% 42% 42%;background:hsl(var(--hue,205),70%,65%)}
+.shape-pebble{border-radius:58% 42% 55% 45% / 48% 52% 48% 52%;background:hsl(var(--hue,205),70%,65%)}
+.agent-figure__face{position:absolute;inset:0}
+.agent-figure__face::before{content:"";position:absolute;left:32%;top:46%;width:7px;height:7px;border-radius:50%;background:#222;box-shadow:14px 0 0 #222}
+.agent-figure__face::after{content:"";position:absolute;left:36%;top:60%;width:28%;height:10%;border-bottom:3px solid #222;border-radius:50%}

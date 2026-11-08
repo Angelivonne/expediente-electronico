@@ -1,13 +1,13 @@
 -- ==========================================================================
--- Expediente Expediente — esquema de base de datos MySQL
+-- Expediente FEMECI — esquema de base de datos MySQL
 -- SQL estándar de MySQL 8; también corre en el MariaDB que trae XAMPP.
 -- ==========================================================================
 
-CREATE DATABASE IF NOT EXISTS expediente_expediente
+CREATE DATABASE IF NOT EXISTS expediente_femeci
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_spanish_ci;
 
-USE expediente_expediente;
+USE expediente_femeci;
 
 -- Usuarios del sistema (NOM-024 6.6.3 autenticación, 6.6.4 autorización por roles)
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS historial_clinico (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   paciente_id   INT UNSIGNED NOT NULL,
   tipo          ENUM('consulta','receta','hospitalizacion','estudio','urgencias',
-                     'interconsulta','referencia','egreso','consentimiento','incapacidad') NOT NULL,
+                     'interconsulta','referencia','egreso','consentimiento') NOT NULL,
   fecha         DATETIME     NOT NULL,
   titulo        VARCHAR(200) NOT NULL,
   detalle       JSON         NOT NULL,                        -- campos propios de cada tipo
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS historial_clinico (
 -- Migración de bases anteriores (solo tenían consulta, receta, hospitalización y estudio); repetirla no cambia nada.
 ALTER TABLE historial_clinico
   MODIFY tipo ENUM('consulta','receta','hospitalizacion','estudio','urgencias',
-                   'interconsulta','referencia','egreso','consentimiento','incapacidad') NOT NULL;
+                   'interconsulta','referencia','egreso','consentimiento') NOT NULL;
 
 -- Portal del paciente: rol 'paciente' y cuenta ligada a su propio expediente (solo lectura).
 -- Idempotente: repetirlo no cambia nada (va aquí porque la llave foránea necesita la tabla pacientes).
@@ -154,11 +154,13 @@ CREATE TABLE IF NOT EXISTS bitacora (
   valor_anterior  TEXT         NULL,
   valor_nuevo     TEXT         NULL,
   usuario_id      INT UNSIGNED NULL,                      -- se llenará cuando exista inicio de sesión
+  institucion_id  INT UNSIGNED NULL,                      -- institución de quien hizo el movimiento
   ip              VARCHAR(45)  NULL,
   creado_en       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_bitacora_registro (tabla, registro_id),
-  INDEX idx_bitacora_fecha (tabla, registro_id, creado_en),
-  INDEX idx_bitacora_usuario (usuario_id, creado_en)
+  INDEX idx_bitacoraRegistro (tabla, registro_id),
+  INDEX idx_bitacoraFecha (tabla, registro_id, creado_en),
+  INDEX idx_bitacoraUsuario (usuario_id, creado_en),
+  INDEX idx_bitacoraInstitucion (institucion_id, creado_en)
 ) ENGINE=InnoDB;
 
 -- Espacio de trabajo: carpetas, notas y bases de datos anidadas (carpeta > carpeta > nota…).
@@ -186,26 +188,6 @@ CREATE TABLE IF NOT EXISTS paginas (
   INDEX idx_paginas_paciente (paciente_id, eliminado_en),
   CONSTRAINT fk_paginas_padre FOREIGN KEY (padre_id) REFERENCES paginas (id) ON DELETE CASCADE,
   CONSTRAINT fk_paginas_propietario FOREIGN KEY (propietario_id) REFERENCES usuarios (id)
-) ENGINE=InnoDB;
-
--- Firmas digitales de las páginas (NOM-024 6.9); las revocaciones se conservan para trazabilidad.
-CREATE TABLE IF NOT EXISTS firmas (
-  id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  pagina_id           INT UNSIGNED NOT NULL,
-  usuario_id          INT UNSIGNED NOT NULL,
-  version             INT UNSIGNED NOT NULL,
-  contenido_hash      CHAR(64) NOT NULL,
-  cedula_profesional  VARCHAR(20) NOT NULL,
-  especialidad        VARCHAR(120) NULL,
-  nombre              VARCHAR(120) NOT NULL,
-  firmado_en          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  revocada_en         DATETIME NULL,
-  revocada_por        INT UNSIGNED NULL,
-  motivo_revocacion   VARCHAR(255) NULL,
-  INDEX idx_firmas_pagina (pagina_id, revocada_en),
-  INDEX fk_firmas_usuario (usuario_id),
-  CONSTRAINT fk_firmas_pagina FOREIGN KEY (pagina_id) REFERENCES paginas (id) ON DELETE CASCADE,
-  CONSTRAINT fk_firmas_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
 ) ENGINE=InnoDB;
 
 -- Filas de las páginas de tipo base de datos; los valores van por id de columna.
@@ -359,7 +341,7 @@ CREATE TABLE IF NOT EXISTS peticiones_idempotentes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 -- ==========================================================================
--- Varias instituciones en una sola base (expediente_expediente) y códigos de acceso.
+-- Varias instituciones en una sola base (expediente_femeci) y códigos de acceso.
 -- Repetirlo no cambia nada (IF NOT EXISTS de MariaDB).
 -- ==========================================================================
 
@@ -433,7 +415,10 @@ ALTER TABLE invitaciones
   ADD INDEX IF NOT EXISTS idx_invitaciones_institucion (institucion_id, creado_en),
   ADD CONSTRAINT fk_invitaciones_institucion FOREIGN KEY IF NOT EXISTS (institucion_id) REFERENCES instituciones (id);
 
--- Bitácora: institución de quien hizo el movimiento (consultas de auditoría por institución)
+-- Bitácora: institución de quien hizo el movimiento (consultas de auditoría por institución).
+-- Se mantiene como ALTER por si la tabla ya existió en un despliegue anterior sin la columna
+-- (Railway, base de datos de versiones previas). En instalaciones nuevas la columna ya viene
+-- en el CREATE TABLE de arriba, y este ALTER es un no-op idempotente.
 ALTER TABLE bitacora
   ADD COLUMN IF NOT EXISTS institucion_id INT UNSIGNED NULL AFTER usuario_id,
   ADD INDEX IF NOT EXISTS idx_bitacora_institucion (institucion_id, creado_en);
@@ -1036,7 +1021,7 @@ CREATE TABLE IF NOT EXISTS recuperaciones_clave (
   KEY idx_recuperacion_usuario (usuario_id),
   CONSTRAINT fk_recuperacion_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-GRANT SELECT, INSERT, UPDATE ON expediente_expediente.recuperaciones_clave TO 'expediente_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON expediente_femeci.recuperaciones_clave TO 'femeci_app'@'localhost';
 
 -- Imágenes médicas (DICOM, JPG/PNG, PDF) por paciente, agrupadas en estudio y serie; archivos en privado/imagenes_medicas
 CREATE TABLE IF NOT EXISTS imagenes_medicas (
@@ -1064,7 +1049,7 @@ CREATE TABLE IF NOT EXISTS imagenes_medicas (
   CONSTRAINT fk_imagen_paciente FOREIGN KEY (paciente_id) REFERENCES pacientes (id),
   CONSTRAINT fk_imagen_institucion FOREIGN KEY (institucion_id) REFERENCES instituciones (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-GRANT SELECT, INSERT, DELETE ON expediente_expediente.imagenes_medicas TO 'expediente_app'@'localhost';
+GRANT SELECT, INSERT, DELETE ON expediente_femeci.imagenes_medicas TO 'femeci_app'@'localhost';
 
 -- Notas debajo de las secciones principales (Pacientes, Agenda y cada expediente), como el espacio para
 -- escribir bajo una base de datos . Una nota por sección e institución; no aparecen en el árbol.
@@ -1085,7 +1070,70 @@ CREATE TABLE IF NOT EXISTS asistente_memoria (
   KEY idx_memoria_usuario (usuario_id),
   CONSTRAINT fk_memoria_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_expediente.asistente_memoria TO 'expediente_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_femeci.asistente_memoria TO 'femeci_app'@'localhost';
 
 -- Página de cada fila de una base de datos: notas libres (panel lateral «Abrir»)
 ALTER TABLE pagina_filas ADD COLUMN IF NOT EXISTS notas MEDIUMTEXT NULL AFTER valores;
+
+-- ==========================================================================
+-- Agentes de IA: instancias configurables del asistente, cada una con su propia
+-- identidad visual (forma geométrica + color), proveedor, modelo, herramientas y
+-- prompt del sistema. Un usuario puede crear, pausar, reanudar y eliminar agentes;
+-- la comunicación con el proveedor reutiliza app/servicios/ia/asistente.php.
+-- ==========================================================================
+CREATE TABLE IF NOT EXISTS agentes (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  usuario_creador INT UNSIGNED NOT NULL,
+  institucion_id  INT UNSIGNED NULL,
+  nombre          VARCHAR(80)  NOT NULL,
+  slug            VARCHAR(90)  NOT NULL,
+  description     VARCHAR(400) NULL,
+  shape           ENUM('circle','pebble','squircle','capsule','triangle','hexagon','cloud','droplet') NOT NULL DEFAULT 'circle',
+  color_hue       TINYINT UNSIGNED NOT NULL DEFAULT 0,     -- 0-359, deriva del seed del agente
+  proveedor       ENUM('anthropic','openai') NOT NULL DEFAULT 'anthropic',
+  servicio        VARCHAR(40)  NOT NULL DEFAULT 'anthropic', -- clave de SERVICIOS_IA
+  modelo          VARCHAR(120) NULL,
+  api_url         VARCHAR(255) NULL,                         -- URL personalizada (servicio=personalizado)
+  api_clave       VARCHAR(255) NULL,                         -- cifrada con AES-256-GCM
+  esfuerzo        ENUM('low','medium','high') NULL DEFAULT 'medium',
+  herramientas    JSON NULL,                                  -- lista de nombres de herramientas
+  system_prompt   MEDIUMTEXT NULL,
+  instrucciones   MEDIUMTEXT NULL,
+  estado          ENUM('creado','iniciado','pausado','eliminado') NOT NULL DEFAULT 'creado',
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_agentes_slug (slug),
+  KEY idx_agentes_creator (usuario_creador, estado),
+  KEY idx_agentes_institucion (institucion_id),
+  CONSTRAINT fk_agentes_creator FOREIGN KEY (usuario_creador) REFERENCES usuarios (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Memoria de cada agente: preferencias y contexto que el agente recuerda entre sesiones.
+CREATE TABLE IF NOT EXISTS agentes_memoria (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  agente_id       INT UNSIGNED NOT NULL,
+  usuario_id      INT UNSIGNED NULL,
+  institucion_id  INT UNSIGNED NULL,
+  texto           VARCHAR(500) NOT NULL,
+  creado_en       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_agmem_agente (agente_id),
+  CONSTRAINT fk_agmem_agente FOREIGN KEY (agente_id) REFERENCES agentes (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Conversaciones de cada agente: turnos (pregunta/contestación) para el historial.
+CREATE TABLE IF NOT EXISTS agentes_conversaciones (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  agente_id       INT UNSIGNED NOT NULL,
+  usuario_id      INT UNSIGNED NULL,
+  institucion_id  INT UNSIGNED NULL,
+  rol             ENUM('system','user','assistant','tool') NOT NULL,
+  contenido       MEDIUMTEXT NULL,
+  herramienta     VARCHAR(80) NULL,
+  creado_en       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_agconv_agente (agente_id, creado_en),
+  CONSTRAINT fk_agconv_agente FOREIGN KEY (agente_id) REFERENCES agentes (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_femeci.agentes TO 'femeci_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_femeci.agentes_memoria TO 'femeci_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_femeci.agentes_conversaciones TO 'femeci_app'@'localhost';

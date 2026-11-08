@@ -19,7 +19,6 @@
  */
 require_once __DIR__ . '/../../servicios/espacio/paginas.php';
 require_once __DIR__ . '/../../servicios/clinica/agenda.php';
-require_once __DIR__ . '/../../servicios/cuenta/instituciones.php';
 
 $tituloPagina   = $tituloPagina   ?? 'Expediente clínico';
 $seccionActiva  = $seccionActiva  ?? '';
@@ -75,16 +74,16 @@ if (!$paginaActual) {
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="csrf" content="<?= tokenCsrf() ?>">
   <title><?= e($tituloPagina) ?> · Expedientes Clínicos</title>
-  <link rel="stylesheet" href="<?= recurso("css/estilos.css") ?>?v=<?= @filemtime(__DIR__ . "/../../assets/css/estilos.css") ?: time() ?>">
-  <?php foreach (glob(__DIR__ . "/../../../assets/css/modulos/*.css") as $hoja): $versionHoja = @filemtime($hoja) ?: time(); ?>
-    <link rel="stylesheet" href="<?= recurso("css/modulos/" . basename($hoja)) ?>?v=<?= $versionHoja ?>">
+  <link rel="stylesheet" href="<?= recurso("css/estilos.css") ?>">
+  <?php foreach (glob(__DIR__ . "/../../../assets/css/modulos/*.css") as $hoja): ?>
+    <link rel="stylesheet" href="<?= recurso("css/modulos/" . basename($hoja)) ?>">
   <?php endforeach; ?>
   <script nonce="<?= nonceCsp() ?>">
     // Aplica el estado guardado de la barra lateral antes de pintar, para evitar parpadeo.
     try { if (localStorage.getItem('lateral-oculta') === '1') document.documentElement.classList.add('lateral-oculta'); } catch (e) {}
   </script>
 </head>
-<body<?= !empty($modoDatosContextuales) ? ' class="datos-contextuales"' : '' ?> data-base="<?= URL_BASE ?>" data-usuario="<?= (int) $usuario['id'] ?>" data-usuario-nombre="<?= e($usuario['nombre']) ?>" data-usuario-foto="<?= !empty($usuario['foto']) ? e(URL_BASE . '/' . $usuario['foto']) : '' ?>" data-titulo="<?= e($tituloPagina) ?>" data-presencia="<?= e($clavePresencia) ?>"<?= !empty($pacienteActual) ? ' data-paciente="' . (int) $pacienteActual . '" data-paciente-nombre="' . e($tituloPagina) . '"' : '' ?><?= !empty($registroActual) ? ' data-registro="' . (int) $registroActual . '"' : '' ?><?= $paginaActual ? ' data-pagina="' . (int) $paginaActual['id'] . '" data-pagina-tipo="' . e($paginaActual['tipo']) . '"' : '' ?>>
+<body data-base="<?= URL_BASE ?>" data-usuario="<?= (int) $usuario['id'] ?>" data-usuario-nombre="<?= e($usuario['nombre']) ?>" data-usuario-foto="<?= !empty($usuario['foto']) ? e(URL_BASE . '/' . $usuario['foto']) : '' ?>" data-titulo="<?= e($tituloPagina) ?>" data-presencia="<?= e($clavePresencia) ?>"<?= !empty($pacienteActual) ? ' data-paciente="' . (int) $pacienteActual . '" data-paciente-nombre="' . e($tituloPagina) . '"' : '' ?><?= !empty($registroActual) ? ' data-registro="' . (int) $registroActual . '"' : '' ?><?= $paginaActual ? ' data-pagina="' . (int) $paginaActual['id'] . '" data-pagina-tipo="' . e($paginaActual['tipo']) . '"' : '' ?>>
 
 <div class="app">
 
@@ -119,23 +118,19 @@ if (!$paginaActual) {
     </button>
 
     <div class="lateral-inicio">
-      <a class="lateral-inicio__inicio<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/" title="Inicio" aria-label="Inicio"><?= iconoRelleno('casa') ?></a>
+      <a class="lateral-inicio__pastilla<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/"><?= iconoRelleno('casa') ?><span>Inicio</span></a>
       <a class="boton-icono<?= $seccionActiva === 'asistente' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/asistente/" title="Asistente de IA"><?= iconoRelleno('mensaje') ?></a>
       <?php if (puede('agenda')): ?>
         <a class="boton-icono<?= $seccionActiva === 'agenda' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/agenda/" title="Agenda"><?= iconoRelleno('calendario') ?></a>
       <?php endif; ?>
       <!-- Notificaciones: assets/js/modulos/notificaciones.js abre la bandeja y mantiene el punto de "sin leer" -->
       <button type="button" class="boton-icono campana" data-notificaciones-abrir aria-haspopup="dialog" aria-expanded="false" title="Notificaciones"><svg class="ir ir--campana" viewBox="0 0 24 24" aria-hidden="true"><g class="a-campana"><rect class="m" x="10.9" y="1.6" width="2.2" height="2.6" rx="1.1"/><path class="b" d="M12 3.2a6 6 0 0 0-6 6v3.4l-1.5 2.5a1.2 1.2 0 0 0 1 1.9h13a1.2 1.2 0 0 0 1-1.9L18 12.6V9.2a6 6 0 0 0-6-6z"/></g><path class="d a-badajo" d="M9.5 18.2h5a2.5 2.5 0 0 1-5 0z"/></svg><span class="campana__punto" data-notificaciones-punto hidden></span></button>
-      <?php if (($usuario['rol'] ?? '') !== 'paciente'): ?>
-        <button type="button" class="boton-icono<?= $seccionActiva === 'equipo' ? ' activo' : '' ?>" data-equipo-abrir aria-haspopup="dialog" aria-expanded="false" aria-controls="equipo-panel" title="Personas" aria-label="Personas"><?= iconoRelleno('usuarios') ?></button>
-      <?php endif; ?>
     </div>
 
     <!-- Cada sección se pliega con su título (se recuerda en este navegador) -->
     <div class="barra-lateral__desplazable">
       <script type="application/json" id="arbol-paginas"><?= json_encode($arbol, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 
-      <a class="lateral-enlace<?= $seccionActiva === 'tablero' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/tablero/"<?= $seccionActiva === 'tablero' ? ' aria-current="page"' : '' ?>><?= icono('grafica') ?><span>Tablero</span></a>
       <?php if (puede('agenda')): $proximas = proximasCitas((int) $usuario['id'], 4); ?>
         <div class="lateral-seccion" data-plegable="eventos">
           <div class="lateral-seccion__titulo">
@@ -179,12 +174,18 @@ if (!$paginaActual) {
         </div>
         <div class="lateral-seccion__contenido">
           <a class="lateral-enlace<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/"<?= $enListado ? ' aria-current="page"' : '' ?>><?= iconoRelleno('usuarios') ?><span>Pacientes</span></a>
-        <?php if (puede('conexiones') || puede('configurar')): ?>
-          <a class="lateral-enlace<?= $seccionActiva === 'conexiones' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/conexiones/"<?= $seccionActiva === 'conexiones' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('usuarios') ?><span>Conexiones con clínicas</span></a>
-        <?php endif; ?>
         </div>
       </div>
 
+
+      <div class="lateral-seccion" data-plegable="agentes">
+        <div class="lateral-seccion__titulo">
+          <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Agentes<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
+        </div>
+        <div class="lateral-seccion__contenido">
+          <a class="lateral-enlace<?= $seccionActiva === 'agentes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/agentes/"<?= $seccionActiva === 'agentes' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('chispa') ?><span>Agentes</span></a>
+        </div>
+      </div>
 
       <div class="lateral-seccion" data-plegable="catalogos">
         <div class="lateral-seccion__titulo">
@@ -243,7 +244,7 @@ if (!$paginaActual) {
           <?= avatar((int) $usuario['id'], $usuario['nombre'], $usuario['foto'] ?? null) ?>
           <input type="file" accept="image/jpeg,image/png,image/webp" data-foto-perfil hidden>
         </label>
-        <a class="barra-lateral__persona" href="<?= URL_BASE ?>/equipo/persona.php?id=<?= (int) $usuario['id'] ?>" title="Tu perfil: actividad, páginas y firma"><?= e($usuario['nombre']) ?></a>
+        <a class="barra-lateral__persona" href="<?= URL_BASE ?>/configuracion/" title="Configuración: tu cuenta, notificaciones y la clínica"><?= e($usuario['nombre']) ?></a>
         <button type="submit" class="boton-icono" title="Cerrar sesión"><?= icono('salir') ?></button>
       </form>
     </div>
@@ -333,19 +334,6 @@ if (!$paginaActual) {
         </div>
       </div>
     </header>
-
-    <?php if ($mostrarBanner && empty($ocultarAvisoDatos) && puede('configurar')):
-        $avisoInstitucion = institucionActual();
-        if (institucionIncompleta($avisoInstitucion)): ?>
-      <!-- Datos de la clínica incompletos: aparecen en notas, recetas y avisos (NOM-004); el administrador los completa aquí -->
-      <div class="aviso-papelera aviso-papelera--datos" role="status">
-        <span>Falta el domicilio y la entidad de <b><?= e($avisoInstitucion['nombre']) ?></b>: por eso no aparecen en las notas, recetas ni en el aviso de privacidad.</span>
-        <span class="aviso-papelera__acciones">
-          <a href="<?= URL_BASE ?>/configuracion/?s=clinica" class="aviso-datos__enlace"><?= icono('candado') ?> Completar los datos de la clínica</a>
-          <button type="button" data-aviso-datos-ocultar><?= icono('cerrar') ?> Recordar más tarde</button>
-        </span>
-      </div>
-    <?php endif; endif; ?>
 
     <?php if ($paginaActual && $paginaActual['en_papelera']): ?>
       <!-- Página en la papelera: se puede restaurar (o eliminar definitivamente si eres quien la creó) -->

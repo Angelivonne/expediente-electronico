@@ -37,9 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!csrfValido()) {
         $error = 'La sesión expiró. Vuelve a intentarlo.';
-    } elseif (RECAPTCHA_SITE_KEY !== '' && $correo !== '' && ($_POST['g-recaptcha-response'] ?? '') !== '' && !recaptchaVerificar((string) $_POST['g-recaptcha-response'])) {
-        $error = 'Verifica que no eres un robot (reCAPTCHA).';
-
     } elseif ($correo === '' || $clave === '' || mb_strlen($correo) > 160 || strlen($clave) > 1024) {
         $error = 'Escribe tu correo y tu contraseña.';
     } elseif (!dentroDelLimite('acceso:ip:' . ipCliente(), INTENTOS_POR_IP, VENTANA_SEGUNDOS)
@@ -51,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $consulta = db()->prepare('SELECT * FROM usuarios WHERE correo = ?');
         $consulta->execute([$correo]);
         $usuario = $consulta->fetch();
-        $debugInfo = 'usuario=' . ($usuario ? 'found(id=' . $usuario['id'] . ',activo=' . $usuario['activo'] . ')' : 'NOT FOUND');
 
         $claveValida = $usuario && password_verify($clave, $usuario['clave_hash'] ?? HASH_SIMULADO);
 
@@ -81,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $notificacion = ['tipo' => 'error', 'texto' => $error . ' [DBG: ' . ($debugInfo ?? 'n/a') . ']'];
+    $notificacion = ['tipo' => 'error', 'texto' => $error];
 }
 
 $tituloPagina = 'Iniciar sesión';
@@ -115,46 +111,6 @@ require __DIR__ . '/../app/vistas/plantilla/acceso_encabezado.php';
       <a class="acceso__olvide" href="<?= URL_BASE ?>/acceso/recuperar.php">¿Olvidaste tu contraseña?</a>
     </div>
   </div>
-
-<?php if (RECAPTCHA_SITE_KEY !== '' && $correo !== ''): ?>
-  <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
-  <script nonce="<?= nonceCsp() ?>">
-    (function() {
-      var siteKey = '<?= e(RECAPTCHA_SITE_KEY) ?>';
-      function getToken() {
-        if (typeof grecaptcha === 'undefined') return;
-        grecaptcha.ready(function() {
-          grecaptcha.execute(siteKey, {action: 'login'}).then(function(token) {
-            var el = document.getElementById('g-recaptcha-response');
-            if (el) el.value = token;
-          });
-        });
-      }
-      // Obtener token al cargar la pagina
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', getToken);
-      } else {
-        getToken();
-      }
-      // Y tambien al enviar el formulario (por si el token expiro)
-      var form = document.querySelector('form.acceso__formulario');
-      if (form) {
-        form.addEventListener('submit', function(e) {
-          var token = document.getElementById('g-recaptcha-response').value;
-          if (!token && typeof grecaptcha !== 'undefined') {
-            e.preventDefault();
-            grecaptcha.ready(function() {
-              grecaptcha.execute(siteKey, {action: 'login'}).then(function(t) {
-                document.getElementById('g-recaptcha-response').value = t;
-                form.submit();
-              });
-            });
-          }
-        });
-      }
-    })();
-  </script>
-<?php endif; ?>
 
   <button type="submit" class="acceso__boton acceso__boton--claro" data-texto-final="Iniciar sesión">
     <?= $correo !== '' ? 'Iniciar sesión' : 'Continuar con correo' ?>

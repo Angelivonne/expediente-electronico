@@ -16,17 +16,13 @@ $tituloPagina = $tituloPagina ?? 'Acceso';
   <link rel="stylesheet" href="<?= recurso("css/estilos.css") ?>">
   <link rel="stylesheet" href="<?= recurso("css/modulos/movil.css") ?>">
   <link rel="stylesheet" href="<?= recurso("css/modulos/controles.css") ?>">
-  <link rel="stylesheet" href="<?= recurso("css/modulos/acceso.css") ?>">
 <?php foreach ($hojasAcceso ?? [] as $hoja): ?>
   <link rel="stylesheet" href="<?= recurso($hoja) ?>">
 <?php endforeach; ?>
-<?php if (RECAPTCHA_SITE_KEY !== ''): ?>
-  <script src="https://www.google.com/recaptcha/api.js?render=<?= e(RECAPTCHA_SITE_KEY) ?>" async defer></script>
-<?php endif; ?>
 </head>
 <body class="acceso" data-base="<?= URL_BASE ?>">
 
-<main class="acceso__ventana<?= !empty($claseVentana) ? ' ' . e($claseVentana) : '' ?>">
+<main class="acceso__ventana">
   <section class="acceso__panel">
     <span class="acceso__marca">Expedientes Clínicos</span>
     <div class="acceso__contenido<?= !empty($claseContenido) ? ' ' . e($claseContenido) : '' ?>">
