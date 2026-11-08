@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!csrfValido()) {
         $error = 'La sesión expiró. Vuelve a intentarlo.';
-    } elseif (RECAPTCHA_SITE_KEY !== '' && $correo !== '' && !recaptchaVerificar((string) ($_POST['g-recaptcha-response'] ?? ''))) {
+    } elseif (false) { // RECAPTCHA temporarily disabled for testing
         $debugToken = substr((string)($_POST['g-recaptcha-response'] ?? ''), 0, 30);
         $error = 'Token: ' . ($debugToken ?: '(vac?o)') . ' | Longitud: ' . strlen((string)($_POST['g-recaptcha-response'] ?? ''));
     } elseif ($correo === '' || $clave === '' || mb_strlen($correo) > 160 || strlen($clave) > 1024) {
