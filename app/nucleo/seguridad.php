@@ -57,7 +57,8 @@ function enviarCabecerasSeguridad(): void
         return;
     }
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443';
+        || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443'
+        || (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
     $ipCliente = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
     $esLoopback = in_array($ipCliente, ['127.0.0.1', '::1'], true)
         || str_starts_with($ipCliente, '::ffff:127.');
