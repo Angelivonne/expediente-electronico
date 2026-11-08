@@ -1,5 +1,4 @@
 <?php
-// Import SQL schema
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 
@@ -9,22 +8,32 @@ if (!file_exists($sqlFile)) {
 }
 
 $sql = file_get_contents($sqlFile);
-$pdo = db();
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-// Split by semicolons (basic approach)
-$statements = array_filter(array_map('trim', explode(';', $sql)));
-$count = 0;
-$errors = 0;
-foreach ($statements as $stmt) {
-    if (empty($stmt) || strpos($stmt, '--') === 0) continue;
-    try {
-        $pdo->exec($stmt);
-        $count++;
-    } catch (Throwable $e) {
-        $errors++;
-        echo "Error: " . $e->getMessage() . "\n";
-        echo "Stmt: " . substr($stmt, 0, 100) . "...\n";
-    }
+// Replace old DB name with new one
+$sql = str_replace('expediente_expediente', DB_NOMBRE, $sql);
+// Remove USE statement (we're already connected to the right DB)
+$sql = preg_replace('/USE\s+\w+\s*;/i', '', $sql);
+
+$mysqli = new mysqli(DB_HOST, DB_USUARIO, DB_CLAVE, DB_NOMBRE, DB_PUERTO);
+if ($mysqli->connect_error) {
+    die("Connection failed: " . $mysqli->connect_error . "\n");
 }
-echo "Executed $count statements, $errors errors\n";
+$mysqli->set_charset('utf8mb4');
+
+// Use multi_query
+if ($mysqli->multi_query($sql)) {
+    $count = 0;
+    do {
+        if ($result = $mysqli->store_result()) {
+            $result->free();
+        }
+        $count++;
+    } while ($mysqli->more_results() && $mysqli->next_result());
+    echo "Executed successfully. Queries: $count\n";
+    if ($mysqli->error) {
+        echo "Last error: " . $mysqli->error . "\n";
+    }
+} else {
+    echo "Error: " . $mysqli->error . "\n";
+}
+$mysqli->close();
