@@ -134,7 +134,7 @@ $migas          = [['texto' => 'Expediente'], ['texto' => 'CIE-10', 'url' => '/c
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
 
-<script>
+<script nonce="<?= nonceCsp() ?>">
 (() => {
   const input = document.querySelector('[data-cie]');
   if (!input) return;
