@@ -85,7 +85,8 @@ if (!move_uploaded_file($audio['tmp_name'], $archivoTemporal)) {
 }
 
 // Llamar al servicio STT local (modelo cargado en memoria, más rápido)
-$ch = curl_init('http://127.0.0.1:8766/');
+$sttUrl = getenv('STT_URL') ?: 'http://127.0.0.1:8766/';
+$ch = curl_init($sttUrl);
 curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_POSTFIELDS => file_get_contents($archivoTemporal),
