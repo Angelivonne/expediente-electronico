@@ -18,6 +18,7 @@ mb_http_output('UTF-8');
 ini_set('default_charset', 'UTF-8');
 
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/reparar_esquema.php';
 require_once __DIR__ . '/funciones.php';
 require_once __DIR__ . '/../vistas/plantilla/iconos.php';
 require_once __DIR__ . '/../datos/catalogos.php';
