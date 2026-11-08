@@ -118,18 +118,38 @@ require __DIR__ . '/../app/vistas/plantilla/acceso_encabezado.php';
   <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
   <script>
     (function() {
-      var form = document.querySelector('form.acceso__formulario');
-      if (!form) return;
-      form.addEventListener('submit', function(e) {
+      var siteKey = '<?= e(RECAPTCHA_SITE_KEY) ?>';
+      function getToken() {
         if (typeof grecaptcha === 'undefined') return;
-        e.preventDefault();
         grecaptcha.ready(function() {
-          grecaptcha.execute('<?= e(RECAPTCHA_SITE_KEY) ?>', {action: 'login'}).then(function(token) {
-            document.getElementById('g-recaptcha-response').value = token;
-            form.submit();
+          grecaptcha.execute(siteKey, {action: 'login'}).then(function(token) {
+            var el = document.getElementById('g-recaptcha-response');
+            if (el) el.value = token;
           });
         });
-      });
+      }
+      // Obtener token al cargar la pagina
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', getToken);
+      } else {
+        getToken();
+      }
+      // Y tambien al enviar el formulario (por si el token expiro)
+      var form = document.querySelector('form.acceso__formulario');
+      if (form) {
+        form.addEventListener('submit', function(e) {
+          var token = document.getElementById('g-recaptcha-response').value;
+          if (!token && typeof grecaptcha !== 'undefined') {
+            e.preventDefault();
+            grecaptcha.ready(function() {
+              grecaptcha.execute(siteKey, {action: 'login'}).then(function(t) {
+                document.getElementById('g-recaptcha-response').value = t;
+                form.submit();
+              });
+            });
+          }
+        });
+      }
     })();
   </script>
 <?php endif; ?>
