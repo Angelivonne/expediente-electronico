@@ -10,6 +10,8 @@ $pdo = db();
 echo "Step 4: db connected\n";
 require_once __DIR__ . "/app/nucleo/funciones.php";
 echo "Step 5: funciones loaded\n";
+require_once __DIR__ . "/app/nucleo/seguridad.php";
+echo "Step 5b: seguridad loaded\n";
 require_once __DIR__ . "/app/nucleo/configuracion.php";
 echo "Step 6: configuracion loaded\n";
 require_once __DIR__ . "/app/nucleo/institucion.php";
