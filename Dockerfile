@@ -1,9 +1,12 @@
 FROM php:8.2-apache
 
-# Disable ALL MPMs first, then enable only prefork
-RUN a2dismod mpm_event || true
-RUN a2dismod mpm_worker || true
-RUN a2dismod mpm_prefork || true
+# Find and disable ALL MPM-related config files
+RUN find /etc/apache2 -name "*mpm*" -type f && echo "---" && ls /etc/apache2/mods-enabled/ | grep mpm
+
+# Remove all MPM module symlinks
+RUN rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf
+
+# Enable only prefork
 RUN a2enmod mpm_prefork
 
 # Enable Apache modules
