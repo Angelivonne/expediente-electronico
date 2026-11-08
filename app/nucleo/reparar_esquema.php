@@ -3,13 +3,14 @@
  * Auto-reparación de esquema: columnas que faltan en tablas ya existentes (Railway, despliegues
  * antiguos). Se ejecuta en cada arranque y es segura de repetir: solo añade lo que falta.
  *
- * Descubre automáticamente qué tablas necesitan `institucion_id` consultando el registro de
- * entidades (entidadesMotor) y los catálogos del sistema, además de tablas conocidas que la
- * usan directamente en SQL. El esquema ideal vive en database/esquema.sql.
+ * Estrategia definitiva: recorre TODAS las tablas de la base de datos actual y agrega
+ * `institucion_id` a las que no la tengan. Esto cubre cualquier consulta SQL directa que use
+ * la columna (hay +100 lugares en el código), no solo las entidades del motor.
+ *
+ * El esquema ideal vive en database/esquema.sql. Es un no-op en bases de datos ya al día.
  */
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../servicios/motor/entidades.php';
 
 function repararColumnaFaltante(string $tabla, string $columna, string $definicion): void
 {
@@ -35,7 +36,7 @@ function repararColumnaFaltante(string $tabla, string $columna, string $definici
     }
 }
 
-/** Cache de existencia de columnas por petición para no repetir consultas en cada listado. */
+/** Cache de existencia de columnas por petición. */
 function columnaExiste(string $tabla, string $columna): bool
 {
     static $cache = [];
@@ -56,44 +57,42 @@ function columnaExiste(string $tabla, string $columna): bool
     return $cache[$clave];
 }
 
-// --- Descubrir tablas que necesitan institucion_id desde el registro de entidades ---
-$tablasInstitucion = [];
-try {
-    $entidades = entidadesMotor();
-    foreach ($entidades as $entidad) {
-        $almacen = $entidad['almacen'] ?? [];
-        if (!empty($almacen['institucion']) && !empty($almacen['tabla'])) {
-            $tablasInstitucion[$almacen['tabla']] = true;
-        }
-    }
-    // Catálogos del sistema: algunos también declosan institucion
-    if (function_exists('catalogosSistema')) {
-        foreach (catalogosSistema() as $clave => $catalogo) {
-            if (!empty($catalogo['institucion']) && !empty($catalogo['tabla'])) {
-                $tablasInstitucion[$catalogo['tabla']] = true;
-            }
-        }
-    }
-} catch (Throwable $e) {
-    error_log('[reparar_esquema] no se pudo leer entidadesMotor/catalogosSistema: ' . $e->getMessage());
-}
-
-// Tablas adicionales conocidas que usan institucion_id directamente en SQL
-$tablasExtra = [
-    'usuarios' => true,
-    'bitacora' => true,
-    'sincronizacion_cola' => true,
+/** Tablas del sistema de MySQL que nunca deben tocarse. */
+$tablasSistema = [
+    'information_schema' => true,
+    'mysql' => true,
+    'performance_schema' => true,
+    'sys' => true,
 ];
 
-// Reparar todas las tablas descubiertas + extras
-foreach (array_merge($tablasInstitucion, $tablasExtra) as $tabla => $_) {
-    repararColumnaFaltante($tabla, 'institucion_id', 'INT UNSIGNED NULL');
+// Obtener todas las tablas de la base de datos actual
+$tablas = [];
+try {
+    $consulta = db()->query(
+        "SELECT TABLE_NAME FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'"
+    );
+    foreach ($consulta->fetchAll() as $fila) {
+        $nombre = (string) $fila['TABLE_NAME'];
+        if (isset($tablasSistema[$nombre])) {
+            continue;
+        }
+        $tablas[] = $nombre;
+    }
+} catch (Throwable $e) {
+    error_log('[reparar_esquema] no se pudo listar tablas: ' . $e->getMessage());
 }
 
-// configuracion usa NOT NULL DEFAULT 0 (tiene filas existentes en despliegues viejos)
-repararColumnaFaltante('configuracion', 'institucion_id', 'INT UNSIGNED NOT NULL DEFAULT 0');
+// Agregar institucion_id a todas las tablas de datos que no la tengan
+foreach ($tablas as $tabla) {
+    if ($tabla === 'configuracion') {
+        repararColumnaFaltante('configuracion', 'institucion_id', 'INT UNSIGNED NOT NULL DEFAULT 0 FIRST');
+    } else {
+        repararColumnaFaltante($tabla, 'institucion_id', 'INT UNSIGNED NULL');
+    }
+}
 
-// Otras columnas útiles del esquema actual
+// Otras columnas útiles del esquema actual (idempotentes)
 repararColumnaFaltante('users', 'paciente_id', 'INT UNSIGNED NULL');
 repararColumnaFaltante('usuarios', 'paciente_id', 'INT UNSIGNED NULL');
 repararColumnaFaltante('usuarios', 'foto', 'VARCHAR(255) NULL');
