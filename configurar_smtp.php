@@ -9,7 +9,7 @@ $cfg = array(
     'puerto'     => 587,
     'seguridad'  => 'tls',
     'usuario'    => 'angelzamora33331@gmail.com',
-    'clave'      => 'dhib gyfn betj jpdn',
+    'clave'      => 'dhibgyfnbetjjpdn',
     'remitente'  => 'angelzamora33331@gmail.com',
     'nombre'     => 'Expedientes Clinicos',
 );
