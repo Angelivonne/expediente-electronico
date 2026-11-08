@@ -34,7 +34,7 @@ define('GOOGLE_CLIENT_ID', '');
 
 // Acceso directo en este equipo: true = se entra como administrador sin escribir contraseña ni código
 // (sirve en equipo propio/local). Ponlo en false para exigir el inicio de sesión normal con clave y código.
-define('ACCESO_AUTOMATICO', false);
+define('ACCESO_AUTOMATICO', filter_var(getenv('ACCESO_AUTOMATICO') ?: 'false', FILTER_VALIDATE_BOOLEAN));
 
 // Verificación de cédulas en el Registro Nacional de Profesionistas (SEP). El portal oficial exige
 // reCAPTCHA y no hay un servicio público: queda vacío hasta contar con un servicio autorizado (HTTPS)
