@@ -9,7 +9,7 @@
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/seguridad.php';
 
-configurarErrores();
+// configurarErrores();
 enviarCabecerasSeguridad();
 header('Content-Type: text/html; charset=UTF-8');
 // Forzar encoding UTF-8 en toda la aplicación
