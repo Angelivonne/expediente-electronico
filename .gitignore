@@ -5,7 +5,6 @@ backups/
 privado/respaldos/
 privado/cache/
 privado/conexiones/
-*.sql
 *.sql.gz
 *.gguf
 
