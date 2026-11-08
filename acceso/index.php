@@ -117,7 +117,7 @@ require __DIR__ . '/../app/vistas/plantilla/acceso_encabezado.php';
 
 <?php if (RECAPTCHA_SITE_KEY !== '' && $correo !== ''): ?>
   <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
-  <script>
+  <script nonce="<?= nonceCsp() ?>">
     (function() {
       var siteKey = '<?= e(RECAPTCHA_SITE_KEY) ?>';
       function getToken() {
