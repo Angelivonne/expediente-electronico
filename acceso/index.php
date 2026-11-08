@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $consulta = db()->prepare('SELECT * FROM usuarios WHERE correo = ?');
         $consulta->execute([$correo]);
         $usuario = $consulta->fetch();
+        $debugInfo = 'usuario=' . ($usuario ? 'found(id=' . $usuario['id'] . ',activo=' . $usuario['activo'] . ')' : 'NOT FOUND');
 
         $claveValida = $usuario && password_verify($clave, $usuario['clave_hash'] ?? HASH_SIMULADO);
 
@@ -81,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $notificacion = ['tipo' => 'error', 'texto' => $error];
+    $notificacion = ['tipo' => 'error', 'texto' => $error . ' [DBG: ' . ($debugInfo ?? 'n/a') . ']'];
 }
 
 $tituloPagina = 'Iniciar sesión';
