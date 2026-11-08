@@ -16,6 +16,7 @@ $tituloPagina = $tituloPagina ?? 'Acceso';
   <link rel="stylesheet" href="<?= recurso("css/estilos.css") ?>">
   <link rel="stylesheet" href="<?= recurso("css/modulos/movil.css") ?>">
   <link rel="stylesheet" href="<?= recurso("css/modulos/controles.css") ?>">
+  <link rel="stylesheet" href="<?= recurso("css/modulos/acceso.css") ?>">
 <?php foreach ($hojasAcceso ?? [] as $hoja): ?>
   <link rel="stylesheet" href="<?= recurso($hoja) ?>">
 <?php endforeach; ?>
