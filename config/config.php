@@ -30,7 +30,8 @@ define('MAIL_CARPETA',   'C:/xampp/mailoutput');
 define('MAIL_REMITENTE', 'no-responder@expediente.local');
 
 // Inicio de sesión con Google: el botón aparece solo cuando hay credenciales OAuth configuradas.
-define('GOOGLE_CLIENT_ID', '');
+define('GOOGLE_CLIENT_ID', getenv('GOOGLE_CLIENT_ID') ?: '');
+define('GOOGLE_CLIENT_SECRET', getenv('GOOGLE_CLIENT_SECRET') ?: '');
 
 // reCAPTCHA v2 (checkbox): protege el inicio de sesi?n y el registro contra bots.
 // Obt?n tus claves en https://www.google.com/recaptcha/admin (tipo: reCAPTCHA v2 "No soy un robot")
