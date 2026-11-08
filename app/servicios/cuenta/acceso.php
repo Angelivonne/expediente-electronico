@@ -12,6 +12,14 @@ const CODIGO_ESPERA_REENVIO = 60; // segundos
 /** Envía un correo de texto. Devuelve true si se entregó (o se guardó, en modo archivo). */
 function enviarCorreo(string $para, string $asunto, string $texto): bool
 {
+    require_once __DIR__ . '/correo_api.php';
+    if ($api = configuracionCorreoApi()) {
+        $error = enviarCorreoApi($api, $para, $asunto, $texto);
+        if ($error !== null) {
+            error_log('[correo-api] ' . $error);
+        }
+        return $error === null;
+    }
     // Con un servidor de correo configurado (Personas y permisos › Correo) el correo sale de verdad
     require_once __DIR__ . '/smtp.php';
     if ($smtp = configuracionSmtp()) {
