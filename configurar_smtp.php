@@ -24,6 +24,8 @@ echo $ok ? "SMTP configurado correctamente\n" : "Error al guardar SMTP\n";
 
 if ($ok) {
     require_once __DIR__ . "/app/servicios/cuenta/smtp.php";
-    $resultado = enviarCorreo('angelzamora33331@gmail.com', 'Prueba de correo - Expediente', 'Este es un correo de prueba del sistema Expediente Clinico.');
-    echo $resultado ? "Correo de prueba enviado OK\n" : "Error al enviar correo de prueba\n";
+    require_once __DIR__ . '/app/servicios/cuenta/smtp.php';
+    $smtp = configuracionSmtp();
+    $error = enviarSmtp($smtp, 'angelzamora33331@gmail.com', 'Prueba de correo - Expediente', 'Este es un correo de prueba.');
+    echo $error === null ? "Correo de prueba enviado OK\n" : "Error SMTP: $error\n";
 }
