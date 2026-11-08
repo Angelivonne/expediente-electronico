@@ -28,6 +28,7 @@ $sql = preg_replace('/ADD (INDEX|UNIQUE INDEX|UNIQUE KEY|KEY) (\w+) IF NOT EXIST
 $sql = preg_replace('/ADD CONSTRAINT (\w+) IF NOT EXISTS/i', 'ADD CONSTRAINT $1', $sql);
 // Handle: ADD FOREIGN KEY IF NOT EXISTS
 $sql = preg_replace('/ADD FOREIGN KEY IF NOT EXISTS/i', 'ADD FOREIGN KEY', $sql);
+$sql = preg_replace('/FOREIGN KEY IF NOT EXISTS/i', 'FOREIGN KEY', $sql);
 
 $mysqli->multi_query($sql);
 $count = 0;
