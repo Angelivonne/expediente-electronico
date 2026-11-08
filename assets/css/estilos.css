@@ -2257,8 +2257,8 @@ body.acceso {
   place-items: center;
   min-height: 100vh;
   padding: 16px;
-  /* Sin paisaje de fondo: solo la ventana de acceso con la pintura a un lado */
-  background: #0f0f0f;
+  /* Fondo gris completo */
+  background: #1a1a1a;
 }
 
 .acceso__ventana {
@@ -2266,7 +2266,7 @@ body.acceso {
   /* Ocupa toda la pantalla: formulario a la izquierda y la pintura llenando el resto */
   grid-template-columns: minmax(400px, 40%) 1fr;
   width: 100%;
-  max-width: 1800px;
+  max-width: none;
   height: calc(100dvh - 32px);
   min-height: 520px;
   padding: 8px;
