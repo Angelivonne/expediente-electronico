@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Modo desarrollo (archivo): saltar verificación de código y entrar directamente
             if (MAIL_MODO === 'archivo') {
                 completarAcceso($usuario);
+                echo 'DEBUG_OK';
                 redirigir(rutaInicio());
             } elseif (crearYEnviarCodigo($usuario)) {
                 session_regenerate_id(true);
