@@ -6,7 +6,6 @@
     <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-7.jpeg') ?>" alt="">
     <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-8.jpeg') ?>" alt="">
     <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-9.jpeg') ?>" alt="">
-    <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-10.jpeg') ?>" alt="">
     <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-11.jpeg') ?>" alt="">
     <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-12.jpeg') ?>" alt="">
     <video class="acceso__diapositiva" data-src="<?= recurso('img/acceso/video-acceso.mp4') ?>" muted playsinline loop preload="none"></video>
