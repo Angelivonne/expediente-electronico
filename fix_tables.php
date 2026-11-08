@@ -12,7 +12,7 @@ $mysqli->set_charset('utf8mb4');
 $sql = file_get_contents(__DIR__ . '/database/esquema.sql');
 
 // Extract CREATE TABLE statements for missing tables
-$missingTables = array('codigos_acceso', 'codigos_acceso_usos', 'imagenes_medicas', 'push_suscripciones', 'push_avisos_enviados', 'push_cola', 'push_preferencias', 'recuperaciones_clave', 'sincronizacion_cola', 'finanzas_movimientos', 'finanzas_cuentas', 'finanzas_categorias');
+$missingTables = array('codigos_acceso', 'codigos_acceso_usos', 'imagenes_medicas', 'push_suscripciones', 'push_avisos_enviados', 'push_cola', 'push_preferencias', 'recuperaciones_clave', 'sincronizacion_cola');
 
 // Find each CREATE TABLE block
 foreach ($missingTables as $table) {
@@ -73,12 +73,42 @@ if (!$check || $check->num_rows == 0) {
     }
 }
 
+// Run finanzas migrations
+$finanzasFiles = array('migracion_finanzas.sql', 'migracion_finanzas_cancelacion.sql', 'migracion_finanzas_cierre.sql', 'migracion_finanzas_cierre_diferencia.sql', 'migracion_finanzas_conciliacion.sql', 'migracion_finanzas_establecimiento.sql', 'migracion_finanzas_facturacion.sql', 'migracion_finanzas_presupuesto.sql', 'migracion_finanzas_profesional.sql');
+foreach ($finanzasFiles as $f) {
+    $path = __DIR__ . '/database/' . $f;
+    if (!file_exists($path)) continue;
+    $sql = file_get_contents($path);
+    $sql = str_replace('expediente_expediente', DB_NOMBRE, $sql);
+    $sql = preg_replace('/USE\s+\w+\s*;/i', '', $sql);
+    // Execute using multi_query
+    @$mysqli->multi_query($sql);
+    $ec = 0;
+    do {
+        if ($r = $mysqli->store_result()) $r->free();
+        if ($mysqli->error) {
+            $ec++;
+            if ($ec <= 3) echo "  Finanzas error ($f): " . $mysqli->error . "\n";
+        }
+        try { $hm = $mysqli->more_results(); } catch (Throwable $e) { $hm = false; }
+        if ($hm) {
+            try { $mysqli->next_result(); } catch (Throwable $e) { break; }
+        }
+    } while ($hm);
+    echo "  Ran $f\n";
+}
+
 // Create admin user if not exists
 $st = $mysqli->query("SELECT COUNT(*) FROM usuarios");
 if ($st && $st->fetch_row()[0] == 0) {
     $hash = password_hash('Admin123!', PASSWORD_DEFAULT);
-    $mysqli->query("INSERT INTO instituciones (id, nombre, tipo, domicilio, entidad, creada_por) VALUES (1, 'Mi Clinica', 'clinica', '', '01', 1)");
-    $mysqli->query("INSERT INTO usuarios (nombre, correo, clave_hash, rol, activo, creado_en, institucion_id) VALUES ('Angel', 'angelzamora@test.com', '$hash', 'administrador', 1, NOW(), 1)");
+    // Insert user first (without institution)
+    $mysqli->query("INSERT INTO usuarios (nombre, correo, clave_hash, rol, activo, creado_en) VALUES ('Angel', 'angelzamora@test.com', '$hash', 'administrador', 1, NOW())");
+    $userId = $mysqli->insert_id;
+    // Then create institution referencing the user
+    $mysqli->query("INSERT INTO instituciones (id, nombre, tipo, domicilio, entidad, creada_por) VALUES (1, 'Mi Clinica', 'clinica', '', '01', $userId)");
+    // Then link user to institution
+    $mysqli->query("UPDATE usuarios SET institucion_id = 1 WHERE id = $userId");
     echo "Admin created: angelzamora@test.com / Admin123!\n";
 }
 
