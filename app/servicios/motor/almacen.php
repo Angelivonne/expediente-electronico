@@ -32,8 +32,15 @@ function motorCondiciones(array $entidad, array $opciones): array
     $params  = [];
 
     if (!empty($almacen['institucion'])) {
-        $params[] = motorInstitucion($opciones);
-        $where[]  = 'c.institucion_id = ?';
+        $tabla = (string) ($almacen['tabla'] ?? '');
+        $tieneInstitucion = true;
+        if (function_exists('columnaExiste') && $tabla !== '') {
+            $tieneInstitucion = columnaExiste($tabla, 'institucion_id');
+        }
+        if ($tieneInstitucion) {
+            $params[] = motorInstitucion($opciones);
+            $where[]  = 'c.institucion_id = ?';
+        }
     }
     if (!empty($almacen['baja'])) {
         if (preg_match('/^[a-z0-9_]{1,40}$/', (string) $almacen['baja'])) {

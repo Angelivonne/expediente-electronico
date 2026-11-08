@@ -18,18 +18,41 @@ function repararColumnaFaltante(string $tabla, string $columna, string $definici
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
         );
         $consulta->execute([$tabla, $columna]);
-        $existe = $consulta->fetchColumn();
+        $existe = (int) $consulta->fetchColumn();
     } catch (Throwable $e) {
-        return; // sin BD o sin permisos: no es falla crítica al arrancar
+        error_log('[reparar_esquema] verificar ' . $tabla . '.' . $columna . ': ' . $e->getMessage());
+        return;
     }
-    if ((int) $existe > 0) {
+    if ($existe > 0) {
         return;
     }
     try {
         db()->exec("ALTER TABLE `$tabla` ADD COLUMN $definicion");
+        error_log('[reparar_esquema] añadido ' . $tabla . '.' . $columna);
     } catch (Throwable $e) {
-        // Columna ya existe (condición de carrera) o no se puede añadir: ignora.
+        error_log('[reparar_esquema] fallo ' . $tabla . '.' . $columna . ': ' . $e->getMessage());
     }
+}
+
+/** Cache de existencia de columnas por petición para no repetir consultas en cada listado. */
+function columnaExiste(string $tabla, string $columna): bool
+{
+    static $cache = [];
+    $clave = $tabla . '.' . $columna;
+    if (array_key_exists($clave, $cache)) {
+        return $cache[$clave];
+    }
+    try {
+        $consulta = db()->prepare(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+        );
+        $consulta->execute([$tabla, $columna]);
+        $cache[$clave] = (int) $consulta->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        $cache[$clave] = false;
+    }
+    return $cache[$clave];
 }
 
 // --- Columnas institucion_id añadidas en un esquema posterior a la creación de la tabla.
@@ -50,7 +73,15 @@ repararColumnaFaltante('configuracion', 'institucion_id', 'INT UNSIGNED NOT NULL
 // Tabla de sincronización: la columna institucion_id se creó en un esquema posterior.
 repararColumnaFaltante('sincronizacion_cola', 'institucion_id', 'INT UNSIGNED NULL AFTER uuid');
 
-// Portal del paciente: cuenta ligada a su propio expediente (solo lectura).
+// Portal del paciente / cuentas: ligas y multi-institución.
 repararColumnaFaltante('users', 'paciente_id', 'INT UNSIGNED NULL AFTER rol');
+repararColumnaFaltante('usuarios', 'institucion_id', 'INT UNSIGNED NULL AFTER id');
+repararColumnaFaltante('usuarios', 'paciente_id', 'INT UNSIGNED NULL AFTER rol');
+repararColumnaFaltante('usuarios', 'foto', 'VARCHAR(255) NULL AFTER correo');
+
+// Registros clínicos/financieros con aislamiento por institución cuando aplique.
+repararColumnaFaltante('notas_medicas', 'institucion_id', 'INT UNSIGNED NULL AFTER id');
+repararColumnaFaltante('recetas', 'institucion_id', 'INT UNSIGNED NULL AFTER id');
+repararColumnaFaltante('estudios', 'institucion_id', 'INT UNSIGNED NULL AFTER id');
 
 // (Añadir aquí más reparaciones cuando el esquema evolucione.)
