@@ -7,8 +7,8 @@ if ($st->fetchColumn() > 0) {
     echo "Admin already exists\n";
     exit;
 }
-$pdo->prepare("INSERT INTO usuarios (nombre, rol, activo, creado_en) VALUES (?, 'administrador', 1, NOW())")
-    ->execute(array('Admin'));
+$pdo->prepare("INSERT INTO usuarios (nombre, correo, clave_hash, rol, activo, creado_en) VALUES (?, ?, ?, 'administrador', 1, NOW())")
+    ->execute(array('Admin', 'admin@expediente.local', password_hash('admin123', PASSWORD_DEFAULT)));
 echo "Admin created with id: " . $pdo->lastInsertId() . "\n";
 $st = $pdo->query("SELECT COUNT(*) FROM instituciones");
 if ($st->fetchColumn() == 0) {
