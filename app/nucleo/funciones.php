@@ -407,7 +407,14 @@ function recaptchaVerificar(string $token): bool
         return false;
     }
     $datos = json_decode((string) $cuerpo, true);
-    return is_array($datos) && !empty($datos['success']);
+    if (!is_array($datos) || empty($datos['success'])) {
+        return false;
+    }
+    // v3 devuelve score (0.0-1.0); aceptar si >= 0.5. v2 no devuelve score, se acepta.
+    if (isset($datos['score'])) {
+        return (float) $datos['score'] >= 0.5;
+    }
+    return true;
 }
 
 

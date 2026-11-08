@@ -115,7 +115,23 @@ require __DIR__ . '/../app/vistas/plantilla/acceso_encabezado.php';
   </div>
 
 <?php if (RECAPTCHA_SITE_KEY !== '' && $correo !== ''): ?>
-  <div class="g-recaptcha" data-sitekey="<?= e(RECAPTCHA_SITE_KEY) ?>" style="margin:12px 0;"></div>
+  <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
+  <script>
+    (function() {
+      var form = document.querySelector('form.acceso__formulario');
+      if (!form) return;
+      form.addEventListener('submit', function(e) {
+        if (typeof grecaptcha === 'undefined') return;
+        e.preventDefault();
+        grecaptcha.ready(function() {
+          grecaptcha.execute('<?= e(RECAPTCHA_SITE_KEY) ?>', {action: 'login'}).then(function(token) {
+            document.getElementById('g-recaptcha-response').value = token;
+            form.submit();
+          });
+        });
+      });
+    })();
+  </script>
 <?php endif; ?>
 
   <button type="submit" class="acceso__boton acceso__boton--claro" data-texto-final="Iniciar sesión">
