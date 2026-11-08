@@ -17,7 +17,7 @@ function hashClave(string $clave): string
 /** Contraseñas muy usadas que no se aceptan aunque cumplan las reglas. */
 const CLAVES_COMUNES = [
     'password', 'contraseña', 'contrasena', '123456789012', 'qwertyuiop12', 'administrador', 'bienvenido',
-    'expediente', 'hospital', 'clinica', 'medico', 'doctor', 'mexico', 'femeci', 'abc12345', 'iloveyou',
+    'expediente', 'hospital', 'clinica', 'medico', 'doctor', 'mexico', 'expediente', 'abc12345', 'iloveyou',
 ];
 
 /**

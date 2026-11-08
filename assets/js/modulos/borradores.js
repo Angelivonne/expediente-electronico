@@ -9,8 +9,8 @@
    ========================================================================== */
 (() => {
   const USUARIO = document.body.dataset.usuario || '0';
-  const PREFIJO = `femeci-borrador-${USUARIO}-`;
-  const MARCA_ENVIO = 'femeci-borrador-enviado';
+  const PREFIJO = `expediente-borrador-${USUARIO}-`;
+  const MARCA_ENVIO = 'expediente-borrador-enviado';
   const VIGENCIA = 7 * 86400000;
   const OMITIR = new Set(['csrf', 'clave_envio']);
   const leer = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
@@ -19,7 +19,7 @@
 
   // Borradores vencidos de cualquier formulario
   try {
-    Object.keys(localStorage).filter((k) => k.startsWith('femeci-borrador-')).forEach((k) => {
+    Object.keys(localStorage).filter((k) => k.startsWith('expediente-borrador-')).forEach((k) => {
       const b = leer(k);
       if (!b || Date.now() - (b.fecha || 0) > VIGENCIA) borrar(k);
     });

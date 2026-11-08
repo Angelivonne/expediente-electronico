@@ -12,7 +12,7 @@
   if (!cuerpo || !resumen) return;
   const contenido = cuerpo.parentElement;
   const columnas = { datos: cuerpo.querySelector('.hoja-paciente__datos'), lado: cuerpo.querySelector('.hoja-paciente__lado') };
-  const CLAVE = `femeci-perfil-${typeof USUARIO_ID !== 'undefined' ? USUARIO_ID : ''}`;
+  const CLAVE = `expediente-perfil-${typeof USUARIO_ID !== 'undefined' ? USUARIO_ID : ''}`;
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE) || '{}'); } catch (e) { return {}; } };
   const guardar = (cambios) => { try { localStorage.setItem(CLAVE, JSON.stringify({ ...leer(), ...cambios })); } catch (e) { /* opcional */ } };
   const sinAcentos = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();

@@ -29,7 +29,7 @@ Archivo: `app/nucleo/seguridad.php`, `app/nucleo/inicio.php`
 
 Archivo: `app/nucleo/seguridad.php` (`iniciarSesionSegura`)
 
-- Cookie `femeci_sesion` con `HttpOnly`, `SameSite=Lax`, `Secure` automático si hay HTTPS,
+- Cookie `expediente_sesion` con `HttpOnly`, `SameSite=Lax`, `Secure` automático si hay HTTPS,
   `use_strict_mode`, `use_only_cookies`.
 - **Inactividad máxima: 30 min** (`MINUTOS_INACTIVIDAD`).
 - **Duración máxima: 12 h** (`HORAS_SESION_MAXIMA`).
@@ -87,12 +87,12 @@ Archivos: `config/db.php`, `database/usuario_aplicacion.sql`, `database/esquema.
 
 - **PDO con consultas preparadas** (`ATTR_EMULATE_PREPARES = false`), modo excepción,
   `utf8mb4`.
-- **Usuario MySQL de privilegios mínimos** `femeci_app` (nunca `root`); credenciales en
+- **Usuario MySQL de privilegios mínimos** `expediente_app` (nunca `root`); credenciales en
   `privado/bd.php` (fuera de la web). Permisos por tabla:
   - `SELECT, INSERT, UPDATE` en datos operativos,
   - **`historial_clinico` y `bitacora`: solo `SELECT, INSERT`** (no se pueden modificar ni borrar),
   - `limites`/espacio de trabajo: también `DELETE`.
-- **Usuario aparte para respaldos** `femeci_respaldo` (`privado/respaldo_bd.php`); la app normal
+- **Usuario aparte para respaldos** `expediente_respaldo` (`privado/respaldo_bd.php`); la app normal
   no puede borrar tablas.
 - **Multitenencia**: casi todas las consultas filtran por `institucion_id`; `puedeVerExpediente()`
   comprueba que el paciente sea de la institución de la sesión.

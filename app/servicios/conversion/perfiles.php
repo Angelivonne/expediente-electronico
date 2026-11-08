@@ -9,7 +9,7 @@
  *                 privado/formatos/<institución>/historial/<id>@<versión>.json.
  * Si el formato de la institución cambia, se edita el perfil o se agrega otro; el código no cambia.
  *
- * Estructura (esquema "femeci-perfil/1"):
+ * Estructura (esquema "expediente-perfil/1"):
  *   id, nombre, institucion, version (1.2.3), vigencia {desde, hasta}, aviso, descripcion,
  *   fuentes [{titulo, url, nota}]
  *   propiedades  [{clave, nombre, tipo, opciones?, contenido?}]  propiedades del paciente que el perfil
@@ -28,7 +28,7 @@
  */
 require_once __DIR__ . '/deteccion.php';
 
-const ESQUEMA_PERFIL = 'femeci-perfil/1';
+const ESQUEMA_PERFIL = 'expediente-perfil/1';
 const CARPETA_PERFILES_INCLUIDOS = __DIR__ . '/../../formatos';
 const CARPETA_PERFILES_PROPIOS = __DIR__ . '/../../../privado/formatos';
 const LIMITE_BYTES_PERFIL = 64 * 1024;

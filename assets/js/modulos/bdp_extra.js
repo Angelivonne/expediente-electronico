@@ -161,7 +161,7 @@ const extenderBdp = () => {
   const D = Bdp.datos;
   D.pacientes = D.pacientes || {};
   D.vistas = D.vistas?.length ? D.vistas : [{ id: 'v1', tipo: 'tabla', nombre: 'Tabla' }];
-  const claveActiva = `femeci-bdp-vista-activa-${USUARIO_ID}-${PAGINA_ID}`;
+  const claveActiva = `expediente-bdp-vista-activa-${USUARIO_ID}-${PAGINA_ID}`;
   let activa = (() => { try { return localStorage.getItem(claveActiva); } catch (e) { return null; } })();
   if (!D.vistas.some((v) => v.id === activa)) activa = D.vistas[0].id;
   const vistaActiva = () => D.vistas.find((v) => v.id === activa) || D.vistas[0];

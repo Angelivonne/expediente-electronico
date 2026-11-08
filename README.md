@@ -4,7 +4,7 @@ Expediente clínico electrónico para establecimientos de salud en México, basa
 NOM-004-SSA3-2012 (expediente clínico), la NOM-024-SSA3-2012 (sistemas de información en salud)
 y la LFPDPPP (protección de datos personales). PHP 8.2 + MySQL/MariaDB (XAMPP) + JavaScript sin frameworks.
 
-Todo vive en **una sola base de datos**: `expediente_femeci`.
+Todo vive en **una sola base de datos**: `expediente_expediente`.
 
 ## Estructura
 
@@ -58,12 +58,12 @@ vendor/                  SDK oficial de Anthropic (Composer; bloqueado)
 
 ## Puesta en marcha
 
-1. Importar `database/esquema.sql` en MySQL (crea `expediente_femeci`).
+1. Importar `database/esquema.sql` en MySQL (crea `expediente_expediente`).
 2. Crear el usuario de la aplicación con `database/usuario_aplicacion.sql` y guardar sus credenciales en
-   `privado/bd.php` (`return ['usuario' => 'femeci_app', 'clave' => '…'];`). Sin ese archivo la app usa root.
+   `privado/bd.php` (`return ['usuario' => 'expediente_app', 'clave' => '…'];`). Sin ese archivo la app usa root.
 3. Para habilitar **Conexiones con clínicas**, importar `database/migracion_conexiones_clinicas.sql` como administrador
-   de MySQL, después de crear `femeci_app`. El script crea las tablas y concede los permisos mínimos requeridos.
-4. Abrir `http://localhost/ExpedienteFEMECI/`. La primera cuenta que se registra es la del administrador.
+   de MySQL, después de crear `expediente_app`. El script crea las tablas y concede los permisos mínimos requeridos.
+4. Abrir `http://localhost/ExpedienteExpediente/`. La primera cuenta que se registra es la del administrador.
 5. Correo: en desarrollo (`MAIL_MODO = 'archivo'`) los correos se guardan en `C:/xampp/mailoutput`.
    En producción, `MAIL_MODO = 'mail'` con SMTP configurado y `URL_ORIGEN` con el dominio real.
 6. Voz: `iniciar_servicio_stt.bat` (raíz) inicia el servicio local de dictado.
@@ -76,7 +76,7 @@ catálogos de la institución mientras se escribe. Al elegir un resultado CIE-10
 clave; al elegir medicamento se completa el nombre y la presentación oficial.
 
 En el servidor local ya cargué **14,497 diagnósticos CIE-10** y **1,983 medicamentos oficiales** para la
-institución 1. La cuenta `femeci_app` permite insertar filas, pero no modificar el esquema; por eso la carga
+institución 1. La cuenta `expediente_app` permite insertar filas, pero no modificar el esquema; por eso la carga
 actual guarda nombre, clave y presentación resumida dentro de las columnas existentes. El archivo oficial
 de medicamentos sigue disponible en Descargas y la semilla SQL conserva además la descripción e indicaciones
 completas.
@@ -127,7 +127,7 @@ central (otra instalación de este mismo código) cuando hay conexión.
 
 ## Respaldos y trabajo sin conexión
 
-- Respaldo diario automático de `expediente_femeci` en `privado/respaldos` (comprimido, con suma SHA-256,
+- Respaldo diario automático de `expediente_expediente` en `privado/respaldos` (comprimido, con suma SHA-256,
   se conservan 14). Configuración → Respaldos: descargar, respaldar ahora, verificar y `CHECK TABLE`.
   Para programarlo con Windows: `mantenimiento/respaldo_diario.bat`. Detalle en `docs/respaldos.md`.
 - MySQL con escritura segura ante apagones (`innodb_flush_log_at_trx_commit=1`, doublewrite) y

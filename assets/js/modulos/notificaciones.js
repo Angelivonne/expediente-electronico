@@ -11,7 +11,7 @@
   if (!boton || !document.body.dataset.usuario) return;
 
   const punto = boton.querySelector('[data-notificaciones-punto]');
-  const CLAVE_ULTIMA = `femeci-notificaciones-ultima-${document.body.dataset.usuario}`;
+  const CLAVE_ULTIMA = `expediente-notificaciones-ultima-${document.body.dataset.usuario}`;
   const INTERVALO = 60000;
 
   const svg = (trazo, clase = 'icono') => `<svg class="${clase}" viewBox="0 0 24 24" aria-hidden="true">${trazo}</svg>`;

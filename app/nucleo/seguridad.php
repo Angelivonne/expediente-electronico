@@ -91,7 +91,7 @@ function enviarCabecerasSeguridad(): void
 function iniciarSesionSegura(): void
 {
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] ?? '') === '443';
-    session_name('femeci_sesion');
+    session_name('expediente_sesion');
     session_start([
         'cookie_httponly' => true,
         'cookie_path'     => URL_BASE . '/',

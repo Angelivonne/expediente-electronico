@@ -13,8 +13,8 @@
   if (!document.body.dataset.usuario || typeof BASE === 'undefined') return;
 
   const RUTA = `${BASE}/api/sincronizacion/sincronizar.php`;
-  const CLAVE_ULTIMO = 'femeci-sinc-ultimo';
-  const CLAVE_APAGADA = 'femeci-sinc-apagada';
+  const CLAVE_ULTIMO = 'expediente-sinc-ultimo';
+  const CLAVE_APAGADA = 'expediente-sinc-apagada';
   const INTERVALO = 3 * 60 * 1000;
   const ESPERA_APAGADA = 30 * 60 * 1000;
 

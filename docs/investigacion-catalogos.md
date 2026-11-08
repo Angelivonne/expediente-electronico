@@ -1,7 +1,7 @@
-# Expediente FEMECI — Informe de Investigación de Bases de Datos Gubernamentales
+# Expediente Expediente — Informe de Investigación de Bases de Datos Gubernamentales
 
 Fecha: 01/11/2026
-Sistema: Expediente FEMECI (C:\xampp\htdocs\ExpedienteFEMECI\)
+Sistema: Expediente Expediente (C:\xampp\htdocs\ExpedienteExpediente\)
 Normativa aplicable: NOM-024-SSA3-2012, NOM-004-SSA3-2012, LFPDPPP
 
 ---

@@ -3,7 +3,7 @@
  * Ensayo de restauración de respaldos (NOM-024: disponibilidad e integridad).
  *
  * Toma el respaldo más reciente, lo descomprime, lo restaura en una base temporal
- * (expediente_femeci_restauracion_prueba) y compara el número de tablas con la base real.
+ * (expediente_expediente_restauracion_prueba) y compara el número de tablas con la base real.
  * Nunca toca la base de producción. Al terminar borra la base temporal.
  *
  * Uso:  C:\xampp\php\php.exe mantenimiento\probar_restauracion.php
@@ -12,7 +12,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../app/servicios/sistema/respaldos.php';
 
-const DB_PRUEBA_RESTAURACION = 'expediente_femeci_restauracion_prueba';
+const DB_PRUEBA_RESTAURACION = 'expediente_expediente_restauracion_prueba';
 
 $respaldos = listarRespaldos();
 if (!$respaldos) {

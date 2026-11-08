@@ -213,7 +213,7 @@
         } catch (e) { mostrarNotificacion('error', e.message); ev.currentTarget.disabled = false; }
       });
       // Al cerrar el popover con un código nuevo, la lista se recarga para mostrarlo
-      const recargarAlCerrar = () => { if (raiz.dataset.cambiado && !document.querySelector('.codigos__nuevo')) { try { sessionStorage.setItem('femeci-personas-vista', 'codigos'); } catch (e) { /* opcional */ } location.reload(); } };
+      const recargarAlCerrar = () => { if (raiz.dataset.cambiado && !document.querySelector('.codigos__nuevo')) { try { sessionStorage.setItem('expediente-personas-vista', 'codigos'); } catch (e) { /* opcional */ } location.reload(); } };
       document.addEventListener('pointerdown', () => setTimeout(recargarAlCerrar, 400));
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setTimeout(recargarAlCerrar, 400); });
     }));
@@ -225,7 +225,7 @@
         { icono: 'cerrar', texto: 'Revocar código', peligro: true, accion: async () => {
           try {
             await api('codigos/revocar.php', { id });
-            try { sessionStorage.setItem('femeci-personas-vista', 'codigos'); } catch (e) { /* opcional */ }
+            try { sessionStorage.setItem('expediente-personas-vista', 'codigos'); } catch (e) { /* opcional */ }
             location.reload();
           } catch (e) { mostrarNotificacion('error', e.message); }
         } },

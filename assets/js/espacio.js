@@ -417,7 +417,7 @@ document.addEventListener('click', (ev) => {
 const Arbol = {
   datos: null,
   abiertos: new Set(),
-  clave: `femeci-arbol-abiertos-${USUARIO_ID}`,
+  clave: `expediente-arbol-abiertos-${USUARIO_ID}`,
 
   iniciar() {
     const fuente = document.getElementById('arbol-paginas');
@@ -1198,7 +1198,7 @@ const Editor = {
     if (!this.formulario) this.recuperarCopiaLocal();
     const reintentar = () => { if (this.sinConexion && !this.guardando) this.guardar(); };
     window.addEventListener('online', reintentar);
-    document.addEventListener('femeci:conexion', reintentar);
+    document.addEventListener('expediente:conexion', reintentar);
 
     this.raiz.addEventListener('keydown', (ev) => this.teclas(ev));
     this.raiz.addEventListener('input', (ev) => this.alEscribir(ev));
@@ -1324,7 +1324,7 @@ const Editor = {
   },
 
   /* Copia local de la nota (solo mientras no se pudo guardar en el servidor) */
-  claveCopia() { return `femeci-nota-${USUARIO_ID}-${this.paginaId || this.seccion}`; },
+  claveCopia() { return `expediente-nota-${USUARIO_ID}-${this.paginaId || this.seccion}`; },
 
   /** Debajo de una sección la nota se crea al escribir por primera vez. */
   async asegurarPagina() {
@@ -2386,7 +2386,7 @@ const Bdp = {
   filtro: '',
   // Vista personal (solo en este navegador): orden, filtros, columnas ocultas y columnas inmovilizadas
   vista: { orden: null, filtros: [], ocultas: [], congelada: null },
-  claveVista: `femeci-bdp-vista-${USUARIO_ID}-${PAGINA_ID}`,
+  claveVista: `expediente-bdp-vista-${USUARIO_ID}-${PAGINA_ID}`,
 
   iniciar() {
     this.raiz = document.querySelector('[data-bdp]');
@@ -3353,10 +3353,10 @@ function iniciarPersonas() {
   const mostrarVista = (nombre) => {
     vistas.forEach((v) => { v.classList.toggle('activa', v.dataset.vista === nombre); v.setAttribute('aria-selected', String(v.dataset.vista === nombre)); });
     raiz.querySelectorAll('[data-vista-panel]').forEach((p) => { p.hidden = p.dataset.vistaPanel !== nombre; });
-    try { sessionStorage.setItem('femeci-personas-vista', nombre); } catch (e) { /* opcional */ }
+    try { sessionStorage.setItem('expediente-personas-vista', nombre); } catch (e) { /* opcional */ }
   };
   vistas.forEach((v) => v.addEventListener('click', () => mostrarVista(v.dataset.vista)));
-  try { mostrarVista(sessionStorage.getItem('femeci-personas-vista') || 'personas'); } catch (e) { mostrarVista('personas'); }
+  try { mostrarVista(sessionStorage.getItem('expediente-personas-vista') || 'personas'); } catch (e) { mostrarVista('personas'); }
 
   // Buscar en la vista actual
   const buscar = raiz.querySelector('[data-personas-buscar]');
@@ -3389,7 +3389,7 @@ function iniciarPersonas() {
       try {
         const r = await accion({ accion: 'invitar', correos: entrada.value, rol: caja.querySelector('input[name="rol"]:checked').value });
         if (r.avisos?.length) mostrarNotificacion('error', r.avisos.join(' '));
-        try { sessionStorage.setItem('femeci-personas-vista', 'invitaciones'); } catch (e) { /* opcional */ }
+        try { sessionStorage.setItem('expediente-personas-vista', 'invitaciones'); } catch (e) { /* opcional */ }
         recargar();
       } catch (e) { mostrarNotificacion('error', e.message); }
     });

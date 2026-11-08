@@ -191,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear
 
     if (!$errores) {
         $pdo = db();
-        $pdo->query("SELECT GET_LOCK('femeci_registro', 10)");
+        $pdo->query("SELECT GET_LOCK('expediente_registro', 10)");
         $usuarioId = null;
         $correoExistia = false;
         try {
@@ -236,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear
                 }
             }
         } finally {
-            $pdo->query("SELECT RELEASE_LOCK('femeci_registro')");
+            $pdo->query("SELECT RELEASE_LOCK('expediente_registro')");
         }
 
         if (!$errores) {

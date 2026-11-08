@@ -102,7 +102,7 @@ hospitalización, estudio e incapacidad; y la firma electrónica de cada nota.
   - Registra el acto en la bitácora.
 - `pacientes/evento.php` muestra el sello («Firmado electrónicamente por … · cédula … el …») y la huella,
   y el botón «Firmar electrónicamente» cuando el rol lo permite y la entrada no está firmada.
-- Migración: `database/migracion_firmas_clinicas.sql` y permisos para `femeci_app`.
+- Migración: `database/migracion_firmas_clinicas.sql` y permisos para `expediente_app`.
 
 Probado: entrada de consentimiento firmada por el administrador (cédula 1077777), huella `87dd777d7f7fec87…`,
 sello visible en el documento; datos de prueba borrados después.

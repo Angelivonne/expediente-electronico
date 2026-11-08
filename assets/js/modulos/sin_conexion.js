@@ -53,7 +53,7 @@
   let bdPromesa = null;
   const bd = () => {
     bdPromesa ??= new Promise((resolver, rechazar) => {
-      const abrir = indexedDB.open('femeci-sin-conexion', 1);
+      const abrir = indexedDB.open('expediente-sin-conexion', 1);
       abrir.onupgradeneeded = () => abrir.result.createObjectStore('cola', { keyPath: 'clave' });
       abrir.onsuccess = () => resolver(abrir.result);
       abrir.onerror = () => rechazar(abrir.error);
@@ -116,7 +116,7 @@
       clearInterval(revision);
       revision = null;
       if (!antes) {
-        document.dispatchEvent(new CustomEvent('femeci:conexion', { detail: { enLinea: true } }));
+        document.dispatchEvent(new CustomEvent('expediente:conexion', { detail: { enLinea: true } }));
         vaciarCola();
       }
     }
@@ -206,7 +206,7 @@
           await quitar(p.clave);
           enviados++;
           sesionVencida = false;
-          document.dispatchEvent(new CustomEvent('femeci:cola-enviada', { detail: { url: p.url, cuerpo: JSON.parse(p.cuerpo), respuesta: res } }));
+          document.dispatchEvent(new CustomEvent('expediente:cola-enviada', { detail: { url: p.url, cuerpo: JSON.parse(p.cuerpo), respuesta: res } }));
           continue;
         }
         // Sesión terminada o abierta de nuevo en otra página: se queda en la cola para la próxima sesión
@@ -223,7 +223,7 @@
     };
     try {
       // Una sola pestaña envía a la vez (las demás esperan su turno o lo omiten)
-      if (navigator.locks) await navigator.locks.request('femeci-cola', { ifAvailable: true }, (candado) => (candado ? enviar() : null));
+      if (navigator.locks) await navigator.locks.request('expediente-cola', { ifAvailable: true }, (candado) => (candado ? enviar() : null));
       else await enviar();
     } finally {
       vaciando = false;

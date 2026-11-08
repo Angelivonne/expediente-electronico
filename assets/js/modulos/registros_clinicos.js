@@ -7,7 +7,7 @@
   const raizCatalogo = form || campoCatalogoInicial?.closest('form');
 
   /* ---------- Búsqueda de diagnósticos y medicamentos del catálogo ---------- */
-  const baseApi = '/ExpedienteFEMECI/api';
+  const baseApi = '/ExpedienteExpediente/api';
   let siguienteLista = 0;
   const temporizadores = new WeakMap();
   const solicitudes = new WeakMap();

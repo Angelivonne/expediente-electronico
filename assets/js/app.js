@@ -743,7 +743,7 @@ function iniciarActividad(contenedor) {
 /* ---------- Barra de pestañas ----------
    Las pestañas viven en sessionStorage (se borran al cerrar el navegador o la sesión),
    porque sus títulos contienen nombres de pacientes. */
-const CLAVE_PESTANAS = `femeci-pestanas-${document.body.dataset.usuario ?? ''}`;
+const CLAVE_PESTANAS = `expediente-pestanas-${document.body.dataset.usuario ?? ''}`;
 const MAX_PESTANAS = 10;
 
 function leerPestanas() {
@@ -880,7 +880,7 @@ function iniciarPestanas() {
 
 /* ---------- Barra lateral: grupos, historial y pestañas cerradas recientemente ----------
    Historial y cerradas viven en sessionStorage (como las pestañas) y se borran al cerrar sesión. */
-const claveLista = (nombre) => `femeci-${nombre}-${document.body.dataset.usuario ?? ''}`;
+const claveLista = (nombre) => `expediente-${nombre}-${document.body.dataset.usuario ?? ''}`;
 function leerLista(nombre) {
   try { return JSON.parse(sessionStorage.getItem(claveLista(nombre))) || []; } catch (e) { return []; }
 }
@@ -1184,9 +1184,9 @@ function iniciarDictado(raiz) {
   const orbitaCompactar = orbita?.querySelector('[data-dictado-orbita-compactar]');
   // Una consulta completa puede durar mucho más que unos minutos: el dictado no se corta solo.
   const MAX_SEGUNDOS = 3600;
-  const CLAVE_PANEL = 'femeci-dictado-panel';
-  const CLAVE_TAMANO = 'femeci-dictado-tamano';
-  const CLAVE_ORBITA = 'femeci-dictado-orbita';
+  const CLAVE_PANEL = 'expediente-dictado-panel';
+  const CLAVE_TAMANO = 'expediente-dictado-tamano';
+  const CLAVE_ORBITA = 'expediente-dictado-orbita';
 
   let reconocedor = null, paroManual = false, reintentosVoz = 0, reinicioVoz = null;
   let textoFinal = '', textoParcial = '', temporizadorEnvio = null;
@@ -2238,7 +2238,7 @@ function iniciarAsistente() {
   const adjuntosCaja = panel.querySelector('[data-entrada-adjuntos]');
   const chipHerramienta = panel.querySelector('[data-herramienta-actual]');
   const raizHtml = document.documentElement;
-  const CLAVE = `femeci-asistente-${document.body.dataset.usuario ?? ''}`;
+  const CLAVE = `expediente-asistente-${document.body.dataset.usuario ?? ''}`;
   const pacienteId = document.body.dataset.paciente ? Number(document.body.dataset.paciente) : null;
   const paginaId = document.body.dataset.pagina ? Number(document.body.dataset.pagina) : null;
 
@@ -3052,7 +3052,7 @@ function programarCierre(notificacion) {
 /* ---------- Inicialización ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   const iniciarSeguro = (nombre, iniciar) => {
-    try { iniciar(); } catch (error) { console.error(`[Expediente FEMECI] No se pudo iniciar ${nombre}.`, error); }
+    try { iniciar(); } catch (error) { console.error(`[Expediente Expediente] No se pudo iniciar ${nombre}.`, error); }
   };
   iniciarSeguro('fechas', actualizarFechasVacias);
   document.addEventListener('change', actualizarFechasVacias);
@@ -4034,7 +4034,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ---------- Secciones de la barra lateral que se pliegan (se recuerda en este navegador) ---------- */
 function iniciarSeccionesPlegables() {
-  const clave = `femeci-lateral-plegadas-${document.body.dataset.usuario ?? ''}`;
+  const clave = `expediente-lateral-plegadas-${document.body.dataset.usuario ?? ''}`;
   let plegadas = [];
   try { plegadas = JSON.parse(localStorage.getItem(clave) || '[]'); } catch (e) { /* opcional */ }
   document.querySelectorAll('[data-plegable]').forEach((seccion) => {

@@ -1,5 +1,5 @@
 {
-    "esquema": "femeci-perfil/1",
+    "esquema": "expediente-perfil/1",
     "id": "imss-control-expediente",
     "nombre": "IMSS · Registro de control del expediente clínico",
     "institucion": "IMSS",

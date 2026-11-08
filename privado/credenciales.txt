@@ -1,14 +1,14 @@
 CREDENCIALES DE LA INSTALACIÓN (no subir a ningún lado)
 
-Base de datos:  expediente_femeci  (MariaDB de XAMPP, 127.0.0.1:3306)
+Base de datos:  expediente_expediente  (MariaDB de XAMPP, 127.0.0.1:3306)
 
 MySQL root            →  2Jiv1W6gKUmSoljR7aO5
   (mysqldump, phpMyAdmin; se usó para crear la base)
 
-femeci_app            →  spYFEdL2w3lxM1KVrCQ4
+expediente_app            →  spYFEdL2w3lxM1KVrCQ4
   (la aplicación normal; ya guardado en privado/bd.php)
 
-femeci_respaldo       →  MWUjr3yub1XxZfpwq6mN
+expediente_respaldo       →  MWUjr3yub1XxZfpwq6mN
   (respaldos y restauración; ya guardado en privado/respaldo_bd.php)
 
 phpMyAdmin: http://localhost/phpmyadmin/  (entra solo, ya configurado)
@@ -20,15 +20,15 @@ Instalado y configurado (31/10/2026):
 - Composer + SDK de Anthropic (vendor/)
 - Extensions PHP activadas: gd, intl, zip (openssl ya venía activo)
 - Correos de desarrollo en C:\xampp\mailoutput
-- Proyecto en C:\xampp\htdocs\ExpedienteFEMECI
-- URL: http://localhost/ExpedienteFEMECI/  (para usarse conviene cambiar
+- Proyecto en C:\xampp\htdocs\ExpedienteExpediente
+- URL: http://localhost/ExpedienteExpediente/  (para usarse conviene cambiar
   config/config.php: URL_ORIGEN y MAIL_MODO con SMTP real)
 - Servicio de voz (Whisper + extractor) entrenado e instalado en ia\.venv
 
 CUENTA DE ADMINISTRADOR (id 1, médico fundador)
-Correo:      admin@femeci.local
+Correo:      admin@expediente.local
 Contraseña:  R9-Huipil-Verde-Tres7
-Nombre:      Administrador FEMECI (cambiable en Mi cuenta)
+Nombre:      Administrador Expediente (cambiable en Mi cuenta)
 Cédula:      1077777 (placeholder, pendiente de verificación; cámbiala en Mi cuenta)
 Al entrar por primera vez manda a registrar la institución (/institucion/).
 

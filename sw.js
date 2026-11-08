@@ -6,7 +6,7 @@
    Se registra desde assets/js/modulos/sin_conexion.js (window.registroServiceWorker).
    ========================================================================== */
 const VERSION = 'v2';
-const CACHE = `femeci-estatico-${VERSION}`;
+const CACHE = `expediente-estatico-${VERSION}`;
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
 const PAGINA_SIN_CONEXION = `${BASE}/assets/sin_conexion.html`;
 const ESENCIALES = [PAGINA_SIN_CONEXION, `${BASE}/assets/css/estilos.css`, `${BASE}/assets/css/modulos/durabilidad.css`];
@@ -22,7 +22,7 @@ self.addEventListener('install', (ev) => {
 
 self.addEventListener('activate', (ev) => {
   ev.waitUntil(caches.keys()
-    .then((claves) => Promise.all(claves.filter((k) => k.startsWith('femeci-estatico-') && k !== CACHE).map((k) => caches.delete(k))))
+    .then((claves) => Promise.all(claves.filter((k) => k.startsWith('expediente-estatico-') && k !== CACHE).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 

@@ -1,7 +1,7 @@
 @echo off
 setlocal
-title Transcriptor de voz - ExpedienteFEMECI
-cd /d C:\xampp\htdocs\ExpedienteFEMECI
+title Transcriptor de voz - ExpedienteExpediente
+cd /d C:\xampp\htdocs\ExpedienteExpediente
 
 REM El modelo se carga desde la cache local; no se consulta internet al arrancar.
 REM (Antes se quedaba colgado esperando a HuggingFace y parecia que no hacia nada.)

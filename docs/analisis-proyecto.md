@@ -1,12 +1,12 @@
-﻿# Análisis del proyecto — ExpedienteFEMECI
+﻿# Análisis del proyecto — ExpedienteExpediente
 
-> Análisis hecho el 1 de noviembre de 2026 sobre `C:\xampp\htdocs\ExpedienteFEMECI`
+> Análisis hecho el 1 de noviembre de 2026 sobre `C:\xampp\htdocs\ExpedienteExpediente`
 > (4,098 archivos, XAMPP con PHP 8.2.12 y MariaDB 10.4.32, Apache y MySQL en ejecución).
 > Punto de entrada revisado a fondo: `pacientes/registro.php`.
 
 ## 0. Cambios aplicados
 
-- **Una sola institución.** Se consolidó todo en **FEMECI** (id 1): los 9 pacientes, las 7 cuentas, las 124
+- **Una sola institución.** Se consolidó todo en **Expediente** (id 1): los 9 pacientes, las 7 cuentas, las 124
   páginas y la configuración de las clínicas de prueba pasaron ahí, y las instituciones 2 y 4 se
   eliminaron. Respaldo previo, restaurado y verificado en una base de prueba:
   `privado/respaldos/antes_consolidar_20261102_031829.sql`.
@@ -28,9 +28,9 @@ Expediente clínico electrónico para consultorios en México, alineado a **NOM-
 
 | Pieza | Elección |
 |---|---|
-| Servidor | Apache de XAMPP, `http://localhost/ExpedienteFEMECI/` |
+| Servidor | Apache de XAMPP, `http://localhost/ExpedienteExpediente/` |
 | Backend | PHP 8.2 "plano": sin framework, sin router, un archivo `.php` por pantalla |
-| Base de datos | MySQL/MariaDB, **una sola base**: `expediente_femeci` |
+| Base de datos | MySQL/MariaDB, **una sola base**: `expediente_expediente` |
 | Frontend | HTML renderizado en servidor + JavaScript vanilla (`assets/js`) |
 | Dependencias | solo `anthropic-ai/sdk` vía Composer (`vendor/`) |
 | Voz a texto | Parakeet TDT 0.6B v3 local (`models/stt/*.gguf`, 485 MB) + binario en `transcribe-cpp/` |
@@ -140,7 +140,7 @@ definen `define('RESPUESTA_JSON', true)` **antes** de incluirlo.
 | Archivo | Para qué |
 |---|---|
 | `database/esquema.sql` | 1,071 líneas: todas las tablas, migraciones idempotentes, **triggers de sincronización**, semillas |
-| `database/usuario_aplicacion.sql` | usuario MySQL `femeci_app` con privilegios mínimos y `femeci_respaldo` |
+| `database/usuario_aplicacion.sql` | usuario MySQL `expediente_app` con privilegios mínimos y `expediente_respaldo` |
 | `database/migracion_catalogos_admin.sql` | 34 tablas `catalogo_*` (nunca se importaron en esta instalación) |
 | `database/migracion_medicamentos_cie10_incapacidad.sql` | crea `medicamentos` y `cie10`, agrega el tipo `incapacidad` |
 | `database/semillas_cie10_oficial.sql` (2 MB) / `semillas_medicamentos_cnis_2026.sql` (1 MB) | carga de los 14,497 diagnósticos y 1,983 medicamentos |
@@ -196,7 +196,7 @@ Automatismos que no se ven en el archivo:
 
 ## 5. La base de datos real (no la del esquema: la que está cargada)
 
-`expediente_femeci` · usuario `femeci_app` · MariaDB 10.4.32 · **66 tablas**: 32 de la aplicación y 34
+`expediente_expediente` · usuario `expediente_app` · MariaDB 10.4.32 · **66 tablas**: 32 de la aplicación y 34
 `catalogo_*` con el diseño de `migracion_catalogos_admin.sql` (clave, nombre, descripción, activo y sus
 llaves a entidades, municipios, localidades y unidades). 23 de esas 34 tienen datos cargados.
 
@@ -206,8 +206,8 @@ llaves a entidades, municipios, localidades y unidades). 23 de esas 34 tienen da
 | `medicamentos` | **1,983** | la que consulta el autocompletado de medicamentos |
 | `pacientes` | 9 | todos en la institución única; ninguno dado de baja |
 | `historial_clinico` | 3 | 1 consulta, 1 receta, 1 estudio |
-| `usuarios` | 7 | 2 administradores, 3 médicos (1 dado de baja), enfermería y recepción — todos en FEMECI |
-| `instituciones` | 1 | **FEMECI** (consultorio) |
+| `usuarios` | 7 | 2 administradores, 3 médicos (1 dado de baja), enfermería y recepción — todos en Expediente |
+| `instituciones` | 1 | **Expediente** (consultorio) |
 | `paginas` | 124 | 87 notas, 34 bases de datos (32 son catálogos), 2 carpetas |
 | `pagina_filas` | 2 | el espacio de trabajo está prácticamente vacío |
 | `bitacora` | 459 | incluye los accesos anteriores a la consolidación |
@@ -264,7 +264,7 @@ un expediente clínico abierto**. Para producción: `false`.
 
 ### 8.2 Resuelto: la lista de pacientes se veía vacía
 La sesión automática entraba como **usuario #1**, que había quedado en la **institución #4 "Clinica Test"**
-(0 pacientes). Se consolidó todo en **FEMECI** (institución 1) y el usuario #1 volvió a ella: la lista
+(0 pacientes). Se consolidó todo en **Expediente** (institución 1) y el usuario #1 volvió a ella: la lista
 muestra los 9 pacientes. Sigue en pie **8.1**: apagar el acceso automático en producción.
 
 ### 8.3 Resuelto: los catálogos ya están conectados a sus páginas
@@ -352,7 +352,7 @@ hace más de 30 días: crecerá indefinidamente mientras no haya central.
 
 1. Poner `ACCESO_AUTOMATICO = false` antes de cualquier demostración o publicación.
 2. `git init` + primer commit (sin `privado/`, `vendor/`, modelos), ahora que el árbol está ordenado.
-3. Revisar en Configuración el nombre y los datos de la institución FEMECI (el nombre quedó provisional).
+3. Revisar en Configuración el nombre y los datos de la institución Expediente (el nombre quedó provisional).
 4. Decidir si se borran las 34 tablas `catalogo_*` vacías junto con su migración y sus `GRANT`.
 5. Completar en `usuario_aplicacion.sql` los permisos de `imagenes_medicas`, `asistente_memoria` y
    `recuperaciones_clave`, y llevar el DDL de `firmas` a `esquema.sql`.

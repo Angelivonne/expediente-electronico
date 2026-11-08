@@ -201,7 +201,7 @@ function escribirHl7(array $pacientes): string
         $v = fn (string $campo): string => hl7Escapar(isset($p[$campo]) && $p[$campo] !== '' ? convValorTexto($p[$campo]) : null);
         $control = 'EC' . $ahora . str_pad((string) ($i + 1), 6, '0', STR_PAD_LEFT);
         $segmentos = [
-            'MSH|^~\\&|EXPEDIENTES_CLINICOS|FEMECI|||' . $ahora . '||ADT^A04^ADT_A01|' . $control . '|P|2.5|||AL|NE|MEX|UNICODE UTF-8',
+            'MSH|^~\\&|EXPEDIENTES_CLINICOS|Expediente|||' . $ahora . '||ADT^A04^ADT_A01|' . $control . '|P|2.5|||AL|NE|MEX|UNICODE UTF-8',
             'EVN|A04|' . $ahora,
         ];
         $ids = [];
@@ -209,7 +209,7 @@ function escribirHl7(array $pacientes): string
             $ids[] = $v('curp') . '^^^RENAPO&' . HL7_OID_CURP . '&ISO^CURP';
         }
         if (!empty($p['folio'])) {
-            $ids[] = $v('folio') . '^^^FEMECI^MR';
+            $ids[] = $v('folio') . '^^^Expediente^MR';
         }
         $sexo = match ($p['sexo'] ?? '') { 'H' => 'M', 'M' => 'F', 'X' => 'O', default => '' };
         $nacimiento = !empty($p['fecha_nacimiento']) ? str_replace('-', '', substr((string) $p['fecha_nacimiento'], 0, 10)) : '';

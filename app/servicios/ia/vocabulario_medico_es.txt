@@ -1,5 +1,5 @@
 # ============================================================================
-# VOCABULARIO MÉDICO ESPAÑOL MEXICANO - EXPEDIENTE ELECTRÓNICO FEMECI
+# VOCABULARIO MÉDICO ESPAÑOL MEXICANO - EXPEDIENTE ELECTRÓNICO Expediente
 # Objetivo: ~2.8 MB de vocabulario para reconocimiento de voz médico-paciente
 # Cubre: síntomas, enfermedades, medicamentos, secciones de expediente,
 # jerga mexicana, patrones conversacionales, identificación de hablante,

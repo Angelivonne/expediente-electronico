@@ -8,7 +8,7 @@
 
 const Markdown = (() => {
   const escapar = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const urlInterna = (u) => /^\/(?!\/)/.test(u);   // rutas del propio sistema: /ExpedienteFEMECI/paginas/ver.php?id=…
+  const urlInterna = (u) => /^\/(?!\/)/.test(u);   // rutas del propio sistema: /ExpedienteExpediente/paginas/ver.php?id=…
   const urlSegura = (u) => /^(https?:\/\/|mailto:)/i.test(u) || urlInterna(u);
   // Junto a cada enlace se muestra su dominio: así se ve a dónde lleva antes de abrirlo
   const dominio = (u) => {

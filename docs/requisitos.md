@@ -3,7 +3,7 @@
 Estado de cada petición hecha durante el desarrollo. ✅ hecho · ⏳ pendiente · 👤 requiere una acción tuya.
 
 ## Reglas generales
-- ✅ Una sola base de datos MySQL (`expediente_femeci`).
+- ✅ Una sola base de datos MySQL (`expediente_expediente`).
 - ✅ Estilo minimalista oscuro de las referencias; sin tarjetas con sombra, degradados, insignias ni emojis en la interfaz.
 - ✅ Sin datos falsos: estados vacíos reales; se quitó el proveedor de IA simulado.
 - ✅ Notificaciones y componentes con el estilo de las referencias; animaciones sutiles.

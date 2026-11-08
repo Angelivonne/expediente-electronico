@@ -1,6 +1,6 @@
 # Conexiones con clínicas
 
-La sección vincula clínicas que ya están registradas en la misma base de datos de ExpedienteFEMECI. No enlaza todavía instalaciones independientes ni envía datos a un servidor remoto.
+La sección vincula clínicas que ya están registradas en la misma base de datos de ExpedienteExpediente. No enlaza todavía instalaciones independientes ni envía datos a un servidor remoto.
 
 ## Flujo de acceso
 
@@ -14,7 +14,7 @@ Los PDFs se guardan en `privado/conexiones/` con nombre aleatorio, permisos de a
 
 ## Requisitos para activar
 
-- Aplicar `database/migracion_conexiones_clinicas.sql` con una cuenta administrativa de MySQL. El usuario de aplicación `femeci_app` no puede crear tablas ni otorgar permisos; el script crea las tablas y asigna privilegios mínimos al usuario de aplicación.
+- Aplicar `database/migracion_conexiones_clinicas.sql` con una cuenta administrativa de MySQL. El usuario de aplicación `expediente_app` no puede crear tablas ni otorgar permisos; el script crea las tablas y asigna privilegios mínimos al usuario de aplicación.
 - La instancia permite cargar documentos y consultar datos si el sitio usa HTTPS, o si el acceso HTTP llega únicamente desde `localhost` por loopback (`127.0.0.1`/`::1`) en la misma computadora. Una conexión HTTP desde otra computadora o dirección de red queda bloqueada.
 - Para operar entre computadoras y clínicas, configura HTTPS con un certificado confiable. El certificado SSL instalado actualmente en localhost no es confiable para el navegador, así que esa ruta aún no está habilitada en esta PC.
 - Usar únicamente convenios y autorizaciones ya firmados por las personas e instituciones correspondientes. La sección almacena la evidencia; no redacta ni sustituye documentos legales.

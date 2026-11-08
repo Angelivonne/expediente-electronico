@@ -9,8 +9,8 @@
 (() => {
   const yo = Number(document.body.dataset.usuario || 0);
   if (!yo || document.body.classList.contains('portal') || typeof BASE === 'undefined') return;
-  const CLAVE_APAGADA = `femeci-aura-apagada-${yo}`;
-  const CLAVE_OCULTAS = `femeci-aura-ocultas-${yo}`;
+  const CLAVE_APAGADA = `expediente-aura-apagada-${yo}`;
+  const CLAVE_OCULTAS = `expediente-aura-ocultas-${yo}`;
   const leer = (k, d) => { try { return JSON.parse(sessionStorage.getItem(k) ?? localStorage.getItem(k) ?? 'null') ?? d; } catch (e) { return d; } };
   const apagada = () => { try { return localStorage.getItem(CLAVE_APAGADA) === '1'; } catch (e) { return false; } };
   let ocultas = new Set(leer(CLAVE_OCULTAS, []));
@@ -82,10 +82,10 @@
     pildora.querySelector('[data-aura-atender]').dataset.auraAtender = m.c.id;
     pildora.querySelector('[data-aura-ocultar]').dataset.auraOcultar = m.c.id;
     // Al aparecer la notificación de una cita se abre solo el panel de atención rápida (una vez por cita)
-    const abiertas = new Set(leer(`femeci-aura-paneles-${yo}`, []));
+    const abiertas = new Set(leer(`expediente-aura-paneles-${yo}`, []));
     if (!abiertas.has(m.c.id) && !document.querySelector('.aura-panel')) {
       abiertas.add(m.c.id);
-      try { sessionStorage.setItem(`femeci-aura-paneles-${yo}`, JSON.stringify([...abiertas])); } catch (e) { /* opcional */ }
+      try { sessionStorage.setItem(`expediente-aura-paneles-${yo}`, JSON.stringify([...abiertas])); } catch (e) { /* opcional */ }
       abrirPanel(m.c);
     }
   }

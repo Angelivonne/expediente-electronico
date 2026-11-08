@@ -34,8 +34,8 @@
   const LIBERAN = ['cancelada', 'no_asistio'];   // estados que dejan libre el horario
   const MARCA = '<svg class="cal-marca" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
 
-  const leer = (clave, defecto) => { try { const v = localStorage.getItem(`femeci-agenda-${clave}`); return v === null ? defecto : JSON.parse(v); } catch (e) { return defecto; } };
-  const guardar = (clave, valor) => { try { localStorage.setItem(`femeci-agenda-${clave}`, JSON.stringify(valor)); } catch (e) { /* opcional */ } };
+  const leer = (clave, defecto) => { try { const v = localStorage.getItem(`expediente-agenda-${clave}`); return v === null ? defecto : JSON.parse(v); } catch (e) { return defecto; } };
+  const guardar = (clave, valor) => { try { localStorage.setItem(`expediente-agenda-${clave}`, JSON.stringify(valor)); } catch (e) { /* opcional */ } };
 
   /* ---------- Fechas ---------- */
   const dosDigitos = (n) => String(n).padStart(2, '0');

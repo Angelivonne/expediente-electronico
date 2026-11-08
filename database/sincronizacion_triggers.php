@@ -6,7 +6,7 @@
  * Solo desde la línea de comandos (la carpeta database/ está bloqueada al navegador):
  *   C:/xampp/php/php.exe database/sincronizacion_triggers.php           → triggers
  *   C:/xampp/php/php.exe database/sincronizacion_triggers.php --siembra → triggers + siembra de filas existentes
- * La salida se aplica como root:  ... | C:/xampp/mysql/bin/mysql -u root expediente_femeci
+ * La salida se aplica como root:  ... | C:/xampp/mysql/bin/mysql -u root expediente_expediente
  * y se copia a database/esquema.sql cuando cambia la lista de columnas.
  */
 if (PHP_SAPI !== 'cli') {

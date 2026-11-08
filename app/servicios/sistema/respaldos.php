@@ -2,14 +2,14 @@
 /**
  * Respaldos de la base de datos (NOM-024 6.6: disponibilidad e integridad).
  *
- *   - mysqldump de expediente_femeci (solo esta base, sin CREATE DATABASE) comprimido en
+ *   - mysqldump de expediente_expediente (solo esta base, sin CREATE DATABASE) comprimido en
  *     privado/respaldos/respaldo-AAAAMMDD-HHMMSS-motivo.sql.gz, con su suma SHA-256 al lado (.sha256).
  *   - Se conservan los 14 más recientes.
  *   - Automático y perezoso: la primera petición del día lanza en segundo plano mantenimiento/respaldar.php;
  *     un candado (flock) evita que se repita. El Programador de tareas de Windows puede llamar al mismo
  *     script con mantenimiento/respaldo_diario.bat (docs/respaldos.md).
  *   - Restaurar es destructivo: solo administrador, con confirmación escrita y un respaldo previo automático.
- *     Necesita el usuario de MySQL femeci_respaldo (privado/respaldo_bd.php); la app normal no puede borrar tablas.
+ *     Necesita el usuario de MySQL expediente_respaldo (privado/respaldo_bd.php); la app normal no puede borrar tablas.
  */
 
 const CARPETA_RESPALDOS   = __DIR__ . '/../../../privado/respaldos';
@@ -301,7 +301,7 @@ function verificarIntegridadBd(): array
 }
 
 /**
- * Restaura un respaldo sobre expediente_femeci. Antes hace un respaldo automático del estado actual.
+ * Restaura un respaldo sobre expediente_expediente. Antes hace un respaldo automático del estado actual.
  * Devuelve ['ok' => true, 'previo' => archivo] o ['ok' => false, 'error'].
  */
 function restaurarRespaldo(string $nombre): array

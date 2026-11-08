@@ -14,7 +14,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 # Con pythonw.exe (arranque automático sin ventana) sys.stdout es None y print() falla.
 # En ese caso se escribe todo a un log en la carpeta temporal.
 if sys.stdout is None or sys.stderr is None:
-    _log = open(os.path.join(tempfile.gettempdir(), 'femeci_stt.log'), 'a', encoding='utf-8', buffering=1)
+    _log = open(os.path.join(tempfile.gettempdir(), 'expediente_stt.log'), 'a', encoding='utf-8', buffering=1)
     if sys.stdout is None:
         sys.stdout = _log
     if sys.stderr is None:

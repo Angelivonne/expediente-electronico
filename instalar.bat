@@ -1,10 +1,10 @@
 @echo off
-REM Instalador local de ExpedienteFEMECI para Windows (XAMPP)
+REM Instalador local de ExpedienteExpediente para Windows (XAMPP)
 setlocal
 
 set XAMPP=C:\xampp
-set PROYECTO=%XAMPP%\htdocs\ExpedienteFEMECI
-set DB=expediente_femeci
+set PROYECTO=%XAMPP%\htdocs\ExpedienteExpediente
+set DB=expediente_expediente
 
 echo [1/6] Verificando XAMPP...
 if not exist "%XAMPP%\mysql\bin\mysql.exe" (
@@ -26,7 +26,7 @@ echo [4/6] Generando privado\bd.php...
 if not exist "%PROYECTO%\privado" mkdir "%PROYECTO%\privado"
 (
     echo ^<?php
-    echo return ['usuario' =^> 'femeci_app', 'clave' =^> 'spYFEdL2w3lxM1KVrCQ4'];
+    echo return ['usuario' =^> 'expediente_app', 'clave' =^> 'spYFEdL2w3lxM1KVrCQ4'];
 ) > "%PROYECTO%\privado\bd.php"
 
 echo [5/6] Iniciando Apache...
@@ -34,5 +34,5 @@ start "" "%XAMPP%\apache\bin\httpd.exe"
 timeout /t 3 /nobreak >nul
 
 echo [6/6] Listo.
-echo Abre: http://localhost/ExpedienteFEMECI/
+echo Abre: http://localhost/ExpedienteExpediente/
 pause
