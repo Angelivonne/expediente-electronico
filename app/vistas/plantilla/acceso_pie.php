@@ -10,6 +10,12 @@
     <img class="acceso__diapositiva acceso__diapositiva--vertical" data-src="<?= recurso('img/acceso/diapositiva-3.webp') ?>" alt="">
     <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-5.webp') ?>" alt="">
     <img class="acceso__diapositiva acceso__diapositiva--contener" data-src="<?= recurso('img/acceso/diapositiva-6.webp') ?>" alt="">
+    <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-7.jpeg') ?>" alt="">
+    <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-8.jpeg') ?>" alt="">
+    <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-9.jpeg') ?>" alt="">
+    <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-10.jpeg') ?>" alt="">
+    <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-11.jpeg') ?>" alt="">
+    <img class="acceso__diapositiva" data-src="<?= recurso('img/acceso/diapositiva-12.jpeg') ?>" alt="">
   </div>
 </main>
 
