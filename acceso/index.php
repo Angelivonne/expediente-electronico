@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrfValido()) {
         $error = 'La sesión expiró. Vuelve a intentarlo.';
     } elseif (RECAPTCHA_SITE_KEY !== '' && $correo !== '' && !recaptchaVerificar((string) ($_POST['g-recaptcha-response'] ?? ''))) {
+        error_log('[recaptcha] token=' . substr((string)($_POST['g-recaptcha-response'] ?? ''), 0, 20) . ' correo=' . $correo);
         $error = 'Verifica que no eres un robot (reCAPTCHA).';
     } elseif ($correo === '' || $clave === '' || mb_strlen($correo) > 160 || strlen($clave) > 1024) {
         $error = 'Escribe tu correo y tu contraseña.';
