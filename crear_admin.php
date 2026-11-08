@@ -12,8 +12,10 @@ if ($st->fetchColumn() > 0) {
 }
 $st = $pdo->query("SELECT COUNT(*) FROM instituciones");
 if ($st->fetchColumn() == 0) {
-    $pdo->prepare("INSERT INTO instituciones (nombre, tipo, domicilio) VALUES (?, 'clinica', '')")
-        ->execute(array("Mi Clinica"));
+    // Get admin id
+    $adminId = $pdo->query("SELECT id FROM usuarios WHERE rol = 'administrador' LIMIT 1")->fetchColumn();
+    $pdo->prepare("INSERT INTO instituciones (nombre, tipo, domicilio, entidad, creada_por) VALUES (?, 'clinica', '', '01', ?)")
+        ->execute(array("Mi Clinica", $adminId));
     $instId = $pdo->lastInsertId();
     echo "Institution created with id: " . $instId . "\n";
     $pdo->prepare("UPDATE usuarios SET institucion_id = ? WHERE rol = 'administrador'")
