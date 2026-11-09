@@ -227,7 +227,6 @@ function ejecutarHerramientaIa(string $nombre, array $entrada, string $acceso): 
             'agendar_cita'     => iaAgendarCita($entrada),
             'actualizar_cita'  => iaActualizarCita($entrada),
             'datos'                    => iaDatos($entrada),
-            'analizar_datos_clinicos' => iaDatos($entrada),
             'crear_documento_analisis'=> iaCrearDocumentoAnalisis($entrada),
             'generar_documento_pdf'   => iaCrearDocumentoAnalisis($entrada),
             default            => ejecutarHerramientaAmpliada($nombre, $entrada) ?? ejecutarHerramientaIaExtra($nombre, $entrada) ?? fallaIa('Herramienta desconocida.'),
@@ -1363,27 +1362,7 @@ function iaRevisarExpediente(int $id): array
 
 /* ---------- Herramientas de Análisis de Datos y Generación de Documentos Formales ---------- */
 
-function herramientaDatosIa(): array
-{
-    return [
-        'nombre' => 'analizar_datos_clinicos',
-        'descripcion' => 'Consulta y analiza estadísticas de morbilidad, frecuencias de enfermedades CIE-10 y biometría consolidada de la clínica sin revelar nombres de pacientes (privacidad NOM-024). Desduplica pacientes para evitar repeticiones.',
-        'esquema' => [
-            'type' => 'object',
-            'properties' => [
-                'periodo' => [
-                    'type' => 'string',
-                    'enum' => ['todos', 'anio', '12m', 'mes'],
-                    'description' => 'Ventana temporal: todos (histórico), anio (año en curso), 12m (últimos 12 meses), mes (últimos 30 días)'
-                ],
-                'enfoque' => [
-                    'type' => 'string',
-                    'description' => 'Enfoque o patología específica (opcional, ej. hipertensión, diabetes, respiratorias)'
-                ]
-            ]
-        ]
-    ];
-}
+
 
 function herramientaDocumentoAnalisisIa(): array
 {
@@ -1524,20 +1503,7 @@ function obtenerDatosConsolidadosIa(string $periodo = 'todos'): array
     ];
 }
 
-function iaDatos(array $entrada): array
-{
-    $periodo = (string) ($entrada['periodo'] ?? 'todos');
-    $datos = obtenerDatosConsolidadosIa($periodo);
-    
-    $resumen = "Análisis de morbilidad consolidado (" . $datos['pacientes_unicos'] . " pacientes únicos desduplicados, " . $datos['total_consultas'] . " consultas analizadas).";
-    return [
-        'ok' => true,
-        'resultado' => json_encode($datos, JSON_UNESCAPED_UNICODE),
-        'resumen' => $resumen,
-        'url' => URL_BASE . '/pacientes/datos.php?periodo=' . urlencode($periodo),
-        'cambio' => false
-    ];
-}
+
 
 function iaCrearDocumentoAnalisis(array $entrada): array
 {
