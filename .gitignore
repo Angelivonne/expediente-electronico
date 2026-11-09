@@ -1,4 +1,4 @@
-﻿# Basura y datos locales
+# Basura y datos locales
 models/
 transcribe-cpp/
 backups/
@@ -20,3 +20,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+__pycache__/
+*.pyc
