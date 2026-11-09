@@ -72,6 +72,17 @@ foreach ([
     echo "Tabla `$tabla`:\n";
     foreach ($cols as $col) {
         $ok = columnaExiste($tabla, $col);
-        echo "  - $col: " . ($ok ? "OK" : "FALTA") . "\n";
+        if (!$ok) {
+            // Intentar ejecutar ALTER directamente y capturar el error exacto de MySQL
+            try {
+                $pdo->exec("ALTER TABLE `$tabla` ADD COLUMN `$col` VARCHAR(255) NULL");
+                $ok = columnaExiste($tabla, $col, true);
+                echo "  - $col: REPARADO EN VIVO\n";
+            } catch (Throwable $alterError) {
+                echo "  - $col: ERROR (" . $alterError->getMessage() . ")\n";
+            }
+        } else {
+            echo "  - $col: OK\n";
+        }
     }
 }
