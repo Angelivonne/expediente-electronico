@@ -135,7 +135,7 @@ function herramientasIa(string $acceso): array
             'despues_de' => ['type' => 'string', 'description' => 'Texto del bloque o encabezado tras el cual colocarla (por defecto al final)'],
         ], 'required' => ['id', 'tipo']],
     ];
-    $escritura = array_merge($lectura, $escritura, herramientasIaAmpliadas('restringido'), $web, herramientasIaExtra('restringido'));
+    $escritura = array_merge($lectura, $escritura, herramientasIaAmpliadas('restringido'), $web, herramientasIaExtra('restringido'), [herramientaDatosIa(), herramientaDocumentoAnalisisIa()]);
     if ($acceso !== 'expediente') {
         return $escritura;
     }
@@ -174,8 +174,7 @@ function herramientasIa(string $acceso): array
             'esquema' => ['type' => 'object', 'properties' => ['consulta' => ['type' => 'string']], 'required' => ['consulta']],
         ],
     ], $escritura, array_slice(herramientasIaAmpliadas('expediente'), count(herramientasIaAmpliadas('restringido'))), $agenda,
-       array_slice(herramientasIaExtra('expediente'), count(herramientasIaExtra('restringido'))),
-       [herramientaDatosIa(), herramientaDocumentoAnalisisIa()]);
+       array_slice(herramientasIaExtra('expediente'), count(herramientasIaExtra('restringido'))));
 }
 
 /** Formato de herramientas para la API de Anthropic (claves camelCase del SDK). */

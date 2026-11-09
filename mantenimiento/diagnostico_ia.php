@@ -86,3 +86,47 @@ foreach ([
         }
     }
 }
+
+echo "\n--- Prueba Directa de OpenRouter Chat ---\n";
+if (!empty($cfg['clave'])) {
+    $modelosTest = [
+        $cfg['modelo'],
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'google/gemini-2.0-flash-lite-preview-02-05:free',
+        'google/gemini-2.0-flash-exp:free',
+        'deepseek/deepseek-r1:free',
+        'qwen/qwen-2.5-72b-instruct'
+    ];
+    foreach ($modelosTest as $mTest) {
+        if (empty($mTest) || $mTest === 'openrouter/free') continue;
+        echo "Probando modelo: $mTest\n";
+        $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $cfg['clave'],
+                'HTTP-Referer: https://web-production-cdeee.up.railway.app',
+                'X-Title: FEMECI Expediente Clinico'
+            ],
+            CURLOPT_POSTFIELDS => json_encode([
+                'model' => $mTest,
+                'messages' => [['role' => 'user', 'content' => 'Di exactamente: FUNCIONA']],
+                'max_tokens' => 20
+            ])
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        echo "  HTTP $code | Err: $err | Resp: " . substr($resp, 0, 160) . "\n";
+        if ($code === 200) {
+            echo "  --> EXITOSO CON: $mTest\n";
+            break;
+        }
+    }
+}

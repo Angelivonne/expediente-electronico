@@ -99,11 +99,20 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
         </thead>
         <tbody>
           <?php foreach ($llaves as $llave): ?>
-            <?php $catalogo = $catalogos[$llave] ?? null; if (!$catalogo) continue; ?>
-            <?php $total = $conteos[$llave] ?? null; ?>
+            <?php
+              $catalogo = $catalogos[$llave] ?? null;
+              if (!$catalogo) continue;
+              $total = $conteos[$llave] ?? null;
+              $urlTabla = !empty($catalogo['editor'])
+                ? URL_BASE . '/' . trim($catalogo['editor'], '/') . '/'
+                : URL_BASE . '/catalogos/editar_tabla.php?tabla=' . urlencode($llave);
+              $urlNuevo = !empty($catalogo['editor'])
+                ? URL_BASE . '/' . trim($catalogo['editor'], '/') . '/nuevo.php'
+                : URL_BASE . '/catalogos/nuevo.php?tabla=' . urlencode($llave);
+            ?>
             <tr>
               <td class="bd-tabla__celda-titulo">
-                <a class="bd-tabla__titulo" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=<?= e(urlencode($llave)) ?>">
+                <a class="bd-tabla__titulo" href="<?= e($urlTabla) ?>" title="Abrir tabla independiente de <?= e($catalogo['titulo']) ?>">
                   <?= icono('tabla') ?> <span><?= e($catalogo['titulo']) ?></span>
                 </a>
               </td>
@@ -121,7 +130,8 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
               </td>
               <td style="text-align:right;">
                 <div style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;">
-                  <a class="boton boton--secundario boton--pequeno" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=<?= e(urlencode($llave)) ?>">Abrir</a>
+                  <a class="boton boton--primario boton--pequeno" href="<?= e($urlNuevo) ?>" title="Ingresar nuevo dato"><?= icono('agregar') ?> Nuevo</a>
+                  <a class="boton boton--secundario boton--pequeno" href="<?= e($urlTabla) ?>" title="Abrir tabla independiente">Abrir</a>
                   <a class="boton-icono" href="<?= URL_BASE ?>/api/motor/exportar.php?<?= e(http_build_query(['entidad' => $llave])) ?>" title="Exportar catálogo" aria-label="Exportar"><?= icono('descargar') ?></a>
                   <?php if (puede('configurar')): ?>
                     <a class="boton-icono" href="<?= URL_BASE ?>/catalogos/importar.php?tabla=<?= e(urlencode($llave)) ?>" title="Importar datos" aria-label="Importar"><?= icono('subir') ?></a>
