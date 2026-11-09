@@ -177,16 +177,6 @@ if (!$paginaActual) {
         </div>
       </div>
 
-
-      <div class="lateral-seccion" data-plegable="agentes">
-        <div class="lateral-seccion__titulo">
-          <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Agentes<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
-        </div>
-        <div class="lateral-seccion__contenido">
-          <a class="lateral-enlace<?= $seccionActiva === 'agentes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/agentes/"<?= $seccionActiva === 'agentes' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('chispa') ?><span>Agentes</span></a>
-        </div>
-      </div>
-
       <div class="lateral-seccion" data-plegable="catalogos">
         <div class="lateral-seccion__titulo">
           <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Catálogos<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
@@ -376,3 +366,4 @@ if (!$paginaActual) {
     <?php endif; ?>
 
     <main class="pagina <?= e($claseContenido) ?>">
+

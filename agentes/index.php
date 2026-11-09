@@ -3,6 +3,7 @@ require_once __DIR__ . '/../app/nucleo/inicio.php';
 require_once __DIR__ . '/../app/servicios/ia/asistente.php';
 require_once __DIR__ . '/../app/servicios/ia/agentes.php';
 
+redirigir('/pacientes/');
 if (!puede('asistente')) {
     mensajeFlash('error', 'Tu rol no tiene acceso a los agentes.');
     redirigir('/pacientes/');
@@ -171,4 +172,5 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 <script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/modulos/agentes.js") ?>"></script>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
+
 
