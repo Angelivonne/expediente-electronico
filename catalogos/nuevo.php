@@ -26,8 +26,9 @@ $datos   = array_fill_keys($campos, '');
 $errores = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $entradaPost = is_array($_POST['datos'] ?? null) ? $_POST['datos'] : $_POST;
     foreach ($campos as $campo) {
-        $datos[$campo] = trim((string) ($_POST[$campo] ?? ''));
+        $datos[$campo] = trim((string) ($entradaPost[$campo] ?? ''));
     }
 
     // Validación básica: campos obligatorios
@@ -65,19 +66,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$tituloPagina   = 'Nuevo ' . $catalogo['titulo'];
+$tituloPagina   = 'Nuevo · ' . $catalogo['titulo'];
 $seccionActiva  = 'catalogos-' . $clave;
 $claseContenido = 'pagina--ancha';
-$migas          = [['texto' => 'catálogos', 'url' => URL_BASE . '/catalogos/'], ['texto' => $catalogo['titulo'], 'url' => URL_BASE . '/catalogos/editar.php?tabla=' . urlencode($clave)], ['texto' => 'Nuevo registro']];
+$migas          = [['texto' => 'Catálogos', 'url' => URL_BASE . '/catalogos/'], ['texto' => $catalogo['titulo'], 'url' => URL_BASE . '/catalogos/editar_tabla.php?tabla=' . urlencode($clave)], ['texto' => 'Nuevo registro']];
 
 require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 ?>
 <div class="pagina__cabecera">
-  <h1 class="pagina__titulo"><?= e('Nuevo ' . $catalogo['titulo']) ?></h1>
-  <p class="pagina__subtitulo">Registra una entrada en el catálogo de <?= e($catalogo['titulo']) ?></p>
+  <span class="pagina__meta"><?= iconoRelleno('tabla') ?> Catálogo del sistema</span>
+  <h1 class="pagina__titulo">Nuevo registro: <?= e($catalogo['titulo']) ?></h1>
+  <p class="pagina__subtitulo">Registra una nueva entrada en el catálogo maestro.</p>
 </div>
-
-<?php require __DIR__ . '/_nav.php'; ?>
 
 <?php if (!empty($errores['general'])): ?>
   <div class="notificaciones" aria-live="polite">
@@ -85,16 +85,19 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
   </div>
 <?php endif; ?>
 
-<section class="finanzas__seccion-limpio">
-  <div class="finanzas__titulo-fila-limpio">
-    <h2 class="finanzas__titulo-limpio"><?= icono('documento') ?> Datos del registro</h2>
+<section class="bd" style="max-width:800px;margin-bottom:32px;">
+  <div class="bd__cabecera">
+    <h2 class="bd__titulo"><?= icono('documento') ?> Datos del registro</h2>
+    <div class="bd__herramientas">
+      <a class="boton boton--fantasma" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=<?= e(urlencode($clave)) ?>"><?= icono('atras') ?> Volver al catálogo</a>
+    </div>
   </div>
-  <form method="post" action="<?= e($_SERVER['REQUEST_URI'] . '?tabla=' . urlencode($clave)) ?>" class="nuevo-registro__form">
+
+  <form method="post" action="" style="padding:24px 20px;">
     <?= campoCsrf() ?>
     <input type="hidden" name="tabla" value="<?= e($clave) ?>">
-    <input type="hidden" name="accion_nueva" value="1">
 
-    <div class="nuevo-registro__campos">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:20px;">
       <?php foreach ($campos as $nombre): ?>
         <?php
           $def = $camposDef[$nombre] ?? [];
@@ -105,34 +108,33 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
           $error = (string) ($errores[$nombre] ?? '');
           $opciones = $def['opciones'] ?? [];
         ?>
-        <label class="nuevo-registro__campo<?= $error !== '' ? ' tiene-error' : '' ?>">
-          <span><?= e($texto) ?><?= $requerido ? ' *' : '' ?></span>
+        <label class="formulario__campo<?= $error !== '' ? ' tiene-error' : '' ?>" style="display:flex;flex-direction:column;gap:6px;">
+          <span style="font-weight:550;font-size:var(--fs-sm);color:var(--texto-fuerte);"><?= e($texto) ?><?= $requerido ? ' *' : '' ?></span>
           <?php if ($tipo === 'casilla'): ?>
-            <input type="checkbox" name="datos[<?= e($nombre) ?>]" value="1"<?= $valor !== '' ? ' checked' : '' ?>>
+            <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" name="datos[<?= e($nombre) ?>]" value="1"<?= $valor !== '' ? ' checked' : '' ?>>
+              <span>Activo / Sí</span>
+            </label>
           <?php elseif ($tipo === 'opcion' && !empty($opciones)): ?>
-            <select name="datos[<?= e($nombre) ?>]">
+            <select class="control" name="datos[<?= e($nombre) ?>]">
               <option value="">—</option>
               <?php foreach ($opciones as $claveOpcion => $textoOpcion): ?>
                 <option value="<?= e((string) $claveOpcion) ?>"<?= $valor === (string) $claveOpcion ? ' selected' : '' ?>><?= e((string) $textoOpcion) ?></option>
               <?php endforeach; ?>
             </select>
           <?php elseif ($tipo === 'fecha'): ?>
-            <input type="date" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= $requerido ? ' required' : '' ?>>
+            <input class="control" type="date" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= $requerido ? ' required' : '' ?>>
           <?php elseif ($tipo === 'numero'): ?>
-            <input type="number" step="0.01" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= $requerido ? ' required' : '' ?>>
+            <input class="control" type="number" step="0.01" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= $requerido ? ' required' : '' ?>>
           <?php else: ?>
-            <input type="text" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= !empty($def['max']) ? ' maxlength="' . (int) $def['max'] . '"' : '' ?><?= $requerido ? ' required' : '' ?>>
+            <input class="control" type="text" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= !empty($def['max']) ? ' maxlength="' . (int) $def['max'] . '"' : '' ?><?= $requerido ? ' required' : '' ?>>
           <?php endif; ?>
-          <?php if ($error !== ''): ?><em class="nuevo-registro__error"><?= e($error) ?></em><?php endif; ?>
+          <?php if ($error !== ''): ?><em class="error-campo" style="color:var(--color-peligro, #e53935);font-size:var(--fs-xs);"><?= e($error) ?></em><?php endif; ?>
         </label>
       <?php endforeach; ?>
     </div>
 
-    <?php if (!empty($errores['general'])): ?>
-      <p class="nuevo-registro__error"><?= e((string) $errores['general']) ?></p>
-    <?php endif; ?>
-
-    <div class="nuevo-registro__acciones">
+    <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:24px;padding-top:16px;border-top:1px solid var(--borde-suave, #e0e0e0);">
       <a class="boton boton--fantasma" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=<?= e(urlencode($clave)) ?>"><?= icono('atras') ?> Cancelar</a>
       <button type="submit" class="boton boton--primario"><?= icono('agregar') ?> Guardar registro</button>
     </div>
@@ -140,8 +142,3 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 </section>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
-
-
-
-
-

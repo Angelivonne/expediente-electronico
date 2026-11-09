@@ -506,6 +506,9 @@ function motorCrear(string $clave, array $datos, array $opciones = []): array
         $marcas[]   = '?';
     }
     foreach ($limpios as $campo => $valor) {
+        if (function_exists('columnaExiste') && !columnaExiste($tabla, $campo)) {
+            continue;
+        }
         $columnas[] = '`' . $campo . '`';
         $valores[]  = $valor;
         $marcas[]   = '?';
@@ -588,7 +591,10 @@ function motorActualizar(string $clave, int $id, array $datos, array $opciones =
     $cambios = 0;
     try {
         foreach ($limpios as $campo => $nuevo) {
-            $anterior = $original[$campo];
+            if (function_exists('columnaExiste') && !columnaExiste($tabla, $campo)) {
+                continue;
+            }
+            $anterior = $original[$campo] ?? null;
             if ((string) $anterior === (string) $nuevo) {
                 continue;
             }
