@@ -5030,8 +5030,8 @@ body.portal .visor { height: calc(100dvh - 64px); }
 
 html, body { height: 100%; overflow-x: hidden !important; overflow-y: auto !important; }
 .app { min-height: calc(100vh - var(--alto-pestanas)) !important; height: auto !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
-.app > .contenido, .app main { min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; display: flex !important; flex-direction: column !important; min-height: 0 !important; height: auto !important; }
-.app .pagina { min-height: 0 !important; height: auto !important; display: flex !important; flex-direction: column !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
+.app > .contenido { min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; display: flex !important; flex-direction: column !important; min-height: 0 !important; height: auto !important; }
+.app .pagina { min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
 .pagina__cabecera, .bd__cabecera { flex: 0 0 auto !important; min-width: 0 !important; max-width: 100% !important; }
 .bd { flex: 1 1 auto !important; min-height: 0 !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; display: flex !important; flex-direction: column !important; }
 .bd__contenido { flex: 1 1 auto !important; min-height: 0 !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
