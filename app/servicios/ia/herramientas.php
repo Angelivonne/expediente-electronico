@@ -175,7 +175,7 @@ function herramientasIa(string $acceso): array
         ],
     ], $escritura, array_slice(herramientasIaAmpliadas('expediente'), count(herramientasIaAmpliadas('restringido'))), $agenda,
        array_slice(herramientasIaExtra('expediente'), count(herramientasIaExtra('restringido'))),
-       in_array($acceso, ['expediente', 'restringido']) ? [herramientaDatosIa()] : []);
+       [herramientaDatosIa(), herramientaDocumentoAnalisisIa()]);
 }
 
 /** Formato de herramientas para la API de Anthropic (claves camelCase del SDK). */
@@ -226,7 +226,10 @@ function ejecutarHerramientaIa(string $nombre, array $entrada, string $acceso): 
             'ver_agenda'       => iaVerAgenda($entrada),
             'agendar_cita'     => iaAgendarCita($entrada),
             'actualizar_cita'  => iaActualizarCita($entrada),
-            'datos'            => iaDatos($entrada),
+            'datos'                    => iaDatos($entrada),
+            'analizar_datos_clinicos' => iaDatos($entrada),
+            'crear_documento_analisis'=> iaCrearDocumentoAnalisis($entrada),
+            'generar_documento_pdf'   => iaCrearDocumentoAnalisis($entrada),
             default            => ejecutarHerramientaAmpliada($nombre, $entrada) ?? ejecutarHerramientaIaExtra($nombre, $entrada) ?? fallaIa('Herramienta desconocida.'),
         };
     } catch (Throwable $e) {
@@ -1157,7 +1160,7 @@ function descripcionHerramientaIa(string $nombre): string
         'editar_columna' => 'Editando la propiedad…', 'leer_paciente' => 'Leyendo el expediente…', 'registrar_paciente' => 'Registrando al paciente…',
         'actualizar_paciente' => 'Actualizando el expediente…', 'agregar_historial' => 'Agregando al historial…',
         'buscar_en_internet' => 'Buscando en internet…', 'leer_sitio_web' => 'Leyendo el sitio…', 'insertar_imagen' => 'Agregando la imagen…', 'ajustar_imagen' => 'Ajustando el tamaño…',
-        'ver_agenda' => 'Revisando la agenda…', 'agendar_cita' => 'Agendando la cita…', 'actualizar_cita' => 'Actualizando la cita…', 'crear_grafica' => 'Dibujando la gráfica…', 'revisar_expediente' => 'Revisando el expediente…', 'editar_nota' => 'Editando la nota…', 'listar_personas' => 'Consultando al equipo…', 'enviar_aviso' => 'Enviando el aviso…', 'estadisticas_pacientes' => 'Calculando estadísticas…', 'datos' => 'Consultando datos…',
+        'ver_agenda' => 'Revisando la agenda…', 'agendar_cita' => 'Agendando la cita…', 'actualizar_cita' => 'Actualizando la cita…', 'crear_grafica' => 'Dibujando la gráfica…', 'revisar_expediente' => 'Revisando el expediente…', 'editar_nota' => 'Editando la nota…', 'listar_personas' => 'Consultando al equipo…', 'enviar_aviso' => 'Enviando el aviso…', 'estadisticas_pacientes' => 'Calculando estadísticas…', 'datos' => 'Consultando datos…', 'analizar_datos_clinicos' => 'Analizando datos clínicos…', 'crear_documento_analisis' => 'Generando documento formal…', 'generar_documento_pdf' => 'Generando documento PDF…',
     ][$nombre] ?? 'Trabajando…';
 }
 
@@ -1356,3 +1359,433 @@ function iaRevisarExpediente(int $id): array
             'resumen' => 'Revisó el expediente ' . $datos['folio'] . ($altas ? " · {$altas} " . ($altas === 1 ? 'alerta importante' : 'alertas importantes') : ''),
             'url' => URL_BASE . '/pacientes/ver.php?id=' . $id, 'cambio' => false];
 }
+
+
+/* ---------- Herramientas de Análisis de Datos y Generación de Documentos Formales ---------- */
+
+function herramientaDatosIa(): array
+{
+    return [
+        'nombre' => 'analizar_datos_clinicos',
+        'descripcion' => 'Consulta y analiza estadísticas de morbilidad, frecuencias de enfermedades CIE-10 y biometría consolidada de la clínica sin revelar nombres de pacientes (privacidad NOM-024). Desduplica pacientes para evitar repeticiones.',
+        'esquema' => [
+            'type' => 'object',
+            'properties' => [
+                'periodo' => [
+                    'type' => 'string',
+                    'enum' => ['todos', 'anio', '12m', 'mes'],
+                    'description' => 'Ventana temporal: todos (histórico), anio (año en curso), 12m (últimos 12 meses), mes (últimos 30 días)'
+                ],
+                'enfoque' => [
+                    'type' => 'string',
+                    'description' => 'Enfoque o patología específica (opcional, ej. hipertensión, diabetes, respiratorias)'
+                ]
+            ]
+        ]
+    ];
+}
+
+function herramientaDocumentoAnalisisIa(): array
+{
+    return [
+        'nombre' => 'crear_documento_analisis',
+        'descripcion' => 'Crea un documento formal clínico/epidemiológico (PDF/HTML descargable e imprimible en Arial 12pt, texto negro, 2.5cm de margen, sin colores, con tablas y fórmulas de desduplicación) con el análisis de enfermedades de la clínica. Devuelve el enlace directo al documento y resumen.',
+        'esquema' => [
+            'type' => 'object',
+            'properties' => [
+                'titulo' => [
+                    'type' => 'string',
+                    'description' => 'Título formal del informe (ej. Informe Epidemiológico y Morbilidad Institucional 2026)'
+                ],
+                'periodo' => [
+                    'type' => 'string',
+                    'enum' => ['todos', 'anio', '12m', 'mes'],
+                    'description' => 'Periodo a incluir'
+                ],
+                'conclusiones' => [
+                    'type' => 'string',
+                    'description' => 'Conclusiones y análisis clínico redactado por el asistente para incluir en el cuerpo del documento formal'
+                ],
+                'recomendaciones' => [
+                    'type' => 'string',
+                    'description' => 'Recomendaciones médicas y preventivas institucionales'
+                ]
+            ],
+            'required' => ['titulo', 'conclusiones']
+        ]
+    ];
+}
+
+function obtenerDatosConsolidadosIa(string $periodo = 'todos'): array
+{
+    $pdo = db();
+    $instId = institucionId();
+
+    $condicionFecha = '';
+    $params = [];
+    if ($instId !== null) {
+        $condicionFecha .= ' AND h.institucion_id = ?';
+        $params[] = $instId;
+    }
+
+    $hoy = date('Y-m-d');
+    if ($periodo === 'mes') {
+        $condicionFecha .= ' AND h.fecha >= ? AND h.fecha <= ?';
+        $params[] = date('Y-m-d 00:00:00', strtotime('-30 days'));
+        $params[] = $hoy . ' 23:59:59';
+    } elseif ($periodo === '12m') {
+        $condicionFecha .= ' AND h.fecha >= ? AND h.fecha <= ?';
+        $params[] = date('Y-m-d 00:00:00', strtotime('-365 days'));
+        $params[] = $hoy . ' 23:59:59';
+    } elseif ($periodo === 'anio') {
+        $condicionFecha .= ' AND h.fecha >= ? AND h.fecha <= ?';
+        $params[] = date('Y-01-01 00:00:00');
+        $params[] = $hoy . ' 23:59:59';
+    }
+
+    $sql = "SELECT h.id, h.paciente_id, h.fecha, h.detalle, p.sexo, p.fecha_nacimiento
+            FROM historial_clinico h
+            INNER JOIN pacientes p ON p.id = h.paciente_id
+            WHERE h.tipo = 'consulta' AND p.eliminado_en IS NULL $condicionFecha
+            ORDER BY h.fecha ASC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $pacientesUnicos = [];
+    $morbilidad = [];
+    $sexos = ['M' => 0, 'F' => 0];
+    $biometria = ['sistolica' => [], 'diastolica' => [], 'glucosa' => [], 'imc' => []];
+
+    foreach ($filas as $fila) {
+        $pid = (int) $fila['paciente_id'];
+        $pacientesUnicos[$pid] = true;
+        $sexo = strtoupper($fila['sexo'] ?? '');
+        if (isset($sexos[$sexo])) {
+            $sexos[$sexo]++;
+        }
+
+        $det = json_decode($fila['detalle'] ?? '{}', true) ?: [];
+        $cie10 = trim((string) ($det['diagnostico_codigo'] ?? $det['cie10'] ?? ''));
+        $dx = trim((string) ($det['diagnostico'] ?? $det['nota'] ?? ''));
+
+        if ($cie10 !== '' || $dx !== '') {
+            $claveDx = $cie10 !== '' ? $cie10 : mb_substr($dx, 0, 50);
+            if (!isset($morbilidad[$claveDx])) {
+                $morbilidad[$claveDx] = [
+                    'codigo' => $cie10 ?: 'S/C',
+                    'descripcion' => $dx ?: 'Diagnóstico clínico',
+                    'pacientes' => [],
+                    'consultas' => 0
+                ];
+            }
+            $morbilidad[$claveDx]['consultas']++;
+            $morbilidad[$claveDx]['pacientes'][$pid] = true;
+        }
+
+        $signos = $det['signos'] ?? [];
+        if (!empty($signos['sistolica']) && is_numeric($signos['sistolica'])) $biometria['sistolica'][] = (float) $signos['sistolica'];
+        if (!empty($signos['diastolica']) && is_numeric($signos['diastolica'])) $biometria['diastolica'][] = (float) $signos['diastolica'];
+        if (!empty($signos['glucosa']) && is_numeric($signos['glucosa'])) $biometria['glucosa'][] = (float) $signos['glucosa'];
+        if (!empty($signos['peso']) && !empty($signos['talla']) && is_numeric($signos['peso']) && is_numeric($signos['talla']) && $signos['talla'] > 0) {
+            $t = $signos['talla'] > 3 ? $signos['talla'] / 100 : $signos['talla'];
+            $biometria['imc'][] = round($signos['peso'] / ($t * $t), 1);
+        }
+    }
+
+    $ranking = [];
+    $totalPacientes = count($pacientesUnicos);
+    foreach ($morbilidad as $k => $m) {
+        $casosUnicos = count($m['pacientes']);
+        $tasa = $totalPacientes > 0 ? round(($casosUnicos / $totalPacientes) * 100, 1) : 0;
+        $ranking[] = [
+            'codigo' => $m['codigo'],
+            'descripcion' => $m['descripcion'],
+            'casos_unicos' => $casosUnicos,
+            'total_consultas' => $m['consultas'],
+            'prevalencia_pct' => $tasa
+        ];
+    }
+    usort($ranking, fn($a, $b) => $b['casos_unicos'] <=> $a['casos_unicos']);
+
+    $promedios = [];
+    foreach ($biometria as $k => $vals) {
+        $promedios[$k] = count($vals) > 0 ? round(array_sum($vals) / count($vals), 1) : null;
+    }
+
+    return [
+        'periodo' => $periodo,
+        'total_consultas' => count($filas),
+        'pacientes_unicos' => $totalPacientes,
+        'distribucion_sexo' => $sexos,
+        'promedios_biometria' => $promedios,
+        'ranking_morbilidad' => array_slice($ranking, 0, 15)
+    ];
+}
+
+function iaDatos(array $entrada): array
+{
+    $periodo = (string) ($entrada['periodo'] ?? 'todos');
+    $datos = obtenerDatosConsolidadosIa($periodo);
+    
+    $resumen = "Análisis de morbilidad consolidado (" . $datos['pacientes_unicos'] . " pacientes únicos desduplicados, " . $datos['total_consultas'] . " consultas analizadas).";
+    return [
+        'ok' => true,
+        'resultado' => json_encode($datos, JSON_UNESCAPED_UNICODE),
+        'resumen' => $resumen,
+        'url' => URL_BASE . '/pacientes/datos.php?periodo=' . urlencode($periodo),
+        'cambio' => false
+    ];
+}
+
+function iaCrearDocumentoAnalisis(array $entrada): array
+{
+    $periodo = (string) ($entrada['periodo'] ?? 'todos');
+    $titulo = trim((string) ($entrada['titulo'] ?? 'Informe Epidemiológico y Morbilidad Institucional'));
+    $conclusiones = trim((string) ($entrada['conclusiones'] ?? ''));
+    $recomendaciones = trim((string) ($entrada['recomendaciones'] ?? ''));
+
+    $datos = obtenerDatosConsolidadosIa($periodo);
+
+    $dirDoc = __DIR__ . '/../../../privado/documentos';
+    if (!is_dir($dirDoc)) {
+        @mkdir($dirDoc, 0777, true);
+    }
+
+    $token = bin2hex(random_bytes(8));
+    $nombreArchivo = 'informe_' . date('Ymd_His') . '_' . $token . '.html';
+    $rutaCompleta = $dirDoc . '/' . $nombreArchivo;
+
+    $filasTablaHtml = '';
+    $i = 1;
+    foreach ($datos['ranking_morbilidad'] as $m) {
+        $filasTablaHtml .= '<tr>'
+            . '<td style="border:1px solid #000;padding:6px;text-align:center;">' . $i++ . '</td>'
+            . '<td style="border:1px solid #000;padding:6px;font-family:monospace;font-weight:bold;">' . htmlspecialchars($m['codigo']) . '</td>'
+            . '<td style="border:1px solid #000;padding:6px;">' . htmlspecialchars($m['descripcion']) . '</td>'
+            . '<td style="border:1px solid #000;padding:6px;text-align:right;">' . $m['casos_unicos'] . '</td>'
+            . '<td style="border:1px solid #000;padding:6px;text-align:right;">' . $m['total_consultas'] . '</td>'
+            . '<td style="border:1px solid #000;padding:6px;text-align:right;">' . $m['prevalencia_pct'] . '%</td>'
+            . '</tr>';
+    }
+
+    $ta = ($datos['promedios_biometria']['sistolica'] && $datos['promedios_biometria']['diastolica'])
+        ? $datos['promedios_biometria']['sistolica'] . '/' . $datos['promedios_biometria']['diastolica'] . ' mmHg'
+        : 'N/A';
+    $glu = $datos['promedios_biometria']['glucosa'] ? $datos['promedios_biometria']['glucosa'] . ' mg/dL' : 'N/A';
+    $imc = $datos['promedios_biometria']['imc'] ? $datos['promedios_biometria']['imc'] . ' kg/m²' : 'N/A';
+
+    $fechaEmision = date('d/m/Y H:i');
+    $urlExpediente = URL_BASE . '/pacientes/datos.php';
+
+    $html = <<<HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>{$titulo}</title>
+<style>
+  @page {
+    size: letter portrait;
+    margin: 2.5cm;
+  }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    color: #000000;
+    background: #ffffff;
+    margin: 0;
+    padding: 2.5cm;
+  }
+  h1 {
+    font-size: 16pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 4px;
+    color: #000000;
+    text-transform: uppercase;
+  }
+  h2 {
+    font-size: 13pt;
+    font-weight: bold;
+    margin-top: 24px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #000000;
+    padding-bottom: 3px;
+    color: #000000;
+  }
+  p, table, ul, ol {
+    color: #000000;
+    font-size: 12pt;
+  }
+  .encabezado-doc {
+    text-align: center;
+    border-bottom: 2px solid #000000;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+  .metadatos-grid {
+    width: 100%;
+    margin-bottom: 16px;
+    border-collapse: collapse;
+  }
+  .metadatos-grid td {
+    padding: 4px 6px;
+    vertical-align: top;
+    font-size: 11pt;
+  }
+  table.datos-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    margin-bottom: 20px;
+  }
+  table.datos-tabla th {
+    border: 1px solid #000000;
+    padding: 8px 6px;
+    background: #f0f0f0;
+    color: #000000;
+    font-weight: bold;
+    font-size: 11pt;
+  }
+  .formula-box {
+    border: 1px solid #000000;
+    padding: 10px 14px;
+    margin: 16px 0;
+    background: #fafafa;
+    font-size: 11pt;
+  }
+  .firma-bloque {
+    margin-top: 48px;
+    text-align: center;
+    page-break-inside: avoid;
+  }
+  .firma-linea {
+    width: 280px;
+    border-top: 1px solid #000000;
+    margin: 0 auto 8px auto;
+  }
+  .no-print {
+    margin-bottom: 24px;
+    padding: 12px;
+    background: #f4f4f4;
+    border: 1px solid #ccc;
+    text-align: right;
+  }
+  .btn-print {
+    padding: 8px 16px;
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+    font-weight: bold;
+    color: #fff;
+    background: #000;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  @media print {
+    body {
+      padding: 0;
+    }
+    .no-print {
+      display: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button class="btn-print" onclick="window.print()">Imprimir / Guardar como PDF</button>
+  <a href="{$urlExpediente}" style="margin-left:12px;color:#000;font-size:11pt;">Ir al Expediente</a>
+</div>
+
+<div class="encabezado-doc">
+  <h1>{$titulo}</h1>
+  <p style="margin:4px 0 0 0;font-size:11pt;">DOCUMENTO CLÍNICO-EPIDEMIOLÓGICO FORMAL · NORMATIVA NOM-004-SSA3-2012 / NOM-024-SSA3-2012</p>
+</div>
+
+<table class="metadatos-grid">
+  <tr>
+    <td style="width:50%;"><strong>Fecha de emisión:</strong> {$fechaEmision}</td>
+    <td style="width:50%;"><strong>Periodo analizado:</strong> {$periodo}</td>
+  </tr>
+  <tr>
+    <td><strong>Total de consultas evaluadas:</strong> {$datos['total_consultas']}</td>
+    <td><strong>Población única censada (desduplicada):</strong> {$datos['pacientes_unicos']} pacientes</td>
+  </tr>
+  <tr>
+    <td><strong>Promedios Biométricos:</strong> TA: {$ta} · Glucosa: {$glu}</td>
+    <td><strong>Índice de Masa Corporal Promedio:</strong> {$imc}</td>
+  </tr>
+</table>
+
+<div class="formula-box">
+  <strong>Criterio Matemático de Desduplicación (Control de Duplicidad Epidemiológica):</strong><br>
+  Para evitar sesgos o repetición de datos en pacientes con múltiples citas subsecuentes durante el mismo ciclo, cada sujeto se computa una sola vez por diagnóstico CIE-10 mediante la función:
+  <br>
+  <em>Prevalencia Registrada = [COUNT(DISTINCT paciente_id con CIE-10) / Total Pacientes Únicos] × 100</em>
+  <br>
+  <strong>Anonimización:</strong> Toda la información contenida en este instrumento resguarda de forma estricta el secreto médico conforme a la NOM-024, omitiendo datos de identificación nominativa.
+</div>
+
+<h2>1. Distribución de Morbilidad y Frecuencias Diagnósticas (CIE-10)</h2>
+<table class="datos-tabla">
+  <thead>
+    <tr>
+      <th style="width:40px;">#</th>
+      <th style="width:75px;">CIE-10</th>
+      <th>Descripción Nosológica Oficial</th>
+      <th style="width:90px;">Casos Únicos</th>
+      <th style="width:90px;">Consultas</th>
+      <th style="width:95px;">Prevalencia</th>
+    </tr>
+  </thead>
+  <tbody>
+    {$filasTablaHtml}
+  </tbody>
+</table>
+
+<h2>2. Análisis Clínico y Conclusiones Asistidas</h2>
+<p style="text-align:justify;">
+  {$conclusiones}
+</p>
+
+<h2>3. Recomendaciones Médicas y Acciones Preventivas</h2>
+<p style="text-align:justify;">
+  {$recomendaciones}
+</p>
+
+<div class="firma-bloque">
+  <div class="firma-linea"></div>
+  <strong>Dirección Médica / Jefatura de Epidemiología y Calidad Clínica</strong><br>
+  <span style="font-size:10pt;">Expediente Clínico Electrónico FEMECI · Certificación NOM-004/NOM-024</span>
+</div>
+
+</body>
+</html>
+HTML;
+
+    file_put_contents($rutaCompleta, $html);
+
+    $urlDoc = URL_BASE . '/pacientes/documento_ia.php?doc=' . urlencode($nombreArchivo);
+    $resumen = "Documento formal generado exitosamente: «{$titulo}» en Arial 12pt, texto negro y formato imprimible/PDF.";
+
+    return [
+        'ok' => true,
+        'resultado' => json_encode([
+            'titulo' => $titulo,
+            'archivo' => $nombreArchivo,
+            'url' => $urlDoc,
+            'pacientes_analizados' => $datos['pacientes_unicos'],
+            'consultas_analizadas' => $datos['total_consultas'],
+            'diagnosticos_incluidos' => count($datos['ranking_morbilidad'])
+        ], JSON_UNESCAPED_UNICODE),
+        'resumen' => $resumen,
+        'url' => $urlDoc,
+        'cambio' => false
+    ];
+}
+

@@ -103,16 +103,12 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             <?php $total = $conteos[$llave] ?? null; ?>
             <tr>
               <td class="bd-tabla__celda-titulo">
-                <?php if ($total !== null): ?>
-                  <a class="bd-tabla__titulo" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=<?= e(urlencode($llave)) ?>">
-                    <?= icono('tabla') ?> <span><?= e($catalogo['titulo']) ?></span>
-                  </a>
-                <?php else: ?>
-                  <span class="bd-tabla__titulo" style="opacity:.6;"><?= icono('tabla') ?> <span><?= e($catalogo['titulo']) ?></span></span>
-                <?php endif; ?>
+                <a class="bd-tabla__titulo" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=<?= e(urlencode($llave)) ?>">
+                  <?= icono('tabla') ?> <span><?= e($catalogo['titulo']) ?></span>
+                </a>
               </td>
               <td style="color:var(--texto);"><?= e($catalogo['descripcion'] ?? ('Catálogo del sistema · tabla ' . $catalogo['tabla'])) ?></td>
-              <td class="num font-mono"><?= $total === null ? '<span class="datos-tenue">No instalada</span>' : number_format((int) $total) ?></td>
+              <td class="num font-mono"><?= $total === null ? '<span class="datos-tenue">0</span>' : number_format((int) $total) ?></td>
               <?php
                 $metaFila = $metaCatalogoDb[$llave] ?? [];
                 $fuenteMostrar = $metaFila['fuente'] ?? ($catalogo['fuente'] ?? '—');
@@ -124,17 +120,16 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
                 <br><small class="datos-tenue"><?= e($catalogo['norma'] ?? '') ?><?= !empty($metaFila['vigencia']) ? ' · hasta ' . e((string) $metaFila['vigencia']) : '' ?><?= !empty($metaFila['responsable']) ? ' · ' . e((string) $metaFila['responsable']) : '' ?></small>
               </td>
               <td style="text-align:right;">
-                <?php if ($total !== null): ?>
-                  <div style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;">
-                    <a class="boton-icono" href="<?= URL_BASE ?>/api/motor/exportar.php?<?= e(http_build_query(['entidad' => $llave])) ?>" title="Exportar catálogo" aria-label="Exportar"><?= icono('descargar') ?></a>
-                    <?php if (puede('configurar')): ?>
-                      <a class="boton-icono" href="<?= URL_BASE ?>/catalogos/importar.php?tabla=<?= e(urlencode($llave)) ?>" title="Importar datos" aria-label="Importar"><?= icono('subir') ?></a>
-                      <?php if ($metaCatalogoDisponible): ?>
-                        <a class="boton-icono" href="<?= URL_BASE ?>/catalogos/meta.php?tabla=<?= e(urlencode($llave)) ?>" title="Metadatos" aria-label="Metadatos"><?= icono('ajustes') ?></a>
-                      <?php endif; ?>
+                <div style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;">
+                  <a class="boton boton--secundario boton--pequeno" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=<?= e(urlencode($llave)) ?>">Abrir</a>
+                  <a class="boton-icono" href="<?= URL_BASE ?>/api/motor/exportar.php?<?= e(http_build_query(['entidad' => $llave])) ?>" title="Exportar catálogo" aria-label="Exportar"><?= icono('descargar') ?></a>
+                  <?php if (puede('configurar')): ?>
+                    <a class="boton-icono" href="<?= URL_BASE ?>/catalogos/importar.php?tabla=<?= e(urlencode($llave)) ?>" title="Importar datos" aria-label="Importar"><?= icono('subir') ?></a>
+                    <?php if ($metaCatalogoDisponible): ?>
+                      <a class="boton-icono" href="<?= URL_BASE ?>/catalogos/meta.php?tabla=<?= e(urlencode($llave)) ?>" title="Metadatos" aria-label="Metadatos"><?= icono('ajustes') ?></a>
                     <?php endif; ?>
-                  </div>
-                <?php else: ?>—<?php endif; ?>
+                  <?php endif; ?>
+                </div>
               </td>
             </tr>
           <?php endforeach; ?>

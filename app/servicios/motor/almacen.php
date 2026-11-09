@@ -223,10 +223,20 @@ function motorListar(string $clave, array $opciones = []): array
         $orden = 'id';
     }
 
-    $consulta = db()->prepare(
-        'SELECT ' . implode(', ', $select) . " FROM $desde WHERE $where ORDER BY $orden LIMIT $limite OFFSET $salto"
-    );
-    $consulta->execute($params);
+    try {
+        $consulta = db()->prepare(
+            'SELECT ' . implode(', ', $select) . " FROM $desde WHERE $where ORDER BY $orden LIMIT $limite OFFSET $salto"
+        );
+        $consulta->execute($params);
+    } catch (Throwable $e) {
+        if ($e->getCode() == '42S22' || strpos($e->getMessage(), '1054') !== false) {
+            error_log('[motorListar] error 1054 en SELECT, reintentando con SELECT c.*: ' . $e->getMessage());
+            $consulta = db()->prepare("SELECT c.* FROM $desde WHERE $where ORDER BY c.id LIMIT $limite OFFSET $salto");
+            $consulta->execute($params);
+        } else {
+            throw $e;
+        }
+    }
 
     return [
         'filas'   => array_map(fn ($f) => motorNormalizarFila($entidad, $f), $consulta->fetchAll()),

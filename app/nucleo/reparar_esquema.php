@@ -236,6 +236,57 @@ try {
             KEY idx_med_inst (institucion_id, activo)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
+
+    // Auto-crear todas las tablas de catálogos si no existen
+    $catalogosTablas = [
+        'catalogo_procedimientos' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_especialidades' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(120) NOT NULL, descripcion VARCHAR(200) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_tipos_consulta' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(100) NOT NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_tipos_atencion' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(100) NOT NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_principios_activos' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_formas_farmaceuticas' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(120) NOT NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_vias_admin' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(100) NOT NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_categorias_farmaco' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(120) NOT NULL, descripcion VARCHAR(255) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_unidades_medida' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(80) NOT NULL, simbolo VARCHAR(20) NOT NULL DEFAULT '', activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_concentraciones' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(100) NOT NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_dispositivos_medicos' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_osteosintesis' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_agentes_diagnosticos' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_nutriologia' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_insumos_salud_publica' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_acupuntura' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_herbolarios' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_homeopaticos' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_snomed' => "codigo VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_loinc' => "codigo VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+        'catalogo_cie11' => "codigo VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
+    ];
+    foreach ($catalogosTablas as $tablaCat => $colsDef) {
+        if (!tablaExiste($tablaCat)) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `$tablaCat` (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                institucion_id INT UNSIGNED NULL,
+                $colsDef,
+                creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_cat_inst (institucion_id, activo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+    }
+
+    // Auto-sincronizar fotos de la clínica y subidas persistentes
+    $dirPrivado = __DIR__ . '/../../privado/subidas';
+    $dirPublico = __DIR__ . '/../../assets/subidas';
+    if (!is_dir($dirPrivado)) { @mkdir($dirPrivado, 0777, true); }
+    if (!is_dir($dirPublico)) { @mkdir($dirPublico, 0777, true); }
+    if (is_dir($dirPrivado)) {
+        foreach (scandir($dirPrivado) as $arch) {
+            if ($arch !== '.' && $arch !== '..' && !file_exists("$dirPublico/$arch")) {
+                @copy("$dirPrivado/$arch", "$dirPublico/$arch");
+            }
+        }
+    }
+
 } catch (Throwable $e) {
     error_log('[reparar_esquema] error creando tablas base: ' . $e->getMessage());
 }
@@ -326,3 +377,87 @@ repararColumnaFaltante('finanzas_movimientos', 'referencia', 'VARCHAR(80) NULL')
 repararColumnaFaltante('finanzas_movimientos', 'estado', "VARCHAR(20) NOT NULL DEFAULT 'pagado'");
 repararColumnaFaltante('finanzas_movimientos', 'metodo', "VARCHAR(30) NULL");
 repararColumnaFaltante('finanzas_movimientos', 'descripcion', "VARCHAR(255) NULL");
+
+
+// =========================================================================
+// PREVENCIÓN CRÍTICA DE ERROR 1054 / SQLSTATE 42S22 (Column not found)
+// Asegurar todas las columnas consultadas en perfil de paciente y sistema
+// =========================================================================
+
+// Firmas clínicas (requeridas en ver.php)
+repararColumnaFaltante('firmas_clinicas', 'historial_id', 'INT NOT NULL DEFAULT 0');
+repararColumnaFaltante('firmas_clinicas', 'usuario_id', 'INT NOT NULL DEFAULT 0');
+repararColumnaFaltante('firmas_clinicas', 'usuario_nombre', 'VARCHAR(120) NOT NULL DEFAULT ""');
+repararColumnaFaltante('firmas_clinicas', 'cedula', 'VARCHAR(20) NULL');
+repararColumnaFaltante('firmas_clinicas', 'huella', 'CHAR(64) NOT NULL DEFAULT ""');
+repararColumnaFaltante('firmas_clinicas', 'firmado_en', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+repararColumnaFaltante('firmas_clinicas', 'revocada_en', 'DATETIME NULL');
+repararColumnaFaltante('firmas_clinicas', 'motivo_revocacion', 'VARCHAR(255) NULL');
+
+// Comentarios
+repararColumnaFaltante('comentarios', 'institucion_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('comentarios', 'entidad', 'VARCHAR(40) NOT NULL DEFAULT "pacientes"');
+repararColumnaFaltante('comentarios', 'registro_id', 'INT UNSIGNED NOT NULL DEFAULT 0');
+repararColumnaFaltante('comentarios', 'usuario_id', 'INT UNSIGNED NULL');
+repararColumnaFaltante('comentarios', 'texto', 'TEXT NOT NULL');
+repararColumnaFaltante('comentarios', 'resuelto_en', 'DATETIME NULL');
+repararColumnaFaltante('comentarios', 'creado_en', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+
+// Citas
+repararColumnaFaltante('citas', 'institucion_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('citas', 'paciente_id', 'INT UNSIGNED NULL');
+repararColumnaFaltante('citas', 'profesional_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('citas', 'inicio', 'DATETIME NOT NULL');
+repararColumnaFaltante('citas', 'fin', 'DATETIME NOT NULL');
+repararColumnaFaltante('citas', 'motivo', 'VARCHAR(200) NOT NULL DEFAULT ""');
+repararColumnaFaltante('citas', 'notas', 'TEXT NULL');
+repararColumnaFaltante('citas', 'estado', "ENUM('programada','confirmada','atendida','cancelada','no_asistio') NOT NULL DEFAULT 'programada'");
+repararColumnaFaltante('citas', 'recordatorio_min', 'SMALLINT UNSIGNED NULL');
+repararColumnaFaltante('citas', 'avisar_paciente', 'TINYINT(1) NOT NULL DEFAULT 0');
+repararColumnaFaltante('citas', 'recordatorio_enviado_en', 'DATETIME NULL');
+repararColumnaFaltante('citas', 'recordatorio_visto_en', 'DATETIME NULL');
+repararColumnaFaltante('citas', 'creado_por', 'INT UNSIGNED NULL');
+
+// Pacientes
+repararColumnaFaltante('pacientes', 'institucion_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('pacientes', 'folio', 'VARCHAR(30) NULL');
+repararColumnaFaltante('pacientes', 'curp', 'VARCHAR(20) NULL');
+repararColumnaFaltante('pacientes', 'confirmacion_datos', 'TINYINT(1) NOT NULL DEFAULT 0');
+repararColumnaFaltante('pacientes', 'extras', 'JSON NULL');
+repararColumnaFaltante('pacientes', 'foto', 'VARCHAR(255) NULL');
+repararColumnaFaltante('pacientes', 'eliminado_en', 'DATETIME NULL');
+
+// Historial clínico
+repararColumnaFaltante('historial_clinico', 'institucion_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('historial_clinico', 'paciente_id', 'INT UNSIGNED NOT NULL');
+repararColumnaFaltante('historial_clinico', 'usuario_id', 'INT UNSIGNED NULL');
+repararColumnaFaltante('historial_clinico', 'tipo', 'VARCHAR(40) NOT NULL DEFAULT "consulta"');
+repararColumnaFaltante('historial_clinico', 'fecha', 'DATETIME NOT NULL');
+repararColumnaFaltante('historial_clinico', 'detalle', 'JSON NULL');
+
+// Conexiones clínicas y autorizaciones
+repararColumnaFaltante('conexiones_clinicas', 'institucion_a_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('conexiones_clinicas', 'institucion_b_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('conexiones_clinicas', 'solicitada_por', 'INT UNSIGNED NULL');
+repararColumnaFaltante('conexiones_clinicas', 'estado', "ENUM('pendiente','conectada','rechazada','revocada') NOT NULL DEFAULT 'pendiente'");
+repararColumnaFaltante('conexiones_clinicas', 'acuerdo_archivo', 'VARCHAR(255) NULL');
+repararColumnaFaltante('conexiones_clinicas', 'acuerdo_sha256', 'CHAR(64) NULL');
+repararColumnaFaltante('conexiones_clinicas', 'acuerdo_nombre', 'VARCHAR(255) NULL');
+repararColumnaFaltante('conexiones_clinicas', 'acuerdo_version', 'VARCHAR(40) NULL');
+repararColumnaFaltante('conexiones_clinicas', 'acuerdo_a_confirmado', 'DATETIME NULL');
+repararColumnaFaltante('conexiones_clinicas', 'acuerdo_a_usuario', 'INT UNSIGNED NULL');
+repararColumnaFaltante('conexiones_clinicas', 'acuerdo_b_confirmado', 'DATETIME NULL');
+repararColumnaFaltante('conexiones_clinicas', 'acuerdo_b_usuario', 'INT UNSIGNED NULL');
+
+repararColumnaFaltante('conexiones_autorizaciones', 'institucion_origen_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('conexiones_autorizaciones', 'institucion_destino_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
+repararColumnaFaltante('conexiones_autorizaciones', 'alcance', "ENUM('resumen','expediente') NOT NULL DEFAULT 'resumen'");
+repararColumnaFaltante('conexiones_autorizaciones', 'finalidad', 'VARCHAR(500) NULL');
+repararColumnaFaltante('conexiones_autorizaciones', 'consentimiento_archivo', 'VARCHAR(255) NULL');
+repararColumnaFaltante('conexiones_autorizaciones', 'consentimiento_sha256', 'CHAR(64) NULL');
+repararColumnaFaltante('conexiones_autorizaciones', 'consentimiento_nombre', 'VARCHAR(255) NULL');
+repararColumnaFaltante('conexiones_autorizaciones', 'firmado_en', 'DATETIME NULL');
+repararColumnaFaltante('conexiones_autorizaciones', 'vence_en', 'DATETIME NULL');
+repararColumnaFaltante('conexiones_autorizaciones', 'revocado_en', 'DATETIME NULL');
+repararColumnaFaltante('conexiones_autorizaciones', 'creado_por', 'INT UNSIGNED NULL');
+

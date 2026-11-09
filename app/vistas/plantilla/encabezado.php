@@ -97,7 +97,18 @@ if (!$paginaActual) {
 
     <!-- Foto de la clínica: arriba, antes del buscador y de Inicio (la cambia el administrador) -->
     <div class="lateral-clinica">
-      <?php $fotoClinica = config('foto_clinica'); ?>
+      <?php 
+      $fotoClinica = config('foto_clinica');
+      if ($fotoClinica && !file_exists(__DIR__ . '/../../' . $fotoClinica)) {
+          $nombreBase = basename($fotoClinica);
+          $respaldo = __DIR__ . '/../../privado/subidas/' . $nombreBase;
+          if (file_exists($respaldo)) {
+              $dirPub = __DIR__ . '/../../assets/subidas';
+              if (!is_dir($dirPub)) { @mkdir($dirPub, 0777, true); }
+              @copy($respaldo, __DIR__ . '/../../' . $fotoClinica);
+          }
+      }
+      ?>
       <?php if ($fotoClinica || puede('configurar')): ?>
         <figure class="clinica<?= $fotoClinica ? '' : ' clinica--vacia' ?>" data-clinica>
           <?php if ($fotoClinica): ?>

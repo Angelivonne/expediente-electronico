@@ -38,16 +38,33 @@ if (!isset($tipos[$tipo]) || !$info || $info[0] < 200 || $info[1] < 100) {
     responder(415, ['ok' => false, 'error' => 'Usa una imagen JPG, PNG o WebP de al menos 200 × 100 píxeles.']);
 }
 
-$carpeta = __DIR__ . '/../../assets/subidas';
+$carpetaPublica = __DIR__ . '/../../assets/subidas';
+$carpetaPrivada = __DIR__ . '/../../privado/subidas';
+if (!is_dir($carpetaPublica)) { @mkdir($carpetaPublica, 0777, true); }
+if (!is_dir($carpetaPrivada)) { @mkdir($carpetaPrivada, 0777, true); }
+
 $nombre  = 'clinica-' . bin2hex(random_bytes(8)) . '.' . $tipos[$tipo];
-if (!guardarSubida($archivo['tmp_name'], "$carpeta/$nombre")) {
+$destinoPublico = "$carpetaPublica/$nombre";
+$destinoPrivado = "$carpetaPrivada/$nombre";
+
+// Guardar en volumen persistente privado y en carpeta pública
+$okPrivado = copy($archivo['tmp_name'], $destinoPrivado);
+$okPublico = guardarSubida($archivo['tmp_name'], $destinoPublico);
+
+if (!$okPublico && $okPrivado) {
+    @copy($destinoPrivado, $destinoPublico);
+    $okPublico = file_exists($destinoPublico);
+}
+
+if (!$okPublico && !$okPrivado) {
     responder(500, ['ok' => false, 'error' => 'No se pudo guardar la imagen.']);
 }
 
-// Borra la foto anterior (solo si es un archivo nuestro de la carpeta de subidas)
+// Borra la foto anterior (en ambas carpetas)
 $anterior = config('foto_clinica');
-if ($anterior && preg_match('#^assets/subidas/clinica-[0-9a-f]{16}\.(jpg|png|webp)$#', $anterior)) {
+if ($anterior && preg_match('#^assets/subidas/(clinica-[0-9a-f]{16}\.(jpg|png|webp))$#', $anterior, $m)) {
     @unlink(__DIR__ . '/../../' . $anterior);
+    @unlink("$carpetaPrivada/" . $m[1]);
 }
 
 guardarConfig('foto_clinica', "assets/subidas/$nombre");

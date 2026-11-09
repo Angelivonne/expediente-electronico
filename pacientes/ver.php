@@ -67,16 +67,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion_comentario_historia
     }
     redirigir('/pacientes/ver.php?id=' . $id . '#evento-' . $idEvento);
 }
-$comentariosExpediente = motorListar('comentarios', ['filtro' => ['entidad' => 'pacientes', 'registro_id' => $id], 'limite' => 100])['filas'];
+$comentariosExpediente = [];
 $autoresComentarios = [];
-if ($comentariosExpediente) {
-    $idsAutores = array_values(array_unique(array_map(fn ($c) => (int) $c['usuario_id'], $comentariosExpediente)));
-    $marcas = implode(',', array_fill(0, count($idsAutores), '?'));
-    $consultaAutores = db()->prepare("SELECT id, nombre FROM usuarios WHERE id IN ($marcas)");
-    $consultaAutores->execute($idsAutores);
-    foreach ($consultaAutores as $autor) {
-        $autoresComentarios[(int) $autor['id']] = $autor['nombre'];
+try {
+    $comentariosExpediente = motorListar('comentarios', ['filtro' => ['entidad' => 'pacientes', 'registro_id' => $id], 'limite' => 100])['filas'];
+    if ($comentariosExpediente) {
+        $idsAutores = array_values(array_filter(array_unique(array_map(fn ($c) => (int) ($c['usuario_id'] ?? 0), $comentariosExpediente))));
+        if ($idsAutores) {
+            $marcas = implode(',', array_fill(0, count($idsAutores), '?'));
+            $consultaAutores = db()->prepare("SELECT id, nombre FROM usuarios WHERE id IN ($marcas)");
+            $consultaAutores->execute($idsAutores);
+            foreach ($consultaAutores as $autor) {
+                $autoresComentarios[(int) $autor['id']] = $autor['nombre'];
+            }
+        }
     }
+} catch (Throwable $e) {
+    error_log('[ver.php] comentariosExpediente ignorado por error de esquema: ' . $e->getMessage());
 }
 
 $nombreCompleto = trim("{$p['nombre']} {$p['primer_apellido']} {$p['segundo_apellido']}");
@@ -89,12 +96,16 @@ $historial->execute([$p['id']]);
 $historial = $historial->fetchAll();
 $firmasHistorial = [];
 if ($historial) {
-    $idsHistorial = array_map(fn ($registro) => (int) $registro['id'], $historial);
-    $marcasFirmas = implode(',', array_fill(0, count($idsHistorial), '?'));
-    $stmtFirmasHistorial = db()->prepare("SELECT historial_id, usuario_nombre, cedula, huella, firmado_en FROM firmas_clinicas WHERE revocada_en IS NULL AND historial_id IN ($marcasFirmas)");
-    $stmtFirmasHistorial->execute($idsHistorial);
-    foreach ($stmtFirmasHistorial as $firmaHistorial) {
-        $firmasHistorial[(int) $firmaHistorial['historial_id']] = $firmaHistorial;
+    try {
+        $idsHistorial = array_map(fn ($registro) => (int) $registro['id'], $historial);
+        $marcasFirmas = implode(',', array_fill(0, count($idsHistorial), '?'));
+        $stmtFirmasHistorial = db()->prepare("SELECT historial_id, usuario_nombre, cedula, huella, firmado_en FROM firmas_clinicas WHERE revocada_en IS NULL AND historial_id IN ($marcasFirmas)");
+        $stmtFirmasHistorial->execute($idsHistorial);
+        foreach ($stmtFirmasHistorial as $firmaHistorial) {
+            $firmasHistorial[(int) $firmaHistorial['historial_id']] = $firmaHistorial;
+        }
+    } catch (Throwable $e) {
+        error_log('[ver.php] firmasHistorial ignorado por error de esquema: ' . $e->getMessage());
     }
 }
 require_once __DIR__ . '/../app/datos/registros_clinicos.php';
@@ -211,11 +222,15 @@ $puedeEditar = puede('editar_paciente');
 // Portal del paciente: si ya tiene cuenta se muestra en lugar de generar otro código (assets/js/modulos/portal_acceso.js)
 $cuentaPortal = null;
 if ($puedeEditar) {
-    $c = db()->prepare("SELECT correo, activo, ultimo_acceso, creado_en FROM usuarios WHERE paciente_id = ? AND rol = 'paciente' ORDER BY id LIMIT 1");
-    $c->execute([$p['id']]);
-    if ($cuenta = $c->fetch()) {
-        $cuentaPortal = ['correo' => $cuenta['correo'], 'activa' => (bool) $cuenta['activo'], 'creada' => fechaCorta($cuenta['creado_en']),
-                         'ultimo_acceso' => $cuenta['ultimo_acceso'] ? hace($cuenta['ultimo_acceso']) : null];
+    try {
+        $c = db()->prepare("SELECT correo, activo, ultimo_acceso, creado_en FROM usuarios WHERE paciente_id = ? AND rol = 'paciente' ORDER BY id LIMIT 1");
+        $c->execute([$p['id']]);
+        if ($cuenta = $c->fetch()) {
+            $cuentaPortal = ['correo' => $cuenta['correo'], 'activa' => (bool) $cuenta['activo'], 'creada' => fechaCorta($cuenta['creado_en']),
+                             'ultimo_acceso' => $cuenta['ultimo_acceso'] ? hace($cuenta['ultimo_acceso']) : null];
+        }
+    } catch (Throwable $e) {
+        error_log('[ver.php] cuentaPortal ignorado por error de esquema: ' . $e->getMessage());
     }
 }
 $fotoUrl = fotoPacienteUrl($p);
@@ -255,10 +270,14 @@ if (count($evolucion) >= 2) {
 // Próximas citas del paciente
 $proximasDelPaciente = [];
 if (puede('agenda')) {
-    $c = db()->prepare("SELECT c.id, c.inicio, c.fin, c.motivo, c.estado, u.nombre AS profesional FROM citas c JOIN usuarios u ON u.id = c.profesional_id
-                         WHERE c.paciente_id = ? AND c.fin >= NOW() AND c.estado NOT IN ('cancelada', 'no_asistio') ORDER BY c.inicio LIMIT 4");
-    $c->execute([$p['id']]);
-    $proximasDelPaciente = $c->fetchAll();
+    try {
+        $c = db()->prepare("SELECT c.id, c.inicio, c.fin, c.motivo, c.estado, u.nombre AS profesional FROM citas c JOIN usuarios u ON u.id = c.profesional_id
+                             WHERE c.paciente_id = ? AND c.fin >= NOW() AND c.estado NOT IN ('cancelada', 'no_asistio') ORDER BY c.inicio LIMIT 4");
+        $c->execute([$p['id']]);
+        $proximasDelPaciente = $c->fetchAll();
+    } catch (Throwable $e) {
+        error_log('[ver.php] proximasDelPaciente ignorado por error de esquema: ' . $e->getMessage());
+    }
 }
 
 // Propiedades del expediente: icono, etiqueta, valor y cómo se edita en línea (null = desde "Editar datos")
@@ -710,12 +729,16 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
   <?php
 $comentariosHistorial = [];
 if ($historial) {
-    $idsEventos = array_map(fn ($h) => (int) $h['id'], $historial);
-    $marcasEventos = implode(',', array_fill(0, count($idsEventos), '?'));
-    $stmtComentarios = db()->prepare("SELECT c.id, c.registro_id, c.texto, c.creado_en, c.resuelto_en, u.nombre AS autor FROM comentarios c LEFT JOIN usuarios u ON u.id = c.usuario_id WHERE c.institucion_id = ? AND c.entidad = 'historial' AND c.registro_id IN ($marcasEventos) ORDER BY c.creado_en DESC");
-    $stmtComentarios->execute(array_merge([institucionId()], $idsEventos));
-    foreach ($stmtComentarios->fetchAll() as $comentarioEvento) {
-        $comentariosHistorial[(int) $comentarioEvento['registro_id']][] = $comentarioEvento;
+    try {
+        $idsEventos = array_map(fn ($h) => (int) $h['id'], $historial);
+        $marcasEventos = implode(',', array_fill(0, count($idsEventos), '?'));
+        $stmtComentarios = db()->prepare("SELECT c.id, c.registro_id, c.texto, c.creado_en, c.resuelto_en, u.nombre AS autor FROM comentarios c LEFT JOIN usuarios u ON u.id = c.usuario_id WHERE c.institucion_id = ? AND c.entidad = 'historial' AND c.registro_id IN ($marcasEventos) ORDER BY c.creado_en DESC");
+        $stmtComentarios->execute(array_merge([institucionId()], $idsEventos));
+        foreach ($stmtComentarios->fetchAll() as $comentarioEvento) {
+            $comentariosHistorial[(int) $comentarioEvento['registro_id']][] = $comentarioEvento;
+        }
+    } catch (Throwable $e) {
+        error_log('[ver.php] comentariosHistorial ignorado por error de esquema: ' . $e->getMessage());
     }
 }
 ?><?php if ($historial): ?>

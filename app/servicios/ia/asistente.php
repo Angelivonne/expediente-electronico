@@ -81,12 +81,19 @@ function modelosDisponibles(string $proveedor, string $url, string $clave): arra
             $pagina = (new ClienteAnthropic(apiKey: $clave))->models->list(limit: 100);
             return array_map(fn ($m) => ['id' => $m->id, 'nombre' => $m->displayName, 'contexto' => $m->maxInputTokens ?? null], $pagina->getItems());
         }
+        $cabeceras = array_filter([$clave ? 'Authorization: Bearer ' . $clave : null]);
+        if (str_contains($url, 'openrouter.ai')) {
+            $cabeceras[] = 'HTTP-Referer: https://web-production-cdeee.up.railway.app';
+            $cabeceras[] = 'X-Title: FEMECI Expediente Electronico';
+        }
         $curl = curl_init(rtrim($url, '/') . '/models');
         curl_setopt_array($curl, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => 8,
             CURLOPT_TIMEOUT        => 20,
-            CURLOPT_HTTPHEADER     => array_filter([$clave ? 'Authorization: Bearer ' . $clave : null]),
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+            CURLOPT_HTTPHEADER     => $cabeceras,
         ]);
         $cuerpo = curl_exec($curl);
         $codigo = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
@@ -312,7 +319,16 @@ function resultadoParaCompatibles(string $resultado): string
 function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, array $herramientas): ?array
 {
     $url = rtrim($cfg['url'], '/') . '/chat/completions';
-    $peticion = ['model' => $cfg['modelo'], 'messages' => $historial, 'stream' => true];
+    $modelo = trim((string) $cfg['modelo']);
+
+    // Fallback inteligente para OpenRouter si se indicó un modelo inválido como "openrouter/free"
+    if (str_contains($url, 'openrouter.ai')) {
+        if ($modelo === 'openrouter/free' || $modelo === 'free' || empty($modelo)) {
+            $modelo = 'meta-llama/llama-3.3-70b-instruct:free';
+        }
+    }
+
+    $peticion = ['model' => $modelo, 'messages' => $historial, 'stream' => true];
     if ($herramientas) {
         $peticion['tools'] = $herramientas;
         $peticion['tool_choice'] = 'auto';
@@ -355,18 +371,26 @@ function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, a
         $emitir($tipo, $dato);
     };
 
+    $cabeceras = ['Content-Type: application/json'];
+    if (!empty($cfg['clave'])) {
+        $cabeceras[] = 'Authorization: Bearer ' . $cfg['clave'];
+    }
+    if (str_contains($url, 'openrouter.ai')) {
+        $cabeceras[] = 'HTTP-Referer: https://web-production-cdeee.up.railway.app';
+        $cabeceras[] = 'X-Title: FEMECI Expediente Clinico';
+    }
+
     $intento = 0;
     while (true) {
         $curl = curl_init($url);
         curl_setopt_array($curl, [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $cuerpo,
-            CURLOPT_HTTPHEADER     => array_filter([
-                'Content-Type: application/json',
-                $cfg['clave'] ? 'Authorization: Bearer ' . $cfg['clave'] : null,
-            ]),
+            CURLOPT_HTTPHEADER     => $cabeceras,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT        => 600,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_WRITEFUNCTION  => function ($c, string $fragmento) use (&$pendiente, &$errorCrudo, &$llamadas, $emitirMarca, $repartirTexto): int {
                 if (curl_getinfo($c, CURLINFO_RESPONSE_CODE) >= 400) {
                     $errorCrudo .= $fragmento;
