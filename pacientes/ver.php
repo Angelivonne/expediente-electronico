@@ -793,6 +793,9 @@ if ($historial) {
               <div class="historial__pie-evento">
                 <p class="historial__autor"><?= e($h['autor_nombre']) ?><?= $h['autor_cedula'] ? ' · Cédula ' . e($h['autor_cedula']) : '' ?> · registrado <?= e(fechaCorta($h['creado_en'] ?? $h['fecha'])) ?></p>
                 <a class="historial__completo" href="<?= URL_BASE ?>/pacientes/evento.php?id=<?= (int) $h['id'] ?>"><?= icono('expandir') ?> Ver completo</a>
+                <?php if ($h['tipo'] === 'receta'): ?>
+                  <a class="historial__completo" style="margin-left:8px;" href="<?= URL_BASE ?>/pacientes/receta_imprimir.php?id=<?= (int) $h['id'] ?>" target="_blank" rel="noopener"><?= icono('documento') ?> Imprimir receta</a>
+                <?php endif; ?>
               </div>
               <?php $eventoComentarios = $comentariosHistorial[(int) $h['id']] ?? []; ?>
               <div class="historial-comentarios">

@@ -69,6 +69,22 @@ $stmt->execute($paramsConsulta);
 $filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Función auxiliar para clasificar CIE-10 en categorías nosológicas
+
+// Función oficial de rangos etarios según el Sistema Nacional de Vigilancia Epidemiológica (SINAVE / SUIVE-1)
+function grupoEdadSuive(int $edad): string {
+    if ($edad < 1) return '< 1 año';
+    if ($edad <= 4) return '1 a 4 años';
+    if ($edad <= 9) return '5 a 9 años';
+    if ($edad <= 14) return '10 a 14 años';
+    if ($edad <= 19) return '15 a 19 años';
+    if ($edad <= 24) return '20 a 24 años';
+    if ($edad <= 44) return '25 a 44 años';
+    if ($edad <= 49) return '45 a 49 años';
+    if ($edad <= 59) return '50 a 59 años';
+    if ($edad <= 64) return '60 a 64 años';
+    return '65 y más años';
+}
+
 function categorizarCie10(string $codigo, string $descripcion): string
 {
     $letra = strtoupper(substr(trim($codigo), 0, 1));
@@ -283,6 +299,58 @@ foreach ($piramideEdad as $gNombre => $gData) {
         'masculino' => $gData['masculino'],
         'total' => $gData['femenino'] + $gData['masculino'],
     ];
+}
+
+// Salida en formato oficial SUIVE-1 (SINAVE / NOM-017-SSA2-2012)
+if (isset($_GET['formato']) && $_GET['formato'] === 'suive') {
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="suive1_morbilidad_sinave_' . date('Ymd_His') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+    
+    // Encabezado institucional
+    fputcsv($out, ['SISTEMA NACIONAL DE VIGILANCIA EPIDEMIOLOGICA (SINAVE) - INFORME SUIVE-1']);
+    fputcsv($out, ['ESTABLECIMIENTO:', config('nombre_establecimiento') ?: 'Expediente FEMECI', 'FECHA:', date('d/m/Y H:i')]);
+    fputcsv($out, ['PERIODO:', $tituloPeriodo]);
+    fputcsv($out, ['NORMATIVA:', 'NOM-017-SSA2-2012 / NOM-004-SSA3-2012 / NOM-024-SSA3-2012']);
+    fputcsv($out, []);
+    
+    // Columnas estándar SUIVE-1
+    fputcsv($out, [
+        'NUM', 'CIE10', 'DIAGNOSTICO_CLINICO', 'GRUPO_NOSOLOGICO',
+        'MENOR_1_ANIO', '1_A_4', '5_A_9', '10_A_14', '15_A_19', '20_A_24',
+        '25_A_44', '45_A_49', '50_A_59', '60_A_64', '65_Y_MAS',
+        'MASCULINO', 'FEMENINO', 'TOTAL_CASOS_NUEVOS_DESDUPLICADOS', 'CONSULTAS_TOTALES'
+    ]);
+    
+    $num = 1;
+    $suiveCols = ['< 1 año', '1 a 4 años', '5 a 9 años', '10 a 14 años', '15 a 19 años', '20 a 24 años', '25 a 44 años', '45 a 49 años', '50 a 59 años', '60 a 64 años', '65 y más años'];
+    foreach ($tablaMorbilidad as $row) {
+        $diagItem = $diagnosticosMap[$row['cie10'] !== 'SIN-COD' && $row['cie10'] !== 'SD-00' ? $row['cie10'] : mb_strtolower($row['nombre'])] ?? null;
+        $conteoPorCol = array_fill_keys($suiveCols, 0);
+        if ($diagItem && !empty($diagItem['edades'])) {
+            foreach ($diagItem['edades'] as $ed) {
+                $g = grupoEdadSuive((int)$ed);
+                if (isset($conteoPorCol[$g])) $conteoPorCol[$g]++;
+            }
+        }
+        $linea = [
+            $num++,
+            $row['cie10'],
+            $row['nombre'],
+            $row['categoria'],
+        ];
+        foreach ($suiveCols as $sc) {
+            $linea[] = $conteoPorCol[$sc];
+        }
+        $linea[] = $row['masculino'];
+        $linea[] = $row['femenino'];
+        $linea[] = $row['casos_unicos'];
+        $linea[] = $row['consultas_totales'];
+        fputcsv($out, $linea);
+    }
+    fclose($out);
+    exit;
 }
 
 // 4. Salida en formato CSV para análisis epidemiológico externo
@@ -638,6 +706,7 @@ $imgCategorias = URL_BASE . '/assets/img/reportes/categorias_nosologicas.png?v='
           <option value="mes" <?= $periodo === 'mes' ? 'selected' : '' ?>>Últimos 30 días</option>
         </select>
       </form>
+      <a href="?<?= http_build_query(array_merge($_GET, ['formato' => 'suive'])) ?>" title="Descargar plantilla oficial SUIVE-1 (SINAVE / Secretaría de Salud)">Exportar SUIVE-1 (SINAVE)</a>
       <a href="?<?= http_build_query(array_merge($_GET, ['formato' => 'csv'])) ?>" title="Descargar datos analizados anonimizados en formato CSV para Excel o SPSS">Descargar CSV</a>
       <a href="?<?= http_build_query(array_merge($_GET, ['formato' => 'json'])) ?>" title="Descargar dataset analizado estructurado en JSON">Descargar JSON</a>
       <button type="button" onclick="window.print()" title="Imprimir dictamen en formato formal A4/Carta">Imprimir Documento</button>

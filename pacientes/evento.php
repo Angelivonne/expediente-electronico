@@ -308,6 +308,9 @@ if ($modoPaciente) {
   <?php if (puede('historial')): ?>
     <a class="boton boton--fantasma" href="<?= URL_BASE ?>/pacientes/nuevo_registro.php?paciente=<?= (int) $h['paciente_id'] ?>"><?= icono('agregar') ?> Nuevo registro</a>
   <?php endif; ?>
+  <?php if ($tipo === 'receta'): ?>
+    <a class="boton boton--primario" href="<?= URL_BASE ?>/pacientes/receta_imprimir.php?id=<?= (int) $h['id'] ?>" target="_blank" rel="noopener"><?= icono('documento') ?> Imprimir Receta Oficial</a>
+  <?php endif; ?>
   <button type="button" class="boton boton--secundario" data-imprimir><?= icono('documento') ?> Imprimir</button>
 </div>
 
