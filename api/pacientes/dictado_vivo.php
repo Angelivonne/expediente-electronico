@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Dictado en vivo (navegadores sin Web Speech API, como Zen/Firefox).
  * Recibe un trozo WAV corto (16 kHz, mono, 16 bits) mientras el médico habla y devuelve
@@ -44,13 +44,14 @@ if (strncmp($audio, 'RIFF', 4) !== 0) {
     responderVivo(415, ['ok' => false, 'error' => 'Se esperaba audio WAV.']);
 }
 
-$ch = curl_init('http://127.0.0.1:8766/en-vivo');
+$sttBase = rtrim(getenv('STT_URL') ?: 'http://127.0.0.1:8766', '/');
+$ch = curl_init($sttBase . '/en-vivo');
 curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_POSTFIELDS => $audio,
     CURLOPT_HTTPHEADER => ['Content-Type: audio/wav'],
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_CONNECTTIMEOUT => 2,
+    CURLOPT_CONNECTTIMEOUT => 5,
     CURLOPT_TIMEOUT => 30,
 ]);
 $respuesta = curl_exec($ch);

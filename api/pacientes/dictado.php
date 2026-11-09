@@ -85,7 +85,7 @@ if (!move_uploaded_file($audio['tmp_name'], $archivoTemporal)) {
 }
 
 // Llamar al servicio STT local (modelo cargado en memoria, más rápido)
-$sttUrl = getenv('STT_URL') ?: 'http://127.0.0.1:8766/';
+$sttUrl = rtrim(getenv('STT_URL') ?: 'http://127.0.0.1:8766', '/') . '/';
 $ch = curl_init($sttUrl);
 curl_setopt_array($ch, [
     CURLOPT_POST => true,
@@ -138,3 +138,4 @@ responder(200, [
     'avisos' => dictadoAvisos($textoTranscrito, $campos, $medicamentos),
     'duracion' => null,
 ]);
+
