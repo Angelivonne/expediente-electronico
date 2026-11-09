@@ -806,15 +806,7 @@ svg.icono {
 }
 .bd__buscador input::placeholder { color: var(--texto-tenue); }
 
-.bd__marco,
-.bd-tabla-contenedor {
-  display: block !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  overflow-x: auto !important;
-  overflow-y: visible !important;
-  -webkit-overflow-scrolling: touch;
+.bd__marco {
   background: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -2271,8 +2263,8 @@ body.acceso {
   place-items: center;
   min-height: 100vh;
   padding: 16px;
-  /* Fondo gris completo */
-  background: #1a1a1a;
+  /* Sin paisaje de fondo: solo la ventana de acceso con la pintura a un lado */
+  background: #0f0f0f;
 }
 
 .acceso__ventana {
@@ -2280,7 +2272,7 @@ body.acceso {
   /* Ocupa toda la pantalla: formulario a la izquierda y la pintura llenando el resto */
   grid-template-columns: minmax(400px, 40%) 1fr;
   width: 100%;
-  max-width: none;
+  max-width: 1800px;
   height: calc(100dvh - 32px);
   min-height: 520px;
   padding: 8px;
@@ -5024,32 +5016,11 @@ body.portal .visor { height: calc(100dvh - 64px); }
   color: var(--texto) !important;
 }
 
-/* Tablas y catalogos: ancho completo, sin desbordamiento flex, scroll horizontal fluido */
-.pagina--ancha { max-width: none !important; width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; }
+/* Scroll horizontal en tablas de catalogos/finanzas/pacientes */
+.pagina--ancha { max-width: none !important; width: 100% !important; }
 .pagina--ancha .pagina__cabecera, .pagina--ancha .bd__cabecera, .pagina--ancha .bd > .pagina__descripcion { max-width: none !important; margin-left: 0 !important; margin-right: 0 !important; }
-
-html, body { height: 100%; overflow-x: hidden !important; overflow-y: auto !important; }
-.app { min-height: calc(100vh - var(--alto-pestanas)) !important; height: auto !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
-.app > .contenido { min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; display: flex !important; flex-direction: column !important; min-height: 0 !important; height: auto !important; }
-.app .pagina { min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
-.pagina__cabecera, .bd__cabecera { flex: 0 0 auto !important; min-width: 0 !important; max-width: 100% !important; }
-.bd { flex: 1 1 auto !important; min-height: 0 !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; display: flex !important; flex-direction: column !important; }
-.bd__contenido { flex: 1 1 auto !important; min-height: 0 !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
-.bd__marco, .bd-tabla-contenedor {
-  display: block !important;
-  flex: 0 0 auto !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  box-sizing: border-box !important;
-  overflow-x: auto !important;
-  overflow-y: visible !important;
-  -webkit-overflow-scrolling: touch !important;
-  scrollbar-width: thin !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-.bd-tabla { width: max-content !important; min-width: 100% !important; }
+.bd__marco, .bd-tabla-contenedor { overflow-x: auto !important; overflow-y: visible !important; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.bd-tabla { width: max-content; min-width: 100%; }
 .bd__marco::-webkit-scrollbar, .bd-tabla-contenedor::-webkit-scrollbar { height: 8px; }
 .bd__marco::-webkit-scrollbar-track, .bd-tabla-contenedor::-webkit-scrollbar-track { background: var(--bg-suave, #f1f3f4); border-radius: 4px; }
 .bd__marco::-webkit-scrollbar-thumb, .bd-tabla-contenedor::-webkit-scrollbar-thumb { background: var(--borde-fuerte, #bbb); border-radius: 4px; }
