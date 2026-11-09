@@ -461,3 +461,13 @@ repararColumnaFaltante('conexiones_autorizaciones', 'vence_en', 'DATETIME NULL')
 repararColumnaFaltante('conexiones_autorizaciones', 'revocado_en', 'DATETIME NULL');
 repararColumnaFaltante('conexiones_autorizaciones', 'creado_por', 'INT UNSIGNED NULL');
 
+// Actualizacion automatica de modelo OpenRouter si tiene valor invalido o deprecado
+try {
+    $qModelo = db()->query("SELECT valor FROM configuracion WHERE clave = 'ia_modelo' LIMIT 1");
+    $mActual = $qModelo ? $qModelo->fetchColumn() : null;
+    if ($mActual === 'openrouter/free' || $mActual === 'free' || empty($mActual) || str_contains((string) $mActual, ':free')) {
+        db()->exec("UPDATE configuracion SET valor = 'qwen/qwen-2.5-72b-instruct' WHERE clave = 'ia_modelo'");
+    }
+} catch (Throwable $e) {
+    // Silencioso
+}

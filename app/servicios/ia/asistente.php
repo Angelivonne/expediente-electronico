@@ -321,10 +321,10 @@ function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, a
     $url = rtrim($cfg['url'], '/') . '/chat/completions';
     $modelo = trim((string) $cfg['modelo']);
 
-    // Fallback inteligente para OpenRouter si se indicó un modelo inválido como "openrouter/free"
+    // Fallback inteligente para OpenRouter si se indicó un modelo inválido como "openrouter/free" o deprecado
     if (str_contains($url, 'openrouter.ai')) {
-        if ($modelo === 'openrouter/free' || $modelo === 'free' || empty($modelo)) {
-            $modelo = 'meta-llama/llama-3.3-70b-instruct:free';
+        if ($modelo === 'openrouter/free' || $modelo === 'free' || empty($modelo) || str_contains($modelo, ':free')) {
+            $modelo = 'qwen/qwen-2.5-72b-instruct';
         }
     }
 
