@@ -3,6 +3,7 @@ define('PAGINA_PUBLICA', true);
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../app/nucleo/configuracion.php';
+require_once __DIR__ . '/../app/nucleo/reparar_esquema.php';
 require_once __DIR__ . '/../app/nucleo/institucion.php';
 require_once __DIR__ . '/../app/servicios/ia/asistente.php';
 
@@ -58,4 +59,19 @@ try {
     echo "Tablas catalogo_*: " . implode(', ', $tablas) . "\n";
 } catch (Throwable $e) {
     echo "Error catalogos: " . $e->getMessage() . "\n";
+}
+
+echo "\n--- Verificación Columnas Críticas (Prevención Error 1054) ---\n";
+foreach ([
+    'firmas_clinicas' => ['historial_id', 'usuario_nombre', 'cedula', 'huella', 'firmado_en', 'revocada_en'],
+    'citas' => ['inicio', 'fin', 'motivo', 'estado', 'paciente_id', 'profesional_id'],
+    'comentarios' => ['entidad', 'registro_id', 'texto', 'resuelto_en', 'creado_en'],
+    'conexiones_autorizaciones' => ['alcance', 'vence_en', 'revocado_en', 'institucion_origen_id', 'institucion_destino_id'],
+    'pacientes' => ['institucion_id', 'eliminado_en', 'confirmacion_datos', 'extras', 'foto']
+] as $tabla => $cols) {
+    echo "Tabla `$tabla`:\n";
+    foreach ($cols as $col) {
+        $ok = columnaExiste($tabla, $col);
+        echo "  - $col: " . ($ok ? "OK" : "FALTA") . "\n";
+    }
 }
