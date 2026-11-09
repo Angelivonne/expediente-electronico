@@ -49,7 +49,8 @@ foreach ($catalogos as $clave => $catalogo) {
         continue;
     }
     $sqlConteo = 'SELECT COUNT(*) FROM `' . $tabla . '`';
-    if (!empty($catalogo['institucion'])) {
+    $tieneInstitucion = !empty($catalogo['institucion']) && (!function_exists('columnaExiste') || columnaExiste($tabla, 'institucion_id'));
+    if ($tieneInstitucion) {
         $sqlConteo .= ' WHERE institucion_id = ?';
         $consultaConteo = db()->prepare($sqlConteo);
         $consultaConteo->execute([$institucionCatalogo]);

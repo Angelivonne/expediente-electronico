@@ -21,11 +21,11 @@
   </div>
 <?php endif; ?>
 
-<script src="<?= recurso("js/app.js") ?>"></script>
-<script src="<?= recurso("js/modulos/controles.js") ?>"></script>
-<script src="<?= recurso("js/carrusel_acceso.js") ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/app.js") ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/modulos/controles.js") ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/carrusel_acceso.js") ?>"></script>
 <?php foreach ($guionesAcceso ?? [] as $guion): ?>
-<script src="<?= recurso($guion) ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso($guion) ?>"></script>
 <?php endforeach; ?>
 </body>
 </html>

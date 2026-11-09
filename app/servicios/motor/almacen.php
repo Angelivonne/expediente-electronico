@@ -385,7 +385,7 @@ function motorValidar(string $clave, array $datos, bool $parcial = false, int $i
         $limpios[$campoRelacion] = $idRelacionado;
         $sqlRelacion = 'SELECT 1 FROM `' . $relacion['tabla'] . '` WHERE id = ?';
         $parametrosRelacion = [$idRelacionado];
-        if (!empty($relacion['institucion'])) {
+        if (!empty($relacion['institucion']) && (!function_exists('columnaExiste') || columnaExiste($relacion['tabla'], 'institucion_id'))) {
             $sqlRelacion .= ' AND institucion_id = ?';
             $parametrosRelacion[] = motorInstitucion();
         }
@@ -472,7 +472,7 @@ function motorCrear(string $clave, array $datos, array $opciones = []): array
     $columnas = [];
     $valores  = [];
     $marcas   = [];
-    if (!empty($entidad['almacen']['institucion'])) {
+    if (!empty($entidad['almacen']['institucion']) && (!function_exists('columnaExiste') || columnaExiste($tabla, 'institucion_id'))) {
         $columnas[] = 'institucion_id';
         $valores[]  = motorInstitucion($opciones);
         $marcas[]   = '?';
@@ -547,7 +547,7 @@ function motorActualizar(string $clave, int $id, array $datos, array $opciones =
 
     $where  = 'id = ?';
     $params = [$id];
-    if (!empty($entidad['almacen']['institucion'])) {
+    if (!empty($entidad['almacen']['institucion']) && (!function_exists('columnaExiste') || columnaExiste($tabla, 'institucion_id'))) {
         $where   .= ' AND institucion_id = ?';
         $params[] = motorInstitucion($opciones);
     }
@@ -631,7 +631,7 @@ function motorEliminar(string $clave, int $id, array $opciones = []): array
     $tabla  = (string) $entidad['almacen']['tabla'];
     $where  = 'id = ?';
     $params = [$id];
-    if (!empty($entidad['almacen']['institucion'])) {
+    if (!empty($entidad['almacen']['institucion']) && (!function_exists('columnaExiste') || columnaExiste($tabla, 'institucion_id'))) {
         $where   .= ' AND institucion_id = ?';
         $params[] = motorInstitucion($opciones);
     }

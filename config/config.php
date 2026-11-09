@@ -12,13 +12,13 @@ define('URL_ORIGEN', getenv('URL_ORIGEN') ?: 'http://localhost');
 
 // Base de datos MySQL: una sola base (expediente_femeci). La app entra con un usuario de privilegios
 // mínimos (database/usuario_aplicacion.sql) cuyas credenciales viven en privado/bd.php, nunca root.
-// En Railway la conexión viene en las variables DB_* del servicio.
+// En Railway la conexión viene en las variables DB_* o MYSQL* del servicio.
 $credencialesBd = is_file(__DIR__ . '/../privado/bd.php') ? require __DIR__ . '/../privado/bd.php' : ['usuario' => 'root', 'clave' => ''];
-define('DB_HOST',    getenv('DB_HOST') ?: '127.0.0.1');
-define('DB_PUERTO',  (int) (getenv('DB_PUERTO') ?: 3306));
-define('DB_NOMBRE',  getenv('DB_NOMBRE') ?: 'expediente_femeci');
-define('DB_USUARIO', getenv('DB_USUARIO') ?: $credencialesBd['usuario']);
-define('DB_CLAVE',   getenv('DB_CLAVE') !== false ? getenv('DB_CLAVE') : $credencialesBd['clave']);
+define('DB_HOST',    getenv('DB_HOST') ?: (getenv('MYSQLHOST') ?: '127.0.0.1'));
+define('DB_PUERTO',  (int) (getenv('DB_PUERTO') ?: (getenv('MYSQLPORT') ?: 3306)));
+define('DB_NOMBRE',  getenv('DB_NOMBRE') ?: (getenv('MYSQLDATABASE') ?: 'expediente_femeci'));
+define('DB_USUARIO', getenv('DB_USUARIO') ?: (getenv('MYSQLUSER') ?: $credencialesBd['usuario']));
+define('DB_CLAVE',   getenv('DB_CLAVE') !== false ? getenv('DB_CLAVE') : (getenv('MYSQLPASSWORD') !== false ? getenv('MYSQLPASSWORD') : $credencialesBd['clave']));
 unset($credencialesBd);
 // Programas de MySQL para los respaldos (mysqldump) y la restauración (mysql)
 define('MYSQL_BIN', 'C:/xampp/mysql/bin');

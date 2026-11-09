@@ -72,5 +72,5 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     <div class="dlg__acciones"><button type="button" class="boton" data-cerrar>Cancelar</button><button type="submit" class="boton boton--primario">Guardar</button></div>
   </form>
 </dialog>
-<script src="<?= recurso("js/modulos/agentes.js") ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/modulos/agentes.js") ?>"></script>
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>

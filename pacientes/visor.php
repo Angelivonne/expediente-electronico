@@ -87,5 +87,5 @@ require __DIR__ . '/../app/vistas/plantilla/' . (esPaciente() ? 'portal_encabeza
   </section>
 </div>
 
-<?php if (esPaciente()): foreach ($guionesPagina as $guion): ?><script src="<?= recurso($guion) ?>"></script><?php endforeach; endif; ?>
+<?php if (esPaciente()): foreach ($guionesPagina as $guion): ?><script nonce="<?= nonceCsp() ?>" src="<?= recurso($guion) ?>"></script><?php endforeach; endif; ?>
 <?php require __DIR__ . '/../app/vistas/plantilla/' . (esPaciente() ? 'portal_pie.php' : 'pie.php'); ?>

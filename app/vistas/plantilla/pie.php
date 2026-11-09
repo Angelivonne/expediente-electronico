@@ -40,15 +40,15 @@
 <?php endif; ?>
 <?php $rellenosJs = ['documento', 'carpeta', 'tabla', 'reabrir']; ?>
 <script type="application/json" id="iconos-js"><?= json_encode(array_combine($iconosJs, array_map('icono', $iconosJs)) + array_combine(array_map(fn ($n) => "r_$n", $rellenosJs), array_map('iconoRelleno', $rellenosJs)), JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
-<script src="<?= recurso("js/markdown.js") ?>"></script>
-<script src="<?= recurso("js/app.js") ?>"></script>
-<script src="<?= recurso("js/espacio.js") ?>"></script>
-<script src="<?= recurso("js/graficas.js") ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/markdown.js") ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/app.js") ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/espacio.js") ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/graficas.js") ?>"></script>
 <?php foreach (glob(__DIR__ . "/../../../assets/js/modulos/*.js") as $guion): ?>
-<script src="<?= recurso("js/modulos/" . basename($guion)) ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/modulos/" . basename($guion)) ?>"></script>
 <?php endforeach; ?>
 <?php foreach ($guionesPagina ?? [] as $guion): // scripts propios de una página (p. ej. el visor de imágenes) ?>
-<script src="<?= recurso($guion) ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso($guion) ?>"></script>
 <?php endforeach; ?>
 </body>
 </html>

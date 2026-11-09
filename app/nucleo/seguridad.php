@@ -58,7 +58,7 @@ function enviarCabecerasSeguridad(): void
         return;
     }
     $nonce = nonceCsp();
-    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-$nonce'; "
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'nonce-$nonce' 'sha256-LSVFOuiuifQnPZ+HNy7D/4K97K7oJpogRbkvWsYBWNg='; "
          . "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; "
          . "media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
     header('X-Content-Type-Options: nosniff');

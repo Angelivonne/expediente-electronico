@@ -7,8 +7,13 @@ require_once __DIR__ . '/../app/nucleo/inicio.php';
 require_once __DIR__ . '/../app/servicios/clinica/agenda.php';
 exigirPermiso('agenda');
 
-$profesionales = db()->prepare("SELECT id, nombre, foto, rol FROM usuarios WHERE institucion_id = ? AND activo = 1 AND rol <> 'paciente' ORDER BY FIELD(rol, 'medico', 'enfermeria', 'administrador', 'recepcion'), nombre");
-$profesionales->execute([institucionId()]);
+$filtroInst = (!function_exists('columnaExiste') || columnaExiste('usuarios', 'institucion_id')) ? 'institucion_id = ? AND ' : '';
+$profesionales = db()->prepare("SELECT id, nombre, foto, rol FROM usuarios WHERE {$filtroInst}activo = 1 AND rol <> 'paciente' ORDER BY FIELD(rol, 'medico', 'enfermeria', 'administrador', 'recepcion'), nombre");
+if ($filtroInst !== '') {
+    $profesionales->execute([institucionId()]);
+} else {
+    $profesionales->execute();
+}
 $profesionales = $profesionales->fetchAll();
 $fechaInicial = DateTime::createFromFormat('!Y-m-d', (string) ($_GET['fecha'] ?? '')) ?: new DateTime('today');
 

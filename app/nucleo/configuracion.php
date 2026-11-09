@@ -16,20 +16,39 @@ function config(string $clave, ?string $porDefecto = null): ?string
     if (!array_key_exists($clave, $cache)) {
         // El valor de la institución; si no tiene uno propio, el que existía antes de las instituciones (0),
         // así lo configurado entonces (clave de la IA, permisos, textos) sigue funcionando
-        $consulta = db()->prepare('SELECT valor FROM configuracion WHERE institucion_id IN (?, 0) AND clave = ? ORDER BY institucion_id DESC LIMIT 1');
-        $consulta->execute([institucionId() ?? 0, $clave]);
-        $valor = $consulta->fetchColumn();
-        $cache[$clave] = $valor === false ? null : $valor;
+        try {
+            $consulta = db()->prepare('SELECT valor FROM configuracion WHERE institucion_id IN (?, 0) AND clave = ? ORDER BY institucion_id DESC LIMIT 1');
+            $consulta->execute([institucionId() ?? 0, $clave]);
+            $valor = $consulta->fetchColumn();
+            $cache[$clave] = $valor === false ? null : $valor;
+        } catch (Throwable $e) {
+            // Fallback si la columna institucion_id no existe todavía en la tabla configuracion
+            try {
+                $consulta = db()->prepare('SELECT valor FROM configuracion WHERE clave = ? LIMIT 1');
+                $consulta->execute([$clave]);
+                $valor = $consulta->fetchColumn();
+                $cache[$clave] = $valor === false ? null : $valor;
+            } catch (Throwable $e2) {
+                $cache[$clave] = null;
+            }
+        }
     }
     return $cache[$clave] ?? $porDefecto;
 }
 
 function guardarConfig(string $clave, ?string $valor): void
 {
-    db()->prepare(
-        'INSERT INTO configuracion (institucion_id, clave, valor, actualizado_por) VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE valor = VALUES(valor), actualizado_por = VALUES(actualizado_por)'
-    )->execute([institucionId() ?? 0, $clave, $valor, usuarioActual()['id'] ?? null]);
+    try {
+        db()->prepare(
+            'INSERT INTO configuracion (institucion_id, clave, valor, actualizado_por) VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE valor = VALUES(valor), actualizado_por = VALUES(actualizado_por)'
+        )->execute([institucionId() ?? 0, $clave, $valor, usuarioActual()['id'] ?? null]);
+    } catch (Throwable $e) {
+        db()->prepare(
+            'INSERT INTO configuracion (clave, valor, actualizado_por) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE valor = VALUES(valor), actualizado_por = VALUES(actualizado_por)'
+        )->execute([$clave, $valor, usuarioActual()['id'] ?? null]);
+    }
     $GLOBALS['__cache_config'][$clave] = $valor;
 }
 

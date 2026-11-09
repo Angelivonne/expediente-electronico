@@ -213,6 +213,6 @@ foreach (TIPOS_REGISTRO as $tipo => $info):
   <p>Generado el <?= date('d/m/Y') . ' ' . hora12('now') ?> · <?= e($institucion['nombre'] ?? 'Expediente clínico') ?> · Expediente <?= e($p['folio']) ?></p>
 </footer>
 
-<script src="<?= recurso('js/impresion.js') ?>"></script>
+<script nonce="<?= nonceCsp() ?>" src="<?= recurso('js/impresion.js') ?>"></script>
 </body>
 </html>
