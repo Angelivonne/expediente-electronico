@@ -110,18 +110,10 @@
 .aura-panel__atajos a:hover { border-color: #353535; color: var(--texto-fuerte); text-decoration: none; }
 .aura-panel__atajos svg { width: 16px; height: 16px; }
 
-/* Avisos emergentes de toda la app: vidrio oscuro con un orbe del degradado de la IA */
-.notificacion {
-  gap: 12px; padding: 10px 16px 10px 12px; border-radius: 14px; border: 1px solid transparent;
-  background: linear-gradient(180deg, rgba(30, 30, 34, .94), rgba(20, 20, 23, .96)) padding-box, linear-gradient(135deg, rgba(13, 242, 193, .45), #2a2a2a 45%) border-box;
-  backdrop-filter: blur(12px); box-shadow: 0 12px 34px rgba(0, 0, 0, .5);
-  font-size: var(--fs-sm); color: var(--texto-fuerte);
-}
-.notificacion--error { background: linear-gradient(180deg, rgba(30, 30, 34, .94), rgba(20, 20, 23, .96)) padding-box, linear-gradient(135deg, rgba(255, 61, 94, .55), #2a2a2a 45%) border-box; }
-.notificacion__orbe { width: 16px; height: 16px; flex-shrink: 0; border-radius: 50%;
-  background: radial-gradient(circle at 28% 30%, #74efff 0 10%, transparent 32%), radial-gradient(circle at 72% 68%, #1a2cff 0 8%, transparent 34%), linear-gradient(135deg, #0df2c1, #0b7cff 58%, #1a2cff);
-  box-shadow: 0 0 10px rgba(13, 242, 193, .5); animation: cot-aurora-pulso 1.8s ease-in-out infinite alternate; }
-.notificacion--error .notificacion__orbe { background: radial-gradient(circle at 28% 30%, #ffc0a0 0 10%, transparent 32%), linear-gradient(135deg, #ff8aa0, #ff3d5e 58%, #c81e4a); box-shadow: 0 0 10px rgba(255, 61, 94, .5); }
+/* Avisos emergentes de toda la app: sobreescribir con estilo neutro sin orbes */
+.notificacion { background: var(--bg-tarjeta, #1c1c1e) !important; border: 1px solid var(--borde-fuerte, #2e2e2e) !important; backdrop-filter: none !important; box-shadow: 0 4px 16px rgba(0,0,0,.4) !important; }
+.notificacion--error { border-color: rgba(200,50,60,.35) !important; }
+.notificacion__orbe { display: none !important; }
 
 @media (max-width: 760px) {
   .aura-citas { border-radius: 0; }

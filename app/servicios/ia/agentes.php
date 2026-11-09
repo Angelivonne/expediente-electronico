@@ -48,7 +48,7 @@ function agentsList(int $usuarioId): array {
     $s->execute([$usuarioId]);
     $rows = $s->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as &$r) {
-        $r['hue'] = agentHue($r['slug']);
+        $r['hue'] = ($r['color_hue'] !== null && $r['color_hue'] !== '') ? (int)$r['color_hue'] : agentHue($r['slug']);
         $r['herramientas'] = json_decode($r['herramientas'] ?? '[]', true) ?: [];
     }
     return $rows;
@@ -58,7 +58,7 @@ function agentGet(int $id, int $usuarioId): ?array {
     $s->execute([$id,$usuarioId]);
     $r = $s->fetch(PDO::FETCH_ASSOC);
     if (!$r) return null;
-    $r['hue'] = agentHue($r['slug']);
+    $r['hue'] = ($r['color_hue'] !== null && $r['color_hue'] !== '') ? (int)$r['color_hue'] : agentHue($r['slug']);
     $r['herramientas'] = json_decode($r['herramientas'] ?? '[]', true) ?: [];
     return $r;
 }
@@ -69,8 +69,9 @@ function agentCreate(array $d, int $usuarioId, ?int $institucionId): int {
     if ($slug === '') $slug = 'agente-' . substr(bin2hex(random_bytes(4)),0,8);
     $shape = in_array($d['shape'] ?? 'circle', AGENT_SHAPES, true) ? $d['shape'] : 'circle';
     $prov = in_array($d['proveedor'] ?? 'anthropic', ['anthropic','openai'], true) ? $d['proveedor'] : 'anthropic';
+    $hue   = isset($d['hue']) && is_numeric($d['hue']) ? (int)$d['hue'] : null;
     $s = db()->prepare("INSERT INTO agentes (usuario_creador, institucion_id, nombre, slug, description, shape, color_hue, proveedor, servicio, modelo, api_url, api_clave, esfuerzo, herramientas, system_prompt, instrucciones, estado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'creado')");
-    $s->execute([$usuarioId,$institucionId,$nombre,$slug,trim($d['description'] ?? ''), $shape, null, $prov, trim($d['servicio'] ?? 'anthropic'), trim($d['modelo'] ?? ''), trim($d['api_url'] ?? ''), trim($d['api_clave'] ?? ''), in_array($d['esfuerzo'] ?? 'medium',['low','medium','high'],true) ? $d['esfuerzo'] : 'medium', json_encode(array_values(array_filter((array)($d['herramientas'] ?? [])))), trim($d['system_prompt'] ?? ''), trim($d['instrucciones'] ?? '')]);
+    $s->execute([$usuarioId,$institucionId,$nombre,$slug,trim($d['description'] ?? ''), $shape, $hue, $prov, trim($d['servicio'] ?? 'anthropic'), trim($d['modelo'] ?? ''), trim($d['api_url'] ?? ''), trim($d['api_clave'] ?? ''), in_array($d['esfuerzo'] ?? 'medium',['low','medium','high'],true) ? $d['esfuerzo'] : 'medium', json_encode(array_values(array_filter((array)($d['herramientas'] ?? [])))), trim($d['system_prompt'] ?? ''), trim($d['instrucciones'] ?? '')]);
     return (int)db()->lastInsertId();
 }
 function agentSetState(int $id, int $usuarioId, string $estado): bool {
@@ -103,3 +104,4 @@ function agentSystemPrompt(array $agente): string {
     if ($instr) $txt .= "\nINSTRUCCIONES: $instr";
     return $txt;
 }
+

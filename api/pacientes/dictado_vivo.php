@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Dictado en vivo (navegadores sin Web Speech API, como Zen/Firefox).
  * Recibe un trozo WAV corto (16 kHz, mono, 16 bits) mientras el médico habla y devuelve
@@ -59,7 +59,8 @@ curl_close($ch);
 $resultado = json_decode((string) $respuesta, true);
 if (!is_array($resultado) || !($resultado['ok'] ?? false)) {
     $error = is_array($resultado) ? ($resultado['error'] ?? '') : '';
-    responderVivo(502, ['ok' => false, 'error' => $error ?: 'El transcriptor local no respondió. ¿Está abierto iniciar_servicio_stt.bat?']);
+    responderVivo(502, ['ok' => false, 'error' => $error ?: 'El servicio de transcripción de voz no está disponible en este momento.']);
 }
 
 responderVivo(200, ['ok' => true, 'texto' => trim((string) ($resultado['texto'] ?? ''))]);
+

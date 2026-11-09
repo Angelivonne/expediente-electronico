@@ -112,7 +112,7 @@ function iniciarBaseDatos(bd) {
 
   tabla.querySelectorAll('thead tr:last-child th').forEach((th, indice) => {
     // Clic en el encabezado: menú de la propiedad (ordenar, renombrar, ocultar) si está disponible
-    th.querySelector('button').addEventListener('click', () => {
+    const btnTh = th.querySelector('button'); if (btnTh) btnTh.addEventListener('click', () => {
       if (window.menuPropiedadPacientes) window.menuPropiedadPacientes(th, (asc) => ordenar(asc));
       else ordenar(th.getAttribute('aria-sort') !== 'ascending');
     });
@@ -358,8 +358,8 @@ function mostrarNotificacion(tipo, texto) {
   const aviso = document.createElement('div');
   aviso.className = `notificacion notificacion--${tipo}`;
   aviso.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
-  aviso.innerHTML = '<span class="notificacion__orbe" aria-hidden="true"></span><span></span>';
-  aviso.querySelector('span:last-child').textContent = texto;
+  aviso.innerHTML = '<span></span>';
+  aviso.querySelector('span').textContent = texto;
   contenedor.appendChild(aviso);
   programarCierre(aviso);
 }

@@ -435,6 +435,41 @@
   box-shadow: 0 0 0 2px rgba(47, 128, 237, 0.3);
 }
 
+/* Swatches de color avatar */
+.agentes-colores {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 100ms ease, border-color 100ms ease;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.color-swatch.sel {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+  transform: scale(1.1);
+}
+
+/* Chips de estado del agente */
+.agentes-chip--iniciado { background: rgba(16, 185, 70, 0.15); color: #3fca75; }
+.agentes-chip--pausado  { background: rgba(230, 160, 20, 0.15); color: #e6b830; }
+.agentes-chip--eliminado { background: rgba(200, 50, 50, 0.15); color: #e06060; }
+.agentes-chip--creado   { background: #1d2b3a; color: #58a6ff; }
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }

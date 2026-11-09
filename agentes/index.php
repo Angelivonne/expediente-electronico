@@ -106,7 +106,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 
 <!-- Modal para Crear / Editar Agente -->
 <dialog id="dlg-agente" class="dlg dlg--agente">
-  <form method="dialog" class="dlg__caja dlg__caja--mediana">
+  <form class="dlg__caja dlg__caja--mediana">
     <div class="dlg__cabecera">
       <h3 class="dlg__titulo">Configurar Agente Clínico</h3>
       <button type="button" class="boton-icono" data-cerrar aria-label="Cerrar"><?= icono('cerrar') ?></button>
@@ -123,9 +123,15 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
         <textarea id="ag-desc" name="description" class="campo" rows="2" maxlength="400" placeholder="¿Cuál es su rol o propósito en la clínica?"></textarea>
       </div>
 
+      <!-- Selector de color Bloub Avatar -->
+      <div class="form-grupo">
+        <label class="form-label">Color del Avatar</label>
+        <div class="agentes-colores" data-color-select></div>
+      </div>
+
       <!-- Selector visual de forma Bloub Avatar -->
       <div class="form-grupo">
-        <label class="form-label">Forma y estilo del Avatar Bloub</label>
+        <label class="form-label">Forma del Avatar</label>
         <div class="agentes-formas" data-forma-select></div>
       </div>
 
@@ -165,3 +171,4 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 <script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/modulos/agentes.js") ?>"></script>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
+
