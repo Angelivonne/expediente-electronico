@@ -2,7 +2,7 @@
 /**
  * Módulo de Kardex de Medicación y Cuidados de Enfermería Hospitalaria.
  * Control farmacoterapéutico por turnos (Matutino, Vespertino, Nocturno)
- * conforme a la NOM-004-SSA3-2012 y la NOM-019-SSA3-2013.
+ * conforme a la NOM-004-SSA3-2012 y NOM-019-SSA3-2013.
  */
 require_once __DIR__ . '/../app/nucleo/inicio.php';
 exigirPermiso('ver_expediente');
@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$institucionId, $pacienteId, $camillaId, $medicamento, $dosis, $via, $frecuencia, $horario, $fechaInicio, $indicaciones, $medicoPrescribe]);
 
             registrarBitacora('kardex_medicaciones', (int)$pdo->lastInsertId(), 'crear', 'medicamento', null, $medicamento);
-            mensajeFlash('exito', 'Medicamento prescrito y agregado al Kardex correctamente.');
+            mensajeFlash('exito', 'Medicamento prescrito y agregado al Kardex.');
         } else {
             mensajeFlash('error', 'Faltan campos obligatorios para registrar la medicación.');
         }
@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$institucionId, $medicacionId, $pacienteId, $turno, $fecha, $horaProg, $horaApl, $estado, $enfermero, $obs]);
 
             registrarBitacora('kardex_administraciones', (int)$pdo->lastInsertId(), 'crear', 'estado', null, $estado);
-            mensajeFlash('exito', 'Registro de dosis asentado en la Hoja de Enfermería.');
+            mensajeFlash('exito', 'Dosis registrada en la Hoja de Enfermería.');
         }
         redirigir("/camillas/kardex.php?paciente_id={$pacienteId}&fecha={$fecha}");
     }
@@ -100,12 +100,11 @@ if (!$pacienteId && $camillaId) {
 $stmtHosp = $pdo->prepare("SELECT c.id as camilla_id, c.codigo, c.area, p.id as pac_id, p.nombre, p.primer_apellido, p.segundo_apellido, p.folio
     FROM camillas c 
     INNER JOIN pacientes p ON p.id = c.paciente_id 
-    WHERE c.institucion_id = ? AND c.estado = 'ocupada'
+    WHERE c.institucion_id = ? AND c.estado = 'ocupada' AND p.eliminado_en IS NULL
     ORDER BY c.area ASC, c.codigo ASC");
 $stmtHosp->execute([$institucionId]);
 $pacientesHospitalizados = $stmtHosp->fetchAll(PDO::FETCH_ASSOC);
 
-// Si no se especificó paciente, tomar el primero hospitalizado por defecto
 if (!$pacienteId && !empty($pacientesHospitalizados)) {
     $pacienteId = (int) $pacientesHospitalizados[0]['pac_id'];
 }
@@ -113,36 +112,23 @@ if (!$pacienteId && !empty($pacientesHospitalizados)) {
 $paciente = null;
 $camillaActual = null;
 $medicacionesActivas = [];
-$medicacionesSuspendidas = [];
 $administraciones = [];
 $fechaFiltro = $_GET['fecha'] ?? date('Y-m-d');
 
 if ($pacienteId) {
-    // Datos del paciente
     $stmtP = $pdo->prepare("SELECT * FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL");
     $stmtP->execute([$pacienteId, $institucionId]);
     $paciente = $stmtP->fetch(PDO::FETCH_ASSOC);
 
     if ($paciente) {
-        // Camilla actual asignada
         $stmtCam = $pdo->prepare("SELECT * FROM camillas WHERE paciente_id = ? AND institucion_id = ? AND estado = 'ocupada' LIMIT 1");
         $stmtCam->execute([$pacienteId, $institucionId]);
         $camillaActual = $stmtCam->fetch(PDO::FETCH_ASSOC);
 
-        // Medicaciones del paciente
-        $stmtM = $pdo->prepare("SELECT * FROM kardex_medicaciones WHERE paciente_id = ? AND institucion_id = ? ORDER BY estado ASC, creado_en DESC");
+        $stmtM = $pdo->prepare("SELECT * FROM kardex_medicaciones WHERE paciente_id = ? AND institucion_id = ? AND estado = 'activo' ORDER BY creado_en ASC");
         $stmtM->execute([$pacienteId, $institucionId]);
-        $todasMed = $stmtM->fetchAll(PDO::FETCH_ASSOC);
+        $medicacionesActivas = $stmtM->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($todasMed as $m) {
-            if ($m['estado'] === 'activo') {
-                $medicacionesActivas[] = $m;
-            } else {
-                $medicacionesSuspendidas[] = $m;
-            }
-        }
-
-        // Administraciones para la fecha seleccionada
         $stmtA = $pdo->prepare("SELECT a.*, m.medicamento, m.dosis, m.via, m.horario
             FROM kardex_administraciones a
             INNER JOIN kardex_medicaciones m ON m.id = a.medicacion_id
@@ -153,7 +139,6 @@ if ($pacienteId) {
     }
 }
 
-// Agrupar administraciones por turno
 $adminPorTurno = [
     'matutino' => [],
     'vespertino' => [],
@@ -172,420 +157,300 @@ if ($paciente && !empty($paciente['fecha_nacimiento'])) {
 }
 
 $nombreCompleto = $paciente ? trim("{$paciente['nombre']} {$paciente['primer_apellido']} {$paciente['segundo_apellido']}") : '';
+$iniciales = $paciente ? mb_strtoupper(mb_substr($paciente['nombre'], 0, 1) . mb_substr($paciente['primer_apellido'], 0, 1)) : '';
+$sinAlergias = empty($paciente['alergias']) || mb_strtolower($paciente['alergias']) === 'negadas';
 
-$titulo = $paciente ? "Kardex de Medicación — {$nombreCompleto}" : 'Kardex de Medicación y Cuidados';
+$tituloPagina = $paciente ? "Kardex — {$nombreCompleto}" : 'Kardex de Medicación';
 $seccionActiva = 'camillas';
-require_once __DIR__ . '/../app/vistas/plantilla/encabezado.php';
+require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 ?>
 
-<div class="hoja-paciente">
-
-  <!-- Barra de navegación y herramientas -->
-  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <a href="<?= URL_BASE ?>/camillas/" class="boton boton--sutil" style="display: inline-flex; align-items: center; gap: 6px;">
-        ← <span>Censo de Camillas</span>
-      </a>
-      <span style="color: var(--texto-tenue);">/</span>
-      <span style="font-weight: 600; font-size: 1.05rem; color: #fff;">Hoja de Kardex y Enfermería</span>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-      <!-- Selector de Paciente Hospitalizado -->
-      <form method="get" action="" style="display: inline-flex; align-items: center; gap: 6px; margin: 0;">
-        <label for="select_paciente" style="font-size: 0.8125rem; color: var(--texto-suave);">Cama / Paciente:</label>
-        <select id="select_paciente" name="paciente_id" onchange="this.form.submit()" style="background: #202020; color: #fff; border: 1px solid #333; padding: 6px 10px; border-radius: 6px; font-size: 0.875rem;">
-          <?php if (empty($pacientesHospitalizados)): ?>
-            <option value="">Sin pacientes en camillas</option>
-          <?php else: ?>
-            <?php foreach ($pacientesHospitalizados as $ph): ?>
-              <option value="<?= (int)$ph['pac_id'] ?>" <?= $pacienteId === (int)$ph['pac_id'] ? 'selected' : '' ?>>
-                [<?= e($ph['codigo']) ?>] <?= e("{$ph['nombre']} {$ph['primer_apellido']}") ?> (<?= e(ucfirst($ph['area'])) ?>)
-              </option>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </select>
-      </form>
-
-      <?php if ($paciente): ?>
-        <button type="button" class="boton boton--sutil" onclick="window.print();" style="display: inline-flex; align-items: center; gap: 6px;">
-          <?= icono('documento') ?> <span>Imprimir Kardex Oficial</span>
-        </button>
-
-        <a href="<?= URL_BASE ?>/pacientes/ver.php?id=<?= (int)$paciente['id'] ?>" class="boton boton--secundario" style="display: inline-flex; align-items: center; gap: 6px;">
-          <?= icono('usuarios') ?> <span>Ver Expediente</span>
-        </a>
-      <?php endif; ?>
-    </div>
-  </div>
+<div class="pagina pagina--expediente">
 
   <?php if (!$paciente): ?>
-    <div style="text-align: center; padding: 60px 20px; background: #181818; border: 1px solid #2a2a2a; border-radius: 12px; margin-top: 20px;">
-      <p style="font-size: 1.1rem; color: var(--texto-suave); margin-bottom: 16px;">No hay ningún paciente seleccionado o no hay pacientes en camillas actualmente.</p>
-      <a href="<?= URL_BASE ?>/camillas/" class="boton boton--primario">Ir al Censo para Asignar Pacientes</a>
+    <div class="pagina__cabecera">
+      <h1 class="pagina__titulo">Kardex de Medicación</h1>
+      <p class="pagina__subtitulo">No hay ningún paciente seleccionado.</p>
     </div>
+    <p class="bd__vacio"><a href="<?= URL_BASE ?>/camillas/">Ir al Censo de Camas</a> para asignar pacientes.</p>
   <?php else: ?>
 
-    <!-- Ficha del Paciente / Encabezado de Hospitalización -->
-    <section class="tarjeta" style="background: #181818; border: 1px solid #2a2a2a; border-radius: 12px; padding: 22px; margin-bottom: 24px;">
-      <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;">
-        <div style="display: flex; gap: 16px; align-items: center;">
-          <div style="width: 58px; height: 58px; border-radius: 50%; background: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 700; color: #fff;">
-            <?= e(mb_strtoupper(mb_substr($paciente['nombre'], 0, 1) . mb_substr($paciente['primer_apellido'], 0, 1))) ?>
-          </div>
-          <div>
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <h1 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin: 0;"><?= e($nombreCompleto) ?></h1>
-              <?php if ($camillaActual): ?>
-                <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.8125rem;">
-                  🛏️ <?= e($camillaActual['codigo']) ?> (<?= e(ucfirst($camillaActual['area'])) ?>)
-                </span>
-              <?php endif; ?>
-            </div>
-            <div style="font-size: 0.875rem; color: var(--texto-suave); margin-top: 5px; display: flex; gap: 14px; flex-wrap: wrap;">
-              <span><strong>Folio:</strong> <?= e($paciente['folio']) ?></span>
-              <span><strong>CURP:</strong> <?= e($paciente['curp'] ?: '—') ?></span>
-              <span><strong>Edad:</strong> <?= $edadPaciente !== null ? "{$edadPaciente} años" : '—' ?> (<?= e($paciente['sexo'] === 'M' ? 'Femenino' : 'Masculino') ?>)</span>
-              <span><strong>Gpo Sanguíneo:</strong> <?= e($paciente['grupo_sanguineo'] ?: 'No registrado') ?></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Botones de Acción Rápida -->
-        <div style="display: flex; gap: 8px;">
-          <button type="button" class="boton boton--primario" onclick="document.getElementById('modalNuevaMed').showModal();" style="display: inline-flex; align-items: center; gap: 6px;">
-            <?= icono('agregar') ?> <span>+ Prescribir Medicamento</span>
-          </button>
-          <button type="button" class="boton boton--secundario" onclick="document.getElementById('modalRegistrarAdmin').showModal();" style="display: inline-flex; align-items: center; gap: 6px;">
-            <?= icono('verificado') ?> <span>Registrar Dosis</span>
-          </button>
-        </div>
+    <!-- Encabezado Idéntico a pacientes/ver.php (hoja-paciente) -->
+    <header class="hoja-paciente" id="perfil">
+      <div class="hoja-paciente__foto">
+        <span class="hoja-paciente__iniciales" aria-hidden="true"><?= e($iniciales) ?></span>
       </div>
-
-      <!-- Alerta de Alergias y Diagnóstico de Ingreso -->
-      <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #282828; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
-        <div style="padding: 10px 14px; background: <?= !empty($paciente['alergias']) && mb_strtolower($paciente['alergias']) !== 'negadas' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(255,255,255,0.03)' ?>; border: 1px solid <?= !empty($paciente['alergias']) && mb_strtolower($paciente['alergias']) !== 'negadas' ? 'rgba(239, 68, 68, 0.35)' : '#262626' ?>; border-radius: 8px;">
-          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: <?= !empty($paciente['alergias']) && mb_strtolower($paciente['alergias']) !== 'negadas' ? '#fca5a5' : 'var(--texto-tenue)' ?>; letter-spacing: 0.5px;">
-            ⚠️ Alergias y Reacciones Adversas
-          </div>
-          <div style="font-size: 0.9rem; color: <?= !empty($paciente['alergias']) && mb_strtolower($paciente['alergias']) !== 'negadas' ? '#fecaca' : '#fff' ?>; font-weight: 600; margin-top: 3px;">
-            <?= e($paciente['alergias'] ?: 'Negadas') ?>
-          </div>
-        </div>
-
-        <div style="padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid #262626; border-radius: 8px;">
-          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--texto-tenue); letter-spacing: 0.5px;">
-            Diagnóstico de Ingreso Hospitalario
-          </div>
-          <div style="font-size: 0.9rem; color: #fff; font-weight: 500; margin-top: 3px;">
-            <?= e($camillaActual['diagnostico_ingreso'] ?? $paciente['motivo_consulta'] ?? 'No especificado') ?>
-          </div>
-        </div>
+      <div class="hoja-paciente__identidad">
+        <h1 class="hoja-paciente__nombre"><?= e($nombreCompleto) ?></h1>
+        <p class="hoja-paciente__linea">
+          <span><?= e($paciente['folio']) ?></span>
+          <span><?= $edadPaciente !== null ? "{$edadPaciente} años" : '—' ?></span>
+          <span><?= e($paciente['sexo'] === 'M' ? 'Femenino' : 'Masculino') ?></span>
+          <span>Nació el <?= e(fechaCorta($paciente['fecha_nacimiento'])) ?></span>
+        </p>
+        <ul class="hoja-paciente__alertas">
+          <?php if (!$sinAlergias): ?>
+            <li class="hoja-paciente__alerta hoja-paciente__alerta--alergia">
+              <?= icono('alerta') ?><span><b>Alergias</b> <?= e($paciente['alergias']) ?></span>
+            </li>
+          <?php endif; ?>
+          <?php if ($camillaActual): ?>
+            <li class="hoja-paciente__alerta hoja-paciente__alerta--hospital">
+              <?= icono('clinico') ?><span><b>Cama:</b> <?= e($camillaActual['codigo']) ?> (<?= e(ucfirst($camillaActual['area'])) ?>)</span>
+            </li>
+          <?php endif; ?>
+          <li class="hoja-paciente__alerta">
+            <?= icono('documento') ?><span><b>Diagnóstico de ingreso:</b> <?= e($camillaActual['diagnostico_ingreso'] ?? $paciente['motivo_consulta'] ?? 'No documentado') ?></span>
+          </li>
+        </ul>
       </div>
-    </section>
+    </header>
 
-    <!-- SECCIÓN 1: Prescripciones Activas de Medicamentos (Kardex Farmacoterapéutico) -->
-    <section class="ficha__seccion" style="margin-bottom: 30px;">
-      <div class="ficha__titulo-fila" style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <h2 class="ficha__titulo" style="font-size: 1.15rem; margin: 0;">Prescripción Farmacológica Activa (Kardex)</h2>
-          <p style="font-size: 0.8125rem; color: var(--texto-tenue); margin: 3px 0 0 0;">Control oficial de medicamentos prescritos vigentes según la NOM-004-SSA3-2012.</p>
-        </div>
-        <button type="button" class="boton boton--sutil" onclick="document.getElementById('modalNuevaMed').showModal();" style="font-size: 0.8125rem;">
-          + Agregar Fármaco
-        </button>
-      </div>
+    <!-- Resumen Métrico (Idéntico a pacientes/ver.php hoja-paciente__resumen) -->
+    <dl class="hoja-paciente__resumen">
+      <div><dt>Grupo sanguíneo</dt><dd><?= e($paciente['grupo_sanguineo'] ?: '—') ?></dd></div>
+      <div><dt>Cama asignada</dt><dd><?= e($camillaActual['codigo'] ?? 'Sin cama') ?></dd></div>
+      <div><dt>Ingreso</dt><dd><?= $camillaActual['ingreso_en'] ? e(fechaCorta($camillaActual['ingreso_en'])) : '—' ?></dd></div>
+      <div><dt>Fármacos activos</dt><dd><?= count($medicacionesActivas) ?></dd></div>
+      <div><dt>Dosis matutino</dt><dd><?= count($adminPorTurno['matutino']) ?></dd></div>
+      <div><dt>Dosis vespertino</dt><dd><?= count($adminPorTurno['vespertino']) ?></dd></div>
+      <div><dt>Dosis nocturno</dt><dd><?= count($adminPorTurno['nocturno']) ?></dd></div>
+    </dl>
 
-      <?php if (empty($medicacionesActivas)): ?>
-        <div style="padding: 24px; text-align: center; background: #181818; border: 1px dashed #333; border-radius: 10px; color: var(--texto-tenue);">
-          No hay medicamentos prescritos activos en el Kardex para este paciente.
-        </div>
-      <?php else: ?>
-        <div class="tabla-contenedor" style="background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; overflow: hidden;">
-          <table class="tabla" style="width: 100%; margin: 0;">
-            <thead>
-              <tr style="background: #202020; border-bottom: 1px solid #2c2c2c;">
-                <th style="padding: 12px 16px; text-align: left; font-size: 0.8125rem;">Medicamento y Presentación</th>
-                <th style="padding: 12px 16px; text-align: left; font-size: 0.8125rem;">Dosis y Vía</th>
-                <th style="padding: 12px 16px; text-align: left; font-size: 0.8125rem;">Frecuencia y Horarios</th>
-                <th style="padding: 12px 16px; text-align: left; font-size: 0.8125rem;">Indicaciones / Dilución</th>
-                <th style="padding: 12px 16px; text-align: left; font-size: 0.8125rem;">Médico Prescribe</th>
-                <th style="padding: 12px 16px; text-align: right; font-size: 0.8125rem;">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
+    <!-- Cuerpo en dos columnas (hoja-paciente__cuerpo) -->
+    <div class="hoja-paciente__cuerpo">
+
+      <!-- Columna Principal: Prescripciones y Administraciones -->
+      <div class="hoja-paciente__datos">
+
+        <!-- Sección: Fármacos Prescritos Activos (formato lista-clinica) -->
+        <section class="ficha__seccion">
+          <div class="ficha__titulo-fila">
+            <h2 class="ficha__titulo">Medicamentos prescritos (Kardex activo)</h2>
+            <span class="ficha__fuente">NOM-004-SSA3-2012</span>
+          </div>
+
+          <?php if (empty($medicacionesActivas)): ?>
+            <p class="ficha__vacio">Sin medicamentos prescritos activos en el Kardex.</p>
+          <?php else: ?>
+            <ul class="lista-clinica">
               <?php foreach ($medicacionesActivas as $med): ?>
-                <tr style="border-bottom: 1px solid #232323;">
-                  <td style="padding: 12px 16px;">
-                    <div style="font-weight: 600; color: #fff; font-size: 0.9375rem;"><?= e($med['medicamento']) ?></div>
-                    <div style="font-size: 0.75rem; color: var(--texto-tenue);">Inicio: <?= e(fechaCorta($med['fecha_inicio'])) ?></div>
-                  </td>
-                  <td style="padding: 12px 16px; font-size: 0.875rem;">
-                    <span style="font-weight: 600; color: #93c5fd;"><?= e($med['dosis']) ?></span>
-                    <div style="font-size: 0.75rem; color: var(--texto-suave);"><?= e($med['via']) ?></div>
-                  </td>
-                  <td style="padding: 12px 16px; font-size: 0.875rem;">
-                    <div><?= e($med['frecuencia']) ?></div>
-                    <?php if ($med['horario']): ?>
-                      <div style="font-size: 0.75rem; color: #38bdf8; font-family: monospace; font-weight: 600;">⏰ <?= e($med['horario']) ?></div>
-                    <?php endif; ?>
-                  </td>
-                  <td style="padding: 12px 16px; font-size: 0.8125rem; color: var(--texto-suave); max-width: 250px;">
-                    <?= e($med['indicaciones'] ?: '—') ?>
-                  </td>
-                  <td style="padding: 12px 16px; font-size: 0.8125rem; color: var(--texto-suave);">
-                    <?= e($med['medico_prescribe'] ?: 'Servicio Médico') ?>
-                  </td>
-                  <td style="padding: 12px 16px; text-align: right;">
-                    <div style="display: flex; gap: 6px; justify-content: flex-end;">
-                      <button type="button" class="boton boton--primario" style="font-size: 0.75rem; padding: 4px 8px;" onclick="prepararAdminDosis(<?= (int)$med['id'] ?>, '<?= e($med['medicamento']) ?>', '<?= e($med['dosis']) ?>', '<?= e($med['horario'] ?: '08:00') ?>');">
-                        + Dosis
+                <li>
+                  <a href="javascript:void(0)" onclick="prepararAdminDosis(<?= (int)$med['id'] ?>, '<?= e($med['medicamento']) ?>', '<?= e($med['dosis']) ?>', '<?= e($med['horario'] ?: '08:00') ?>');">
+                    <span class="lista-clinica__icono"><?= icono('pildora') ?></span>
+                    <span class="lista-clinica__texto">
+                      <b><?= e($med['medicamento']) ?></b> · <?= e($med['dosis']) ?> · <?= e($med['via']) ?>
+                      <small>Frecuencia: <?= e($med['frecuencia']) ?> · Horario: <?= e($med['horario'] ?: 'Según indicación') ?> · Inicio: <?= e(fechaCorta($med['fecha_inicio'])) ?><?= $med['indicaciones'] ? ' · ' . e($med['indicaciones']) : '' ?> · Prescribe: <?= e($med['medico_prescribe'] ?: 'Servicio Médico') ?></small>
+                    </span>
+                  </a>
+                  <div style="display: flex; gap: 4px; align-items: center; margin-left: auto;">
+                    <button type="button" class="boton boton--sutil" style="padding: 2px 7px; font-size: var(--fs-xs);" onclick="prepararAdminDosis(<?= (int)$med['id'] ?>, '<?= e($med['medicamento']) ?>', '<?= e($med['dosis']) ?>', '<?= e($med['horario'] ?: '08:00') ?>');">
+                      <?= icono('agregar') ?> Dosis
+                    </button>
+                    <form method="post" action="" style="display: inline;" onsubmit="return confirm('¿Suspender este medicamento del Kardex?');">
+                      <?= campoCsrf() ?>
+                      <input type="hidden" name="accion" value="suspender_medicacion">
+                      <input type="hidden" name="medicacion_id" value="<?= (int)$med['id'] ?>">
+                      <input type="hidden" name="paciente_id" value="<?= (int)$paciente['id'] ?>">
+                      <button type="submit" class="boton boton--sutil" style="padding: 2px 7px; font-size: var(--fs-xs); color: #f87171;">
+                        Suspender
                       </button>
-                      <form method="post" action="" style="display: inline;" onsubmit="return confirm('¿Confirmas suspender este medicamento del Kardex?');">
-                        <?= campoCsrf() ?>
-                        <input type="hidden" name="accion" value="suspender_medicacion">
-                        <input type="hidden" name="medicacion_id" value="<?= (int)$med['id'] ?>">
-                        <input type="hidden" name="paciente_id" value="<?= (int)$paciente['id'] ?>">
-                        <button type="submit" class="boton boton--sutil" style="font-size: 0.75rem; padding: 4px 8px; color: #f87171;" title="Suspender medicamento">
-                          Suspender
-                        </button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
+                    </form>
+                  </div>
+                </li>
               <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
-      <?php endif; ?>
-    </section>
+            </ul>
+          <?php endif; ?>
 
-    <!-- SECCIÓN 2: Hoja de Registro y Administración por Turno (Matutino, Vespertino, Nocturno) -->
-    <section class="ficha__seccion">
-      <div class="ficha__titulo-fila" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <h2 class="ficha__titulo" style="font-size: 1.15rem; margin: 0;">Hoja de Administración de Fármacos por Turnos</h2>
-          <p style="font-size: 0.8125rem; color: var(--texto-tenue); margin: 3px 0 0 0;">Registro de aplicación firmado por enfermería (NOM-019-SSA3-2013).</p>
-        </div>
-
-        <!-- Selector de Fecha de Administración -->
-        <form method="get" action="" style="display: flex; align-items: center; gap: 8px; margin: 0;">
-          <input type="hidden" name="paciente_id" value="<?= (int)$paciente['id'] ?>">
-          <label for="fecha_kardex" style="font-size: 0.8125rem; color: var(--texto-suave);">Fecha:</label>
-          <input type="date" id="fecha_kardex" name="fecha" value="<?= e($fechaFiltro) ?>" onchange="this.form.submit()" style="background: #202020; color: #fff; border: 1px solid #333; padding: 6px 10px; border-radius: 6px; font-size: 0.875rem;">
-          <button type="button" class="boton boton--primario" onclick="document.getElementById('modalRegistrarAdmin').showModal();" style="font-size: 0.8125rem;">
-            + Asentar Dosis
+          <button type="button" class="hoja-paciente__agendar" onclick="document.getElementById('modalNuevaMed').showModal();" style="margin-top: 10px;">
+            <?= icono('agregar') ?> Prescribir medicamento al Kardex
           </button>
-        </form>
+        </section>
+
+        <!-- Sección: Tabla Nativa de Aplicación de Dosis (bd-tabla) -->
+        <section class="ficha__seccion" style="margin-top: 24px;">
+          <div class="ficha__titulo-fila">
+            <h2 class="ficha__titulo">Hoja de enfermería y administración de dosis</h2>
+            <span class="ficha__fuente">Fecha: <?= e(fechaCorta($fechaFiltro)) ?> · NOM-019-SSA3-2013</span>
+          </div>
+
+          <?php if (empty($administraciones)): ?>
+            <p class="ficha__vacio">No hay dosis registradas para la fecha seleccionada (<?= e(fechaCorta($fechaFiltro)) ?>).</p>
+          <?php else: ?>
+            <div class="bd__marco" style="margin-top: 8px;">
+              <table class="bd-tabla">
+                <thead>
+                  <tr>
+                    <th scope="col"><button type="button"><?= icono('reloj') ?> <span>Turno</span></button></th>
+                    <th scope="col"><button type="button"><?= icono('reloj') ?> <span>Hora prog.</span></button></th>
+                    <th scope="col"><button type="button"><?= icono('pildora') ?> <span>Medicamento</span></button></th>
+                    <th scope="col"><button type="button"><?= icono('etiqueta') ?> <span>Dosis / Vía</span></button></th>
+                    <th scope="col"><button type="button"><?= icono('verificado') ?> <span>Estado</span></button></th>
+                    <th scope="col"><button type="button"><?= icono('usuarios') ?> <span>Enfermero/a</span></button></th>
+                    <th scope="col"><button type="button"><?= icono('documento') ?> <span>Notas</span></button></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($administraciones as $adm): 
+                    $colorEstado = match($adm['estado']) {
+                        'aplicado' => '#4ade80',
+                        'pendiente' => '#facc15',
+                        default => '#f87171'
+                    };
+                  ?>
+                    <tr>
+                      <td style="text-transform: capitalize;"><?= e($adm['turno']) ?></td>
+                      <td class="num" style="font-weight: 600;"><?= e($adm['hora_programada']) ?></td>
+                      <td class="bd-tabla__celda-titulo">
+                        <span class="bd-tabla__titulo">
+                          <span><?= e($adm['medicamento']) ?></span>
+                        </span>
+                      </td>
+                      <td><?= e($adm['dosis']) ?> (<?= e($adm['via']) ?>)</td>
+                      <td>
+                        <span style="color: <?= $colorEstado ?>; font-weight: 600;"><?= ucfirst($adm['estado']) ?></span>
+                      </td>
+                      <td><?= e($adm['enfermero_nombre'] ?: '—') ?></td>
+                      <td><?= e($adm['observaciones'] ?: '—') ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+
+          <button type="button" class="hoja-paciente__agendar" onclick="document.getElementById('modalRegistrarAdmin').showModal();" style="margin-top: 10px;">
+            <?= icono('agregar') ?> Asentar aplicación de dosis
+          </button>
+        </section>
+
       </div>
 
-      <!-- Turnos Hospitalarios en 3 Columnas Grid -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
-        
-        <!-- Turno Matutino (07:00 - 15:00) -->
-        <div style="background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; padding-bottom: 10px; margin-bottom: 12px;">
-            <div style="font-weight: 700; color: #fde047; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
-              ☀️ Turno Matutino <span style="font-size: 0.75rem; color: var(--texto-tenue); font-weight: normal;">(07:00 - 15:00)</span>
-            </div>
-            <span class="badge" style="background: rgba(253, 224, 71, 0.15); color: #fde047; font-size: 0.75rem;">
-              <?= count($adminPorTurno['matutino']) ?> dosis
-            </span>
+      <!-- Columna Lateral Derecha (hoja-paciente__lado) -->
+      <aside class="hoja-paciente__lado">
+
+        <section class="ficha__seccion">
+          <div class="ficha__titulo-fila">
+            <h2 class="ficha__titulo">Control de paciente</h2>
           </div>
 
-          <?php if (empty($adminPorTurno['matutino'])): ?>
-            <p style="font-size: 0.8125rem; color: var(--texto-tenue); text-align: center; margin: 20px 0;">Sin administraciones en este turno.</p>
-          <?php else: ?>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              <?php foreach ($adminPorTurno['matutino'] as $aMat): ?>
-                <div style="background: #202020; border: 1px solid #2b2b2b; border-left: 3px solid <?= $aMat['estado'] === 'aplicado' ? '#4ade80' : ($aMat['estado'] === 'pendiente' ? '#facc15' : '#f87171') ?>; border-radius: 6px; padding: 10px 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div style="font-weight: 600; font-size: 0.875rem; color: #fff;"><?= e($aMat['medicamento']) ?></div>
-                    <span style="font-size: 0.75rem; font-family: monospace; font-weight: bold; color: #93c5fd;"><?= e($aMat['hora_programada']) ?></span>
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--texto-suave); margin-top: 2px;">
-                    Dosis: <strong><?= e($aMat['dosis']) ?></strong> (<?= e($aMat['via']) ?>)
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--texto-tenue); margin-top: 4px; display: flex; justify-content: space-between;">
-                    <span><?= e($aMat['enfermero_nombre'] ?: 'Enfermería') ?></span>
-                    <span style="color: <?= $aMat['estado'] === 'aplicado' ? '#86efac' : ($aMat['estado'] === 'pendiente' ? '#fde047' : '#fca5a5') ?>; font-weight: 600;">
-                      <?= ucfirst($aMat['estado']) ?>
-                    </span>
-                  </div>
-                  <?php if (!empty($aMat['observaciones'])): ?>
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-style: italic; margin-top: 4px; border-top: 1px dashed #333; padding-top: 4px;">
-                      "<?= e($aMat['observaciones']) ?>"
-                    </div>
-                  <?php endif; ?>
-                </div>
+          <form method="get" action="" style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-size: var(--fs-xs); color: var(--texto-suave);">Cambiar paciente hospitalizado:</label>
+            <select name="paciente_id" onchange="this.form.submit()" style="background: #202020; color: #fff; border: 1px solid #333; padding: 6px 8px; border-radius: 6px; font-size: var(--fs-xs);">
+              <?php foreach ($pacientesHospitalizados as $ph): ?>
+                <option value="<?= (int)$ph['pac_id'] ?>" <?= $pacienteId === (int)$ph['pac_id'] ? 'selected' : '' ?>>
+                  [<?= e($ph['codigo']) ?>] <?= e("{$ph['nombre']} {$ph['primer_apellido']}") ?>
+                </option>
               <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-        </div>
+            </select>
 
-        <!-- Turno Vespertino (15:00 - 23:00) -->
-        <div style="background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; padding-bottom: 10px; margin-bottom: 12px;">
-            <div style="font-weight: 700; color: #fb923c; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
-              🌇 Turno Vespertino <span style="font-size: 0.75rem; color: var(--texto-tenue); font-weight: normal;">(15:00 - 23:00)</span>
-            </div>
-            <span class="badge" style="background: rgba(251, 146, 60, 0.15); color: #fb923c; font-size: 0.75rem;">
-              <?= count($adminPorTurno['vespertino']) ?> dosis
-            </span>
+            <label style="font-size: var(--fs-xs); color: var(--texto-suave); margin-top: 6px;">Fecha de administración:</label>
+            <input type="date" name="fecha" value="<?= e($fechaFiltro) ?>" onchange="this.form.submit()" style="background: #202020; color: #fff; border: 1px solid #333; padding: 6px 8px; border-radius: 6px; font-size: var(--fs-xs);">
+          </form>
+        </section>
+
+        <section class="ficha__seccion">
+          <div class="ficha__titulo-fila">
+            <h2 class="ficha__titulo">Acciones del Kardex</h2>
           </div>
 
-          <?php if (empty($adminPorTurno['vespertino'])): ?>
-            <p style="font-size: 0.8125rem; color: var(--texto-tenue); text-align: center; margin: 20px 0;">Sin administraciones en este turno.</p>
-          <?php else: ?>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              <?php foreach ($adminPorTurno['vespertino'] as $aVesp): ?>
-                <div style="background: #202020; border: 1px solid #2b2b2b; border-left: 3px solid <?= $aVesp['estado'] === 'aplicado' ? '#4ade80' : ($aVesp['estado'] === 'pendiente' ? '#facc15' : '#f87171') ?>; border-radius: 6px; padding: 10px 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div style="font-weight: 600; font-size: 0.875rem; color: #fff;"><?= e($aVesp['medicamento']) ?></div>
-                    <span style="font-size: 0.75rem; font-family: monospace; font-weight: bold; color: #93c5fd;"><?= e($aVesp['hora_programada']) ?></span>
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--texto-suave); margin-top: 2px;">
-                    Dosis: <strong><?= e($aVesp['dosis']) ?></strong> (<?= e($aVesp['via']) ?>)
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--texto-tenue); margin-top: 4px; display: flex; justify-content: space-between;">
-                    <span><?= e($aVesp['enfermero_nombre'] ?: 'Enfermería') ?></span>
-                    <span style="color: <?= $aVesp['estado'] === 'aplicado' ? '#86efac' : ($aVesp['estado'] === 'pendiente' ? '#fde047' : '#fca5a5') ?>; font-weight: 600;">
-                      <?= ucfirst($aVesp['estado']) ?>
-                    </span>
-                  </div>
-                  <?php if (!empty($aVesp['observaciones'])): ?>
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-style: italic; margin-top: 4px; border-top: 1px dashed #333; padding-top: 4px;">
-                      "<?= e($aVesp['observaciones']) ?>"
-                    </div>
-                  <?php endif; ?>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-        </div>
-
-        <!-- Turno Nocturno (23:00 - 07:00) -->
-        <div style="background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; padding-bottom: 10px; margin-bottom: 12px;">
-            <div style="font-weight: 700; color: #818cf8; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
-              🌙 Turno Nocturno <span style="font-size: 0.75rem; color: var(--texto-tenue); font-weight: normal;">(23:00 - 07:00)</span>
-            </div>
-            <span class="badge" style="background: rgba(129, 140, 248, 0.15); color: #818cf8; font-size: 0.75rem;">
-              <?= count($adminPorTurno['nocturno']) ?> dosis
-            </span>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <button type="button" class="boton boton--secundario" onclick="window.print();" style="width: 100%; justify-content: flex-start;">
+              <?= icono('documento') ?> <span>Imprimir Kardex oficial</span>
+            </button>
+            <a href="<?= URL_BASE ?>/pacientes/ver.php?id=<?= (int)$paciente['id'] ?>" class="boton boton--sutil" style="width: 100%; justify-content: flex-start;">
+              <?= icono('usuarios') ?> <span>Ver expediente completo</span>
+            </a>
+            <a href="<?= URL_BASE ?>/camillas/" class="boton boton--sutil" style="width: 100%; justify-content: flex-start;">
+              <?= icono('clinico') ?> <span>Censo de camillas</span>
+            </a>
           </div>
+        </section>
 
-          <?php if (empty($adminPorTurno['nocturno'])): ?>
-            <p style="font-size: 0.8125rem; color: var(--texto-tenue); text-align: center; margin: 20px 0;">Sin administraciones en este turno.</p>
-          <?php else: ?>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              <?php foreach ($adminPorTurno['nocturno'] as $aNoc): ?>
-                <div style="background: #202020; border: 1px solid #2b2b2b; border-left: 3px solid <?= $aNoc['estado'] === 'aplicado' ? '#4ade80' : ($aNoc['estado'] === 'pendiente' ? '#facc15' : '#f87171') ?>; border-radius: 6px; padding: 10px 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div style="font-weight: 600; font-size: 0.875rem; color: #fff;"><?= e($aNoc['medicamento']) ?></div>
-                    <span style="font-size: 0.75rem; font-family: monospace; font-weight: bold; color: #93c5fd;"><?= e($aNoc['hora_programada']) ?></span>
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--texto-suave); margin-top: 2px;">
-                    Dosis: <strong><?= e($aNoc['dosis']) ?></strong> (<?= e($aNoc['via']) ?>)
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--texto-tenue); margin-top: 4px; display: flex; justify-content: space-between;">
-                    <span><?= e($aNoc['enfermero_nombre'] ?: 'Enfermería') ?></span>
-                    <span style="color: <?= $aNoc['estado'] === 'aplicado' ? '#86efac' : ($aNoc['estado'] === 'pendiente' ? '#fde047' : '#fca5a5') ?>; font-weight: 600;">
-                      <?= ucfirst($aNoc['estado']) ?>
-                    </span>
-                  </div>
-                  <?php if (!empty($aNoc['observaciones'])): ?>
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-style: italic; margin-top: 4px; border-top: 1px dashed #333; padding-top: 4px;">
-                      "<?= e($aNoc['observaciones']) ?>"
-                    </div>
-                  <?php endif; ?>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-        </div>
+      </aside>
 
-      </div>
-    </section>
+    </div>
 
-    <!-- Modal: Prescribir Nuevo Medicamento -->
-    <dialog id="modalNuevaMed" class="modal" style="background: #181818; color: #fff; border: 1px solid #333; border-radius: 12px; padding: 24px; max-width: 580px; width: 95%;">
+    <!-- Modal: Prescribir Medicación -->
+    <dialog id="modalNuevaMed" class="modal" style="background: #181818; color: #fff; border: 1px solid #333; border-radius: 10px; padding: 22px; max-width: 520px; width: 95%;">
       <form method="post" action="">
         <?= campoCsrf() ?>
         <input type="hidden" name="accion" value="agregar_medicacion">
         <input type="hidden" name="paciente_id" value="<?= (int)$paciente['id'] ?>">
         <input type="hidden" name="camilla_id" value="<?= (int)($camillaActual['id'] ?? 0) ?>">
 
-        <h3 style="margin-top: 0; font-size: 1.2rem; color: #fff; margin-bottom: 16px;">+ Prescribir Medicación al Kardex</h3>
+        <div class="ficha__titulo-fila" style="margin-bottom: 14px;">
+          <h3 class="ficha__titulo" style="font-size: 1.1rem; margin: 0;">Prescribir Medicación al Kardex</h3>
+        </div>
 
-        <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; flex-direction: column; gap: 11px;">
           <div>
-            <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Nombre del Medicamento y Presentación *</label>
-            <input type="text" name="medicamento" required placeholder="Ej. Ceftriaxona 1g Fco. Ámpula" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+            <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Medicamento y Presentación *</label>
+            <input type="text" name="medicamento" required placeholder="Ej. Ceftriaxona 1g Fco. Ámpula" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
-              <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Dosis *</label>
-              <input type="text" name="dosis" required placeholder="Ej. 1 g, 50 mg, 1000 ml" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+              <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Dosis *</label>
+              <input type="text" name="dosis" required placeholder="Ej. 1 g, 50 mg" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
             </div>
             <div>
-              <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Vía de Administración *</label>
-              <select name="via" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+              <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Vía *</label>
+              <select name="via" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
                 <option value="Intravenosa (IV)">Intravenosa (IV)</option>
                 <option value="Oral (VO)">Oral (VO)</option>
                 <option value="Subcutánea (SC)">Subcutánea (SC)</option>
                 <option value="Intramuscular (IM)">Intramuscular (IM)</option>
-                <option value="Inhalatoria (Nebulización)">Inhalatoria (Nebulización)</option>
+                <option value="Inhalatoria">Inhalatoria</option>
                 <option value="Tópica">Tópica</option>
-                <option value="Sublingual">Sublingual</option>
-                <option value="Oftálmica">Oftálmica</option>
               </select>
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
-              <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Frecuencia / Intervalo</label>
-              <input type="text" name="frecuencia" required placeholder="Ej. Cada 8 horas, Cada 12 horas" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+              <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Frecuencia</label>
+              <input type="text" name="frecuencia" required placeholder="Ej. Cada 8 horas, Cada 12 horas" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
             </div>
             <div>
-              <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Horario Programado</label>
-              <input type="text" name="horario" placeholder="Ej. 08:00, 16:00, 24:00" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+              <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Horario</label>
+              <input type="text" name="horario" placeholder="08:00, 20:00" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
             </div>
           </div>
 
           <div>
-            <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Indicaciones Especiales o Dilución</label>
-            <textarea name="indicaciones" rows="2" placeholder="Ej. Diluir en 100 ml de Sol. Fisiológica e infundir en 30 minutos..." style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff; resize: vertical;"></textarea>
+            <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Indicaciones / Dilución</label>
+            <input type="text" name="indicaciones" placeholder="Ej. Diluir en 100ml Sol. Fisiológica..." style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
           </div>
 
           <div>
-            <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Médico que Prescribe</label>
-            <input type="text" name="medico_prescribe" value="<?= e($usuario['nombre']) ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+            <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Médico Prescribe</label>
+            <input type="text" name="medico_prescribe" value="<?= e($usuario['nombre']) ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
           </div>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
           <button type="button" class="boton boton--sutil" onclick="document.getElementById('modalNuevaMed').close();">Cancelar</button>
           <button type="submit" class="boton boton--primario">Guardar Prescripción</button>
         </div>
       </form>
     </dialog>
 
-    <!-- Modal: Registrar Administración de Dosis -->
-    <dialog id="modalRegistrarAdmin" class="modal" style="background: #181818; color: #fff; border: 1px solid #333; border-radius: 12px; padding: 24px; max-width: 540px; width: 95%;">
+    <!-- Modal: Asentar Dosis -->
+    <dialog id="modalRegistrarAdmin" class="modal" style="background: #181818; color: #fff; border: 1px solid #333; border-radius: 10px; padding: 22px; max-width: 500px; width: 95%;">
       <form method="post" action="">
         <?= campoCsrf() ?>
         <input type="hidden" name="accion" value="registrar_administracion">
         <input type="hidden" name="paciente_id" value="<?= (int)$paciente['id'] ?>">
 
-        <h3 style="margin-top: 0; font-size: 1.2rem; color: #fff; margin-bottom: 16px;">Asentar Administración de Dosis</h3>
+        <div class="ficha__titulo-fila" style="margin-bottom: 14px;">
+          <h3 class="ficha__titulo" style="font-size: 1.1rem; margin: 0;">Asentar Administración de Dosis</h3>
+        </div>
 
-        <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; flex-direction: column; gap: 11px;">
           <div>
-            <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Seleccionar Fármaco Prescrito *</label>
-            <select id="admin_medicacion_id" name="medicacion_id" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+            <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Medicamento Prescrito *</label>
+            <select id="admin_medicacion_id" name="medicacion_id" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
               <?php foreach ($medicacionesActivas as $mAct): ?>
                 <option value="<?= (int)$mAct['id'] ?>">
                   <?= e($mAct['medicamento']) ?> — <?= e($mAct['dosis']) ?> (<?= e($mAct['via']) ?>)
@@ -594,51 +459,51 @@ require_once __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             </select>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
-              <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Turno *</label>
-              <select name="turno" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+              <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Turno *</label>
+              <select name="turno" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
                 <option value="matutino">Matutino (07:00 - 15:00)</option>
                 <option value="vespertino">Vespertino (15:00 - 23:00)</option>
                 <option value="nocturno">Nocturno (23:00 - 07:00)</option>
               </select>
             </div>
             <div>
-              <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Hora Programada</label>
-              <input type="text" id="admin_hora_prog" name="hora_programada" value="<?= date('H:i') ?>" placeholder="08:00" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+              <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Hora Programada</label>
+              <input type="text" id="admin_hora_prog" name="hora_programada" value="<?= date('H:i') ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
-              <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Estado de Aplicación</label>
-              <select name="estado" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
-                <option value="aplicado">✅ Aplicado / Infundido</option>
-                <option value="pendiente">⏰ Pendiente de aplicar</option>
-                <option value="omitido">⚠️ Omitido por indicación</option>
-                <option value="rechazado">❌ Rechazado por paciente</option>
+              <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Estado</label>
+              <select name="estado" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
+                <option value="aplicado">Aplicado</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="omitido">Omitido</option>
+                <option value="rechazado">Rechazado</option>
               </select>
             </div>
             <div>
-              <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Fecha</label>
-              <input type="date" name="fecha" value="<?= e($fechaFiltro) ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+              <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Fecha</label>
+              <input type="date" name="fecha" value="<?= e($fechaFiltro) ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
             </div>
           </div>
 
           <div>
-            <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Enfermero/a que Administra *</label>
-            <input type="text" name="enfermero_nombre" required value="<?= e($usuario['nombre']) ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+            <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Enfermero/a Responsable *</label>
+            <input type="text" name="enfermero_nombre" required value="<?= e($usuario['nombre']) ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
           </div>
 
           <div>
-            <label style="font-size: 0.8125rem; color: var(--texto-suave); display: block; margin-bottom: 4px;">Notas Clínicas / Tolerancia</label>
-            <input type="text" name="observaciones" placeholder="Ej. Sin eventualidades, tolera vía oral, vía periférica permeable..." style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 8px 12px; border-radius: 6px; color: #fff;">
+            <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Observaciones / Notas de Turno</label>
+            <input type="text" name="observaciones" placeholder="Sin eventualidades, vía permeable..." style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
           </div>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
           <button type="button" class="boton boton--sutil" onclick="document.getElementById('modalRegistrarAdmin').close();">Cancelar</button>
-          <button type="submit" class="boton boton--primario">Guardar en Hoja de Turno</button>
+          <button type="submit" class="boton boton--primario">Guardar en Hoja</button>
         </div>
       </form>
     </dialog>
@@ -660,44 +525,4 @@ function prepararAdminDosis(medId, medNombre, medDosis, medHorario) {
 }
 </script>
 
-<!-- Estilos específicos para impresión formal de Kardex -->
-<style>
-@media print {
-  /* Ocultar barra lateral, botones, formularios y encabezados del sistema */
-  .barra-lateral, .encabezado, .pestanas, .boton, dialog, form, .no-imprimir {
-    display: none !important;
-  }
-  body, .contenido, .hoja-paciente {
-    background: #fff !important;
-    color: #000 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-  }
-  .tarjeta, .ficha__seccion, .tabla-contenedor {
-    background: #fff !important;
-    border: 1px solid #000 !important;
-    color: #000 !important;
-    box-shadow: none !important;
-  }
-  table.tabla th {
-    background: #e5e5e5 !important;
-    color: #000 !important;
-    border-bottom: 1px solid #000 !important;
-  }
-  table.tabla td {
-    color: #000 !important;
-    border-bottom: 1px solid #ccc !important;
-  }
-  h1, h2, h3, strong {
-    color: #000 !important;
-  }
-  .badge {
-    border: 1px solid #000 !important;
-    color: #000 !important;
-    background: transparent !important;
-  }
-}
-</style>
-
-<?php require_once __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
+<?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>

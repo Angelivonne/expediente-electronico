@@ -1,9 +1,8 @@
 <?php
 /**
  * INFORME EPIDEMIOLÓGICO Y ANÁLISIS DE DATOS CLÍNICOS
- * Documento formal institucional: tipografía Arial 12pt, texto en negro,
- * márgenes de documento formal (2.5 cm), gráficas estadísticas de Matplotlib,
- * no duplicidad de datos y anonimización de pacientes para protección de privacidad.
+ * Morbilidad hospitalaria y ambulatoria, clasificación nosológica CIE-10,
+ * pirámide etaria y exportación oficial SUIVE-1 (SINAVE).
  */
 require_once __DIR__ . '/../app/nucleo/inicio.php';
 require_once __DIR__ . '/../app/datos/catalogos.php';
@@ -14,7 +13,7 @@ exigirPermiso('ver_expediente');
 $pdo = db();
 $institucionId = institucionId();
 
-// 1. Manejo del Periodo (Ventana de tiempo sin solapamiento de datos)
+// 1. Manejo del Periodo
 $periodo = $_GET['periodo'] ?? 'todos';
 $hoy = date('Y-m-d');
 $condicionFecha = '';
@@ -45,11 +44,11 @@ switch ($periodo) {
         $periodo = 'todos';
         $condicionFecha = '';
         $paramsFecha = [];
-        $tituloPeriodo = "Histórico total consolidado (Registro completo)";
+        $tituloPeriodo = "Histórico total consolidado";
         break;
 }
 
-// 2. Consulta de Datos (Estrictamente anonimizada: id_paciente, sexo, fecha_nacimiento, fecha_consulta, detalle)
+// 2. Consulta de Datos anonimizada
 $sql = "SELECT h.id AS registro_id, h.paciente_id, h.fecha, h.titulo, h.detalle,
                p.sexo, p.fecha_nacimiento
         FROM historial_clinico h
@@ -68,9 +67,6 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($paramsConsulta);
 $filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Función auxiliar para clasificar CIE-10 en categorías nosológicas
-
-// Función oficial de rangos etarios según el Sistema Nacional de Vigilancia Epidemiológica (SINAVE / SUIVE-1)
 function grupoEdadSuive(int $edad): string {
     if ($edad < 1) return '< 1 año';
     if ($edad <= 4) return '1 a 4 años';
@@ -85,115 +81,78 @@ function grupoEdadSuive(int $edad): string {
     return '65 y más años';
 }
 
-function categorizarCie10(string $codigo, string $descripcion): string
-{
+function categorizarCie10(string $codigo, string $descripcion): string {
     $letra = strtoupper(substr(trim($codigo), 0, 1));
-    switch ($letra) {
-        case 'A':
-        case 'B':
-            return 'Enfermedades Infecciosas y Parasitarias';
-        case 'C':
-        case 'D':
-            return 'Neoplasias y Sangre';
-        case 'E':
-            return 'Enfermedades Endocrinas, Nutricionales y Metabólicas';
-        case 'F':
-            return 'Trastornos Mentales y del Comportamiento';
-        case 'G':
-            return 'Enfermedades del Sistema Nervioso';
-        case 'H':
-            return 'Enfermedades del Ojo y Oído';
-        case 'I':
-            return 'Enfermedades del Sistema Circulatorio / Cardiovascular';
-        case 'J':
-            return 'Enfermedades del Sistema Respiratorio';
-        case 'K':
-            return 'Enfermedades del Sistema Digestivo';
-        case 'L':
-            return 'Enfermedades de la Piel y Tejido Subcutáneo';
-        case 'M':
-            return 'Enfermedades del Sistema Músculo-esquelético';
-        case 'N':
-            return 'Enfermedades del Sistema Genitourinario';
-        case 'O':
-        case 'P':
-        case 'Q':
-            return 'Embarazo, Perinatal y Congénitas';
-        case 'R':
-            return 'Signos, Síntomas y Hallazgos Clínicos';
-        case 'S':
-        case 'T':
-            return 'Traumatismos y Envenenamientos';
-        case 'Z':
-            return 'Factores que Influyen en el Estado de Salud (Preventivo)';
-        default:
-            if (stripos($descripcion, 'hipertensi') !== false) return 'Enfermedades del Sistema Circulatorio / Cardiovascular';
-            if (stripos($descripcion, 'diabet') !== false) return 'Enfermedades Endocrinas, Nutricionales y Metabólicas';
-            if (stripos($descripcion, 'respirat') !== false || stripos($descripcion, 'amigdal') !== false) return 'Enfermedades del Sistema Respiratorio';
-            return 'Otras Condiciones Médicas';
-    }
+    return match ($letra) {
+        'A', 'B' => 'Enfermedades Infecciosas y Parasitarias',
+        'C', 'D' => 'Neoplasias y Sangre',
+        'E'      => 'Enfermedades Endocrinas y Metabólicas',
+        'F'      => 'Trastornos Mentales y del Comportamiento',
+        'G'      => 'Enfermedades del Sistema Nervioso',
+        'H'      => 'Enfermedades del Ojo y Oído',
+        'I'      => 'Enfermedades del Sistema Circulatorio',
+        'J'      => 'Enfermedades del Sistema Respiratorio',
+        'K'      => 'Enfermedades del Sistema Digestivo',
+        'L'      => 'Enfermedades de la Piel',
+        'M'      => 'Sistema Osteomuscular y Tejido Conjuntivo',
+        'N'      => 'Enfermedades del Sistema Genitourinario',
+        default  => 'Otras Causas de Atención Médica'
+    };
 }
 
-// 3. Procesamiento Estadístico con Deduplicación Matemática
 $totalConsultas = count($filas);
 $pacientesAtendidosSet = [];
-$diagnosticosMap = []; // claveCie10 => [info]
+$diagnosticosMap = [];
 $piramideEdad = [
-    '< 15 años'    => ['femenino' => 0, 'masculino' => 0, 'pacientes' => []],
-    '15 - 24 años' => ['femenino' => 0, 'masculino' => 0, 'pacientes' => []],
-    '25 - 44 años' => ['femenino' => 0, 'masculino' => 0, 'pacientes' => []],
-    '45 - 64 años' => ['femenino' => 0, 'masculino' => 0, 'pacientes' => []],
-    '65+ años'     => ['femenino' => 0, 'masculino' => 0, 'pacientes' => []],
+    '< 1 año' => ['femenino' => 0, 'masculino' => 0],
+    '1 a 4 años' => ['femenino' => 0, 'masculino' => 0],
+    '5 a 9 años' => ['femenino' => 0, 'masculino' => 0],
+    '10 a 14 años' => ['femenino' => 0, 'masculino' => 0],
+    '15 a 19 años' => ['femenino' => 0, 'masculino' => 0],
+    '20 a 24 años' => ['femenino' => 0, 'masculino' => 0],
+    '25 a 44 años' => ['femenino' => 0, 'masculino' => 0],
+    '45 a 49 años' => ['femenino' => 0, 'masculino' => 0],
+    '50 a 59 años' => ['femenino' => 0, 'masculino' => 0],
+    '60 a 64 años' => ['femenino' => 0, 'masculino' => 0],
+    '65 y más años' => ['femenino' => 0, 'masculino' => 0],
 ];
-
-$signosVitalesData = [
-    'tas' => [],
-    'tad' => [],
-    'glucosa' => [],
-    'imc' => [],
-];
+$totalFem = 0;
+$totalMasc = 0;
 
 foreach ($filas as $f) {
-    $pId = (int) $f['paciente_id'];
-    $sexo = strtoupper($f['sexo']) === 'M' ? 'M' : 'H';
-    $pacientesAtendidosSet[$pId] = true;
+    $pId = (int)$f['paciente_id'];
+    $sexo = strtoupper(trim((string)$f['sexo']));
+    $fnac = $f['fecha_nacimiento'];
+    $fcons = substr((string)$f['fecha'], 0, 10);
 
-    // Calcular edad a la fecha de consulta
-    $edad = 35; // Default razonable si fecha no viene
-    if (!empty($f['fecha_nacimiento'])) {
-        $fechaNac = new DateTime($f['fecha_nacimiento']);
-        $fechaCons = new DateTime($f['fecha']);
-        $edad = $fechaNac->diff($fechaCons)->y;
-    }
-
-    // Clasificar en pirámide etaria (DEDUPLICADO por paciente en el periodo)
-    $grupoKey = '< 15 años';
-    if ($edad >= 65) $grupoKey = '65+ años';
-    elseif ($edad >= 45) $grupoKey = '45 - 64 años';
-    elseif ($edad >= 25) $grupoKey = '25 - 44 años';
-    elseif ($edad >= 15) $grupoKey = '15 - 24 años';
-
-    if (!isset($piramideEdad[$grupoKey]['pacientes'][$pId])) {
-        $piramideEdad[$grupoKey]['pacientes'][$pId] = true;
-        if ($sexo === 'M') {
-            $piramideEdad[$grupoKey]['femenino']++;
-        } else {
-            $piramideEdad[$grupoKey]['masculino']++;
+    $edad = 0;
+    if (!empty($fnac) && $fnac !== '0000-00-00') {
+        try {
+            $d1 = new DateTime($fnac);
+            $d2 = new DateTime($fcons ?: 'now');
+            $edad = max(0, $d1->diff($d2)->y);
+        } catch (Throwable $e) {
+            $edad = 0;
         }
     }
 
-    // Parsear detalle de la consulta
-    $detalle = json_decode((string) $f['detalle'], true) ?: [];
-
-    // Signos vitales
-    if (!empty($detalle['signos']) && is_array($detalle['signos'])) {
-        if (!empty($detalle['signos']['sistolica'])) $signosVitalesData['tas'][] = (float) $detalle['signos']['sistolica'];
-        if (!empty($detalle['signos']['diastolica'])) $signosVitalesData['tad'][] = (float) $detalle['signos']['diastolica'];
-        if (!empty($detalle['signos']['glucosa'])) $signosVitalesData['glucosa'][] = (float) $detalle['signos']['glucosa'];
-        if (!empty($detalle['signos']['imc'])) $signosVitalesData['imc'][] = (float) $detalle['signos']['imc'];
+    if (!isset($pacientesAtendidosSet[$pId])) {
+        $pacientesAtendidosSet[$pId] = true;
+        $grupoE = grupoEdadSuive($edad);
+        if ($sexo === 'M') {
+            $piramideEdad[$grupoE]['femenino']++;
+            $totalFem++;
+        } else {
+            $piramideEdad[$grupoE]['masculino']++;
+            $totalMasc++;
+        }
     }
 
-    // Extraer diagnósticos
+    $detalle = [];
+    if (!empty($f['detalle'])) {
+        $detalle = is_array($f['detalle']) ? $f['detalle'] : (json_decode((string)$f['detalle'], true) ?: []);
+    }
+
     $diagsExtraidos = [];
     if (!empty($detalle['diagnosticos']) && is_array($detalle['diagnosticos'])) {
         foreach ($detalle['diagnosticos'] as $dItem) {
@@ -210,10 +169,9 @@ foreach ($filas as $f) {
         $diagsExtraidos[] = ['cie10' => 'SD-00', 'nombre' => $desc ?: 'Consulta médica general'];
     }
 
-    // Agregar a la matriz de morbilidad
     foreach ($diagsExtraidos as $diag) {
         $clave = $diag['cie10'] !== 'SIN-COD' && $diag['cie10'] !== 'SD-00' ? $diag['cie10'] : mb_strtolower($diag['nombre']);
-        
+
         if (!isset($diagnosticosMap[$clave])) {
             $diagnosticosMap[$clave] = [
                 'cie10' => $diag['cie10'],
@@ -228,8 +186,6 @@ foreach ($filas as $f) {
         }
 
         $diagnosticosMap[$clave]['consultas_totales']++;
-        
-        // DEDUPLICACIÓN CLAVE: si el paciente ya fue contado para esta patología, no se vuelve a contar en pacientes_unicos
         $diagnosticosMap[$clave]['pacientes_unicos'][$pId] = true;
         if ($sexo === 'M') {
             $diagnosticosMap[$clave]['femenino_unicos'][$pId] = true;
@@ -242,7 +198,6 @@ foreach ($filas as $f) {
 
 $totalPacientesUnicos = count($pacientesAtendidosSet);
 
-// Formatear tabla de morbilidad ordenada por pacientes únicos (prevalencia real)
 $tablaMorbilidad = [];
 $categoriasMap = [];
 
@@ -274,10 +229,8 @@ foreach ($diagnosticosMap as $clave => $item) {
     ];
 }
 
-// Ordenar por casos únicos descendente
 usort($tablaMorbilidad, fn($a, $b) => $b['casos_unicos'] <=> $a['casos_unicos']);
 
-// Categorías consolidadas
 $listaCategorias = [];
 foreach ($categoriasMap as $nombreCat => $cData) {
     $casosCat = count($cData['pacientes']);
@@ -290,7 +243,6 @@ foreach ($categoriasMap as $nombreCat => $cData) {
 }
 usort($listaCategorias, fn($a, $b) => $b['casos'] <=> $a['casos']);
 
-// Pirámide etaria estructurada
 $listaPiramide = [];
 foreach ($piramideEdad as $gNombre => $gData) {
     $listaPiramide[] = [
@@ -301,28 +253,16 @@ foreach ($piramideEdad as $gNombre => $gData) {
     ];
 }
 
-// Salida en formato oficial SUIVE-1 (SINAVE / NOM-017-SSA2-2012)
+// Exportación SUIVE-1
 if (isset($_GET['formato']) && $_GET['formato'] === 'suive') {
     header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="suive1_morbilidad_sinave_' . date('Ymd_His') . '.csv"');
+    header('Content-Disposition: attachment; filename="suive1_epidemiologia_' . date('Ymd_His') . '.csv"');
     $out = fopen('php://output', 'w');
     fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-    
-    // Encabezado institucional
-    fputcsv($out, ['SISTEMA NACIONAL DE VIGILANCIA EPIDEMIOLOGICA (SINAVE) - INFORME SUIVE-1']);
+    fputcsv($out, ['SISTEMA NACIONAL DE VIGILANCIA EPIDEMIOLOGICA (SINAVE) - SUIVE-1']);
     fputcsv($out, ['ESTABLECIMIENTO:', config('nombre_establecimiento') ?: 'Expediente FEMECI', 'FECHA:', date('d/m/Y H:i')]);
-    fputcsv($out, ['PERIODO:', $tituloPeriodo]);
-    fputcsv($out, ['NORMATIVA:', 'NOM-017-SSA2-2012 / NOM-004-SSA3-2012 / NOM-024-SSA3-2012']);
     fputcsv($out, []);
-    
-    // Columnas estándar SUIVE-1
-    fputcsv($out, [
-        'NUM', 'CIE10', 'DIAGNOSTICO_CLINICO', 'GRUPO_NOSOLOGICO',
-        'MENOR_1_ANIO', '1_A_4', '5_A_9', '10_A_14', '15_A_19', '20_A_24',
-        '25_A_44', '45_A_49', '50_A_59', '60_A_64', '65_Y_MAS',
-        'MASCULINO', 'FEMENINO', 'TOTAL_CASOS_NUEVOS_DESDUPLICADOS', 'CONSULTAS_TOTALES'
-    ]);
-    
+    fputcsv($out, ['NUM', 'CIE10', 'DIAGNOSTICO', 'CATEGORIA', '<1', '1-4', '5-9', '10-14', '15-19', '20-24', '25-44', '45-49', '50-59', '60-64', '65+', 'MASC', 'FEM', 'TOTAL_CASOS', 'CONSULTAS']);
     $num = 1;
     $suiveCols = ['< 1 año', '1 a 4 años', '5 a 9 años', '10 a 14 años', '15 a 19 años', '20 a 24 años', '25 a 44 años', '45 a 49 años', '50 a 59 años', '60 a 64 años', '65 y más años'];
     foreach ($tablaMorbilidad as $row) {
@@ -334,15 +274,8 @@ if (isset($_GET['formato']) && $_GET['formato'] === 'suive') {
                 if (isset($conteoPorCol[$g])) $conteoPorCol[$g]++;
             }
         }
-        $linea = [
-            $num++,
-            $row['cie10'],
-            $row['nombre'],
-            $row['categoria'],
-        ];
-        foreach ($suiveCols as $sc) {
-            $linea[] = $conteoPorCol[$sc];
-        }
+        $linea = [$num++, $row['cie10'], $row['nombre'], $row['categoria']];
+        foreach ($suiveCols as $sc) { $linea[] = $conteoPorCol[$sc]; }
         $linea[] = $row['masculino'];
         $linea[] = $row['femenino'];
         $linea[] = $row['casos_unicos'];
@@ -353,53 +286,21 @@ if (isset($_GET['formato']) && $_GET['formato'] === 'suive') {
     exit;
 }
 
-// 4. Salida en formato CSV para análisis epidemiológico externo
+// Exportación CSV
 if (isset($_GET['formato']) && $_GET['formato'] === 'csv') {
     header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="analisis_morbilidad_consultorio_' . date('Ymd_His') . '.csv"');
+    header('Content-Disposition: attachment; filename="morbilidad_' . date('Ymd_His') . '.csv"');
     $out = fopen('php://output', 'w');
-    // BOM UTF-8 para Excel en español
     fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-    
-    // Encabezados
-    fputcsv($out, ['CODIGO_CIE10', 'DIAGNOSTICO_CLINICO', 'CATEGORIA_NOSOLOGICA', 'CASOS_UNICOS_PACIENTES', 'CASOS_FEMENINO', 'CASOS_MASCULINO', 'PREVALENCIA_PORCENTAJE', 'CONSULTAS_TOTALES', 'EDAD_PROMEDIO_ANOS']);
-    
+    fputcsv($out, ['CODIGO_CIE10', 'DIAGNOSTICO', 'CATEGORIA', 'CASOS_UNICOS', 'FEMENINO', 'MASCULINO', 'PREVALENCIA', 'CONSULTAS_TOTALES', 'EDAD_MEDIA']);
     foreach ($tablaMorbilidad as $row) {
-        fputcsv($out, [
-            $row['cie10'],
-            $row['nombre'],
-            $row['categoria'],
-            $row['casos_unicos'],
-            $row['femenino'],
-            $row['masculino'],
-            $row['porcentaje'] . '%',
-            $row['consultas_totales'],
-            $row['edad_promedio']
-        ]);
+        fputcsv($out, [$row['cie10'], $row['nombre'], $row['categoria'], $row['casos_unicos'], $row['femenino'], $row['masculino'], $row['porcentaje'] . '%', $row['consultas_totales'], $row['edad_promedio']]);
     }
     fclose($out);
     exit;
 }
 
-// 5. Salida en formato JSON
-if (isset($_GET['formato']) && $_GET['formato'] === 'json') {
-    header('Content-Type: application/json; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="analisis_morbilidad_consultorio_' . date('Ymd_His') . '.json"');
-    echo json_encode([
-        'institucion' => config('nombre_establecimiento') ?: 'Expediente FEMECI',
-        'periodo' => $tituloPeriodo,
-        'fecha_emision' => date('Y-m-d H:i:s'),
-        'total_pacientes_unicos' => $totalPacientesUnicos,
-        'total_consultas' => $totalConsultas,
-        'morbilidad' => $tablaMorbilidad,
-        'distribucion_etaria' => $listaPiramide,
-        'categorias_nosologicas' => $listaCategorias,
-        'anonimizacion' => 'Totalmente anonimizado según NOM-024 / NOM-004. Sin datos de identificación personal.'
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-// Regenerar o actualizar gráficas Matplotlib si es posible
+// Gráficas
 $rutasPython = [
     'C:\\Users\\abelM\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
     'python',
@@ -412,7 +313,6 @@ foreach ($rutasPython as $rp) {
         break;
     }
 }
-$autor = usuarioActual() ?: ['nombre' => 'Dr. Responsable de Área Médica', 'cedula' => '12345678'];
 $scriptGraficas = __DIR__ . '/../app/servicios/ia/generar_graficas_datos.py';
 if (file_exists($scriptGraficas)) {
     $payloadJson = [
@@ -430,532 +330,150 @@ if (file_exists($scriptGraficas)) {
     @unlink($tmpJsonFile);
 }
 
-// Datos de institución
-$nombreInstitucion = config('nombre_establecimiento') ?: 'Clínica FEMECI - Consultorio de Atención Médica Integral';
-$direccionInstitucion = config('domicilio_establecimiento') ?: 'Servicios de Salud y Atención Médica';
-$responsableSanitario = $autor['nombre'] ?? 'Dr. Responsable de Área Médica';
-$cedulaResponsable = $autor['cedula'] ?? 'Cédula en trámite';
-
-// Rutas de gráficas
 $imgTop = URL_BASE . '/assets/img/reportes/morbilidad_top10.png?v=' . time();
 $imgPiramide = URL_BASE . '/assets/img/reportes/piramide_etaria.png?v=' . time();
 $imgCategorias = URL_BASE . '/assets/img/reportes/categorias_nosologicas.png?v=' . time();
+
+$tituloPagina = 'Datos y Morbilidad';
+$seccionActiva = 'datos';
+require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Informe Epidemiológico y Morbilidad - <?= e($nombreInstitucion) ?></title>
-  <style>
-    /* FORMATO ESTRICTO DE DOCUMENTO FORMAL:
-       - Tipografía: Arial 12pt
-       - Color: Letra negra (#000000), sin otros colores
-       - Márgenes: 2.5 cm regulares en todo el contorno
-    */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      background-color: #e5e5e5;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 12pt;
-      line-height: 1.5;
-      color: #000000;
-      padding: 24px;
-    }
-    .barra-herramientas-superior {
-      max-width: 820px;
-      margin: 0 auto 16px auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #ffffff;
-      padding: 12px 18px;
-      border: 1px solid #000000;
-      border-radius: 4px;
-    }
-    .barra-herramientas-superior a,
-    .barra-herramientas-superior button,
-    .barra-herramientas-superior select {
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 10pt;
-      padding: 6px 14px;
-      color: #000000;
-      background: #ffffff;
-      border: 1px solid #000000;
-      text-decoration: none;
-      cursor: pointer;
-      border-radius: 2px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .barra-herramientas-superior a:hover,
-    .barra-herramientas-superior button:hover {
-      background: #eeeeee;
-    }
 
-    /* Hoja de Documento Formal */
-    .documento-formal {
-      background-color: #ffffff;
-      max-width: 820px;
-      margin: 0 auto 30px auto;
-      padding: 2.5cm;
-      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
-      border: 1px solid #d0d0d0;
-      color: #000000;
-    }
+<div class="pagina pagina--expediente">
 
-    /* Encabezado Formal */
-    .doc-encabezado {
-      border-bottom: 2px solid #000000;
-      padding-bottom: 14px;
-      margin-bottom: 22px;
-      text-align: center;
-    }
-    .doc-institucion {
-      font-size: 14pt;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
-    .doc-subinstitucion {
-      font-size: 10pt;
-      margin-bottom: 2px;
-    }
-    .doc-subtitulo-formal {
-      font-size: 9pt;
-      color: #000000;
-      margin-top: 4px;
-    }
-
-    /* Título del Dictamen */
-    .doc-titulo-dictamen {
-      text-align: center;
-      font-size: 13pt;
-      font-weight: bold;
-      text-transform: uppercase;
-      margin: 20px 0 14px 0;
-      border-top: 1px solid #000000;
-      border-bottom: 1px solid #000000;
-      padding: 8px 0;
-    }
-
-    /* Metadatos en tabla formal */
-    .tabla-metadatos {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-      font-size: 11pt;
-    }
-    .tabla-metadatos td {
-      padding: 4px 6px;
-      vertical-align: top;
-      border: 1px solid #000000;
-    }
-    .tabla-metadatos .etiqueta {
-      font-weight: bold;
-      width: 25%;
-      background: #f5f5f5;
-    }
-
-    /* Secciones del Documento */
-    .doc-seccion-titulo {
-      font-size: 12pt;
-      font-weight: bold;
-      text-transform: uppercase;
-      margin: 26px 0 10px 0;
-      border-bottom: 1px solid #000000;
-      padding-bottom: 3px;
-    }
-    p.doc-parrafo {
-      font-size: 12pt;
-      text-align: justify;
-      margin-bottom: 12px;
-      text-indent: 1.25cm;
-    }
-    p.doc-parrafo-libre {
-      font-size: 12pt;
-      text-align: justify;
-      margin-bottom: 12px;
-    }
-
-    /* Cuadros de Metodología y Fórmulas Matemáticas */
-    .caja-formula {
-      border: 1px solid #000000;
-      background: #fafafa;
-      padding: 12px 16px;
-      margin: 16px 0;
-      font-size: 10.5pt;
-    }
-    .caja-formula-titulo {
-      font-weight: bold;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-      font-size: 10pt;
-      border-bottom: 1px solid #000000;
-      padding-bottom: 2px;
-    }
-    .formula-linea {
-      font-family: "Courier New", Courier, monospace;
-      font-size: 11pt;
-      font-weight: bold;
-      margin: 6px 0;
-      padding-left: 12px;
-    }
-
-    /* Tablas Estadísticas Formales */
-    table.tabla-formal {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 16px 0 24px 0;
-      font-size: 10.5pt;
-      border: 1px solid #000000;
-    }
-    table.tabla-formal th {
-      background: #e8e8e8;
-      color: #000000;
-      font-weight: bold;
-      border: 1px solid #000000;
-      padding: 6px 8px;
-      text-align: center;
-      font-size: 10pt;
-    }
-    table.tabla-formal td {
-      border: 1px solid #000000;
-      padding: 5px 8px;
-      vertical-align: middle;
-      color: #000000;
-    }
-    table.tabla-formal tr:nth-child(even) {
-      background: #fbfbfb;
-    }
-    .texto-derecha { text-align: right; }
-    .texto-centro { text-align: center; }
-
-    /* Gráficas Estadísticas */
-    .contenedor-grafica {
-      margin: 22px 0;
-      text-align: center;
-      page-break-inside: avoid;
-    }
-    .contenedor-grafica img {
-      max-width: 100%;
-      height: auto;
-      border: 1px solid #000000;
-    }
-    .epigrafe-grafica {
-      font-size: 10pt;
-      font-style: italic;
-      margin-top: 6px;
-      text-align: center;
-      color: #000000;
-    }
-
-    /* Bloque de Firmas */
-    .bloque-firmas {
-      margin-top: 45px;
-      display: flex;
-      justify-content: space-between;
-      page-break-inside: avoid;
-    }
-    .firma-columna {
-      width: 45%;
-      text-align: center;
-      font-size: 11pt;
-    }
-    .firma-linea {
-      border-top: 1px solid #000000;
-      margin-bottom: 6px;
-      padding-top: 4px;
-      font-weight: bold;
-    }
-
-    /* Reglas para Impresión */
-    @media print {
-      body {
-        background: transparent !important;
-        padding: 0 !important;
-      }
-      .no-imprimir {
-        display: none !important;
-      }
-      .documento-formal {
-        max-width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        border: none !important;
-        box-shadow: none !important;
-      }
-      @page {
-        size: letter portrait;
-        margin: 2.5cm;
-      }
-      .salto-pagina {
-        page-break-before: always;
-      }
-    }
-  </style>
-</head>
-<body>
-
-  <!-- Barra de Herramientas Superior (No se imprime) -->
-  <div class="barra-herramientas-superior no-imprimir">
-    <div>
-      <a href="<?= URL_BASE ?>/pacientes/">← Volver a Pacientes</a>
-    </div>
-    <div style="display: flex; gap: 8px; align-items: center;">
-      <form method="get" action="" style="display: inline-flex; align-items: center; gap: 6px;">
-        <label for="periodo" style="font-size: 10pt; font-weight: bold;">Periodo:</label>
-        <select name="periodo" id="periodo" onchange="this.form.submit()">
-          <option value="todos" <?= $periodo === 'todos' ? 'selected' : '' ?>>Histórico total consolidado</option>
-          <option value="anio" <?= $periodo === 'anio' ? 'selected' : '' ?>>Año en curso (<?= date('Y') ?>)</option>
-          <option value="12m" <?= $periodo === '12m' ? 'selected' : '' ?>>Últimos 12 meses</option>
-          <option value="mes" <?= $periodo === 'mes' ? 'selected' : '' ?>>Últimos 30 días</option>
-        </select>
-      </form>
-      <a href="?<?= http_build_query(array_merge($_GET, ['formato' => 'suive'])) ?>" title="Descargar plantilla oficial SUIVE-1 (SINAVE / Secretaría de Salud)">Exportar SUIVE-1 (SINAVE)</a>
-      <a href="?<?= http_build_query(array_merge($_GET, ['formato' => 'csv'])) ?>" title="Descargar datos analizados anonimizados en formato CSV para Excel o SPSS">Descargar CSV</a>
-      <a href="?<?= http_build_query(array_merge($_GET, ['formato' => 'json'])) ?>" title="Descargar dataset analizado estructurado en JSON">Descargar JSON</a>
-      <button type="button" onclick="window.print()" title="Imprimir dictamen en formato formal A4/Carta">Imprimir Documento</button>
-    </div>
+  <div class="pagina__cabecera">
+    <h1 class="pagina__titulo">Datos Clínicos y Morbilidad</h1>
+    <p class="pagina__subtitulo">Análisis estadístico de consulta clínica, distribución nosológica y SUIVE-1 (SINAVE) · NOM-017-SSA2-2012</p>
   </div>
 
-  <!-- Documento Formal -->
-  <article class="documento-formal">
+  <!-- Resumen Métrico Nativo (hoja-paciente__resumen) -->
+  <dl class="hoja-paciente__resumen">
+    <div><dt>Total consultas</dt><dd><?= $totalConsultas ?></dd></div>
+    <div><dt>Pacientes únicos</dt><dd><?= $totalPacientesUnicos ?></dd></div>
+    <div><dt>Patología #1</dt><dd title="<?= e($tablaMorbilidad[0]['nombre'] ?? '—') ?>"><?= e(mb_substr($tablaMorbilidad[0]['nombre'] ?? '—', 0, 20)) ?></dd></div>
+    <div><dt>Prevalencia #1</dt><dd><?= ($tablaMorbilidad[0]['porcentaje'] ?? 0) ?>%</dd></div>
+    <div><dt>Mujeres</dt><dd><?= ($totalFem + $totalMasc) > 0 ? round(($totalFem / ($totalFem + $totalMasc)) * 100) : 0 ?>%</dd></div>
+    <div><dt>Hombres</dt><dd><?= ($totalFem + $totalMasc) > 0 ? round(($totalMasc / ($totalFem + $totalMasc)) * 100) : 0 ?>%</dd></div>
+    <div><dt>Categorías</dt><dd><?= count($listaCategorias) ?></dd></div>
+  </dl>
 
-    <!-- Encabezado Oficial -->
-    <header class="doc-encabezado">
-      <div class="doc-institucion"><?= e($nombreInstitucion) ?></div>
-      <div class="doc-subinstitucion"><?= e($direccionInstitucion) ?></div>
-      <div class="doc-subtitulo-formal">SISTEMA NACIONAL DE VIGILANCIA EPIDEMIOLÓGICA Y EXPEDIENTE CLÍNICO ELECTRÓNICO (NOM-004-SSA3-2012 / NOM-024-SSA3-2012)</div>
-    </header>
-
-    <div class="doc-titulo-dictamen">
-      INFORME TÉCNICO DE MORBILIDAD Y ANÁLISIS ESTADÍSTICO DE CONSULTA CLÍNICA
+  <!-- Gráficas Estadísticas en Sección Limpia -->
+  <section class="ficha__seccion" style="margin-top: 24px;">
+    <div class="ficha__titulo-fila">
+      <h2 class="ficha__titulo">Distribución Gráfica Epidemiológica</h2>
+      <span class="ficha__fuente">Periodo: <?= e($tituloPeriodo) ?></span>
     </div>
 
-    <!-- Metadatos del Documento -->
-    <table class="tabla-metadatos">
-      <tr>
-        <td class="etiqueta">Folio de Dictamen:</td>
-        <td>INF-EPI-<?= date('Y') ?>-<?= str_pad((string)($totalPacientesUnicos), 4, '0', STR_PAD_LEFT) ?></td>
-        <td class="etiqueta">Fecha de Emisión:</td>
-        <td><?= date('d/m/Y H:i:s') ?></td>
-      </tr>
-      <tr>
-        <td class="etiqueta">Ventana Temporal:</td>
-        <td><?= e($tituloPeriodo) ?></td>
-        <td class="etiqueta">Área Emisora:</td>
-        <td>Dirección Médica y Estadística Clínica</td>
-      </tr>
-      <tr>
-        <td class="etiqueta">Universo Muestral:</td>
-        <td><?= number_format($totalPacientesUnicos) ?> Pacientes Únicos Atendidos</td>
-        <td class="etiqueta">Consultas Totales:</td>
-        <td><?= number_format($totalConsultas) ?> Notas de Evolución Registradas</td>
-      </tr>
-      <tr>
-        <td class="etiqueta">Nivel de Confidencialidad:</td>
-        <td colspan="3"><strong>DATOS TOTALMENTE ANONIMIZADOS.</strong> No contiene nombres, CURP, números telefónicos ni domicilios de pacientes (LFPDPPP y Ley General de Salud).</td>
-      </tr>
-    </table>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 14px;">
+      <div style="background: #181818; border: 1px solid #2a2a2a; border-radius: 8px; padding: 12px; text-align: center;">
+        <img src="<?= e($imgTop) ?>" alt="Top 10 Morbilidad" style="max-width: 100%; height: auto; border-radius: 4px;">
+        <div style="font-size: var(--fs-xs); color: var(--texto-tenue); margin-top: 6px;">Figura 1. Diez principales causas de morbilidad</div>
+      </div>
+      <div style="background: #181818; border: 1px solid #2a2a2a; border-radius: 8px; padding: 12px; text-align: center;">
+        <img src="<?= e($imgPiramide) ?>" alt="Pirámide Etaria" style="max-width: 100%; height: auto; border-radius: 4px;">
+        <div style="font-size: var(--fs-xs); color: var(--texto-tenue); margin-top: 6px;">Figura 2. Pirámide de grupos etarios y género</div>
+      </div>
+      <div style="background: #181818; border: 1px solid #2a2a2a; border-radius: 8px; padding: 12px; text-align: center;">
+        <img src="<?= e($imgCategorias) ?>" alt="Sistemas Nosológicos" style="max-width: 100%; height: auto; border-radius: 4px;">
+        <div style="font-size: var(--fs-xs); color: var(--texto-tenue); margin-top: 6px;">Figura 3. Distribución por categorías nosológicas</div>
+      </div>
+    </div>
+  </section>
 
-    <!-- 1. INTRODUCCIÓN Y METODOLOGÍA DE NO DUPLICACIÓN -->
-    <div class="doc-seccion-titulo">1. Metodología de Análisis y Control de No Duplicidad</div>
-    
-    <p class="doc-parrafo">
-      El presente documento tiene como objetivo presentar la caracterización estadística rigurosa de las patologías, enfermedades y problemas de salud registrados en el consultorio. Con la finalidad de garantizar la veracidad bioestadística y evitar distorsiones por visitas repetidas del mismo paciente a lo largo de días, semanas o meses, se implementó un modelo de deduplicación de casos basado en conjuntos disjuntos de pacientes únicos atendidos por diagnóstico.
-    </p>
+  <!-- Tabla Nativa de Morbilidad (bd / bd-tabla) -->
+  <section class="bd" data-bd style="margin-top: 28px;">
+    <div class="bd__cabecera">
+      <h2 class="bd__titulo">Matriz de Morbilidad y Prevalencia Clínica</h2>
 
-    <div class="caja-formula">
-      <div class="caja-formula-titulo">Fórmulas Matemáticas de Deduplicación y Prevalencia Real</div>
-      <p style="margin-bottom: 6px;">Para evitar duplicación de pacientes registrados en distintas fechas dentro del periodo:</p>
-      <div class="formula-linea">
-        Casos Únicos (Prevalencia) = CARDINALIDAD { p ∈ Pacientes | ∃ Consulta(p, CIE10_i, t) con t ∈ [T_inicio, T_fin] }
+      <div class="bd__herramientas">
+        <!-- Filtros de tiempo -->
+        <a href="?periodo=todos" class="boton<?= $periodo === 'todos' ? ' boton--primario' : ' boton--sutil' ?>" style="font-size: var(--fs-xs);">Histórico total</a>
+        <a href="?periodo=anio" class="boton<?= $periodo === 'anio' ? ' boton--primario' : ' boton--sutil' ?>" style="font-size: var(--fs-xs);">Año <?= date('Y') ?></a>
+        <a href="?periodo=12m" class="boton<?= $periodo === '12m' ? ' boton--primario' : ' boton--sutil' ?>" style="font-size: var(--fs-xs);">12 meses</a>
+        <a href="?periodo=mes" class="boton<?= $periodo === 'mes' ? ' boton--primario' : ' boton--sutil' ?>" style="font-size: var(--fs-xs);">30 días</a>
+
+        <a href="?<?= http_build_query(array_merge($_GET, ['formato' => 'suive'])) ?>" class="boton boton--secundario" style="margin-left: 6px;">
+          <?= icono('documento') ?> SUIVE-1
+        </a>
+        <a href="?<?= http_build_query(array_merge($_GET, ['formato' => 'csv'])) ?>" class="boton boton--secundario">
+          <?= icono('tabla') ?> CSV
+        </a>
+        <button type="button" class="boton boton--primario bd__nuevo" onclick="window.print();">
+          <?= icono('documento') ?> Imprimir informe
+        </button>
       </div>
-      <div class="formula-linea">
-        % Prevalencia Poblacional = ( Casos Únicos de la Enfermedad_i / Total Pacientes Únicos Atendidos ) × 100
-      </div>
-      <div class="formula-linea">
-        Índice de Reconsulta = Total de Consultas de la Enfermedad_i / Casos Únicos de la Enfermedad_i
-      </div>
-      <p style="margin-top: 6px; font-size: 9.5pt; color: #333333;">
-        <em>Garantía de integridad:</em> Si un paciente acudió en múltiples ocasiones (día, semana o mes) por la misma enfermedad (p. ej. control de hipertensión), se cuantifica como <strong>un solo caso único</strong> en la estadística de morbilidad, contabilizando las visitas adicionales únicamente en la columna de demanda asistencial (consultas totales).
-      </p>
     </div>
 
-    <!-- 2. RESUMEN DE MORBILIDAD Y ENFERMEDADES MÁS FRECUENTES -->
-    <div class="doc-seccion-titulo">2. Análisis de Morbilidad: Principales Enfermedades Registradas</div>
-    
-    <p class="doc-parrafo-libre">
-      En el periodo evaluado se analizaron un total de <strong><?= number_format($totalConsultas) ?></strong> notas de consulta clínica correspondientes a <strong><?= number_format($totalPacientesUnicos) ?></strong> pacientes individuales. A continuación se desglosa el cuadro consolidado de patologías ordenadas de mayor a menor frecuencia epidemiológica:
-    </p>
-
-    <table class="tabla-formal">
-      <thead>
-        <tr>
-          <th style="width: 10%;">CIE-10</th>
-          <th style="width: 34%;">Diagnóstico Clínico / Enfermedad</th>
-          <th style="width: 20%;">Categoría Nosológica</th>
-          <th style="width: 10%;">Casos Únicos</th>
-          <th style="width: 6%;">Fem</th>
-          <th style="width: 6%;">Masc</th>
-          <th style="width: 7%;">Prev. %</th>
-          <th style="width: 7%;">Cons.</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php if (empty($tablaMorbilidad)): ?>
-          <tr><td colspan="8" class="texto-centro">No se encontraron registros de consulta en la ventana seleccionada.</td></tr>
-        <?php else: ?>
-          <?php foreach ($tablaMorbilidad as $idx => $filaM): ?>
+    <div class="bd__marco">
+      <table class="bd-tabla">
+        <thead>
+          <tr>
+            <th scope="col"><button type="button"><?= icono('etiqueta') ?> <span>Código CIE-10</span></button></th>
+            <th scope="col"><button type="button"><?= icono('documento') ?> <span>Diagnóstico clínico</span></button></th>
+            <th scope="col"><button type="button"><?= icono('carpeta') ?> <span>Categoría nosológica</span></button></th>
+            <th scope="col" class="num"><button type="button"><?= icono('usuarios') ?> <span>Casos únicos</span></button></th>
+            <th scope="col" class="num"><button type="button"><span>Fem.</span></button></th>
+            <th scope="col" class="num"><button type="button"><span>Masc.</span></button></th>
+            <th scope="col" class="num"><button type="button"><span>Prevalencia</span></button></th>
+            <th scope="col" class="num"><button type="button"><span>Consultas</span></button></th>
+            <th scope="col" class="num"><button type="button"><span>Edad media</span></button></th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($tablaMorbilidad as $row): ?>
             <tr>
-              <td class="texto-centro"><strong><?= e($filaM['cie10']) ?></strong></td>
-              <td><?= e($filaM['nombre']) ?></td>
-              <td style="font-size: 9.5pt;"><?= e($filaM['categoria']) ?></td>
-              <td class="texto-centro"><strong><?= number_format($filaM['casos_unicos']) ?></strong></td>
-              <td class="texto-centro"><?= number_format($filaM['femenino']) ?></td>
-              <td class="texto-centro"><?= number_format($filaM['masculino']) ?></td>
-              <td class="texto-derecha"><?= number_format($filaM['porcentaje'], 1) ?>%</td>
-              <td class="texto-centro"><?= number_format($filaM['consultas_totales']) ?></td>
+              <td>
+                <span style="font-family: monospace; color: #93c5fd; font-weight: 600;"><?= e($row['cie10']) ?></span>
+              </td>
+              <td class="bd-tabla__celda-titulo">
+                <span class="bd-tabla__titulo">
+                  <span><?= e($row['nombre']) ?></span>
+                </span>
+              </td>
+              <td><?= e($row['categoria']) ?></td>
+              <td class="num" style="font-weight: 600; color: #fff;"><?= (int)$row['casos_unicos'] ?></td>
+              <td class="num"><?= (int)$row['femenino'] ?></td>
+              <td class="num"><?= (int)$row['masculino'] ?></td>
+              <td class="num" style="color: #93c5fd; font-weight: 600;"><?= $row['porcentaje'] ?>%</td>
+              <td class="num"><?= (int)$row['consultas_totales'] ?></td>
+              <td class="num"><?= $row['edad_promedio'] ?> a</td>
             </tr>
           <?php endforeach; ?>
-        <?php endif; ?>
-      </tbody>
-    </table>
-
-    <div class="salto-pagina"></div>
-
-    <!-- 3. GRÁFICAS ESTADÍSTICAS DE MATPLOTLIB -->
-    <div class="doc-seccion-titulo">3. Representación Gráfica Estadísticamente Validada</div>
-
-    <p class="doc-parrafo-libre">
-      Las siguientes figuras estadísticas fueron procesadas mediante la librería bioestadística <strong>Matplotlib</strong>, aplicando estrictos criterios formales de representación gráfica: formato de alta resolución (300 DPI), tipografía Arial estandarizada, escala monocromática/grises y ejes con leyenda cuantitativa:
-    </p>
-
-    <!-- Gráfica 1: Top 10 Morbilidad -->
-    <div class="contenedor-grafica">
-      <img src="<?= $imgTop ?>" alt="Figura 1. Diez Principales Causas de Morbilidad">
-      <div class="epigrafe-grafica">FIGURA 1. Distribución de las diez patologías con mayor prevalencia en el consultorio (casos únicos sin duplicidad). Fuente: Registros clínicos del establecimiento.</div>
+        </tbody>
+      </table>
     </div>
+  </section>
 
-    <!-- Gráfica 2: Pirámide de Edad y Sexo -->
-    <div class="contenedor-grafica">
-      <img src="<?= $imgPiramide ?>" alt="Figura 2. Pirámide de Grupos Etarios y Sexo">
-      <div class="epigrafe-grafica">FIGURA 2. Estructura demográfica de la población atendida por grupos de edad quinquenales y género.</div>
-    </div>
+</div>
 
-    <div class="salto-pagina"></div>
+<style>
+@media print {
+  .barra-lateral, .encabezado, .pestanas, .bd__herramientas, .boton {
+    display: none !important;
+  }
+  body, .contenido, .pagina {
+    background: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .bd__marco, table.bd-tabla {
+    border: 1px solid #000 !important;
+  }
+  table.bd-tabla th, table.bd-tabla td {
+    color: #000 !important;
+    border: 1px solid #ccc !important;
+  }
+  .hoja-paciente__resumen {
+    border-color: #000 !important;
+  }
+  .hoja-paciente__resumen dd, .hoja-paciente__resumen dt {
+    color: #000 !important;
+  }
+  h1, h2, h3 {
+    color: #000 !important;
+  }
+}
+</style>
 
-    <!-- Gráfica 3: Distribución por Sistemas -->
-    <div class="contenedor-grafica">
-      <img src="<?= $imgCategorias ?>" alt="Figura 3. Carga de Morbilidad por Sistema Nosológico">
-      <div class="epigrafe-grafica">FIGURA 3. Concentración nosológica por grandes aparatos y sistemas clínicos afectados en la consulta.</div>
-    </div>
-
-    <!-- 4. DISTRIBUCIÓN POR CATEGORÍAS NOSOLÓGICAS Y DEMOGRAFÍA -->
-    <div class="doc-seccion-titulo">4. Distribución por Sistemas Nosológicos y Factores Demográficos</div>
-
-    <p class="doc-parrafo">
-      La clasificación nosológica permite al consultorio evaluar la demanda de insumos terapéuticos, instrumental diagnóstico y perfiles de atención especializada que requiere la población usuaria:
-    </p>
-
-    <table class="tabla-formal">
-      <thead>
-        <tr>
-          <th>Categoría Nosológica / Sistema Afectado</th>
-          <th style="width: 25%;">Pacientes Únicos Afectados</th>
-          <th style="width: 25%;">Porcentaje sobre Total Poblacional</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($listaCategorias as $catRow): ?>
-          <tr>
-            <td><strong><?= e($catRow['categoria']) ?></strong></td>
-            <td class="texto-centro"><?= number_format($catRow['casos']) ?> pacientes</td>
-            <td class="texto-derecha"><?= number_format($catRow['porcentaje'], 1) ?>%</td>
-          </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-
-    <div class="doc-seccion-titulo">5. Parámetros Biométricos y Signos Vitales Medios de la Población</div>
-
-    <?php
-      $avgTas = !empty($signosVitalesData['tas']) ? round(array_sum($signosVitalesData['tas']) / count($signosVitalesData['tas']), 1) : 0;
-      $avgTad = !empty($signosVitalesData['tad']) ? round(array_sum($signosVitalesData['tad']) / count($signosVitalesData['tad']), 1) : 0;
-      $avgGlucosa = !empty($signosVitalesData['glucosa']) ? round(array_sum($signosVitalesData['glucosa']) / count($signosVitalesData['glucosa']), 1) : 0;
-      $avgImc = !empty($signosVitalesData['imc']) ? round(array_sum($signosVitalesData['imc']) / count($signosVitalesData['imc']), 1) : 0;
-    ?>
-    <table class="tabla-formal">
-      <thead>
-        <tr>
-          <th>Parámetro Fisiológico Evaluado</th>
-          <th style="width: 25%;">Valor Medio Observado</th>
-          <th style="width: 45%;">Rango de Referencia Clínico</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Tensión Arterial Sistólica (TAS)</strong></td>
-          <td class="texto-centro"><?= $avgTas ?> mmHg</td>
-          <td>110 – 129 mmHg (Normal / Óptima según NOM-030)</td>
-        </tr>
-        <tr>
-          <td><strong>Tensión Arterial Diastólica (TAD)</strong></td>
-          <td class="texto-centro"><?= $avgTad ?> mmHg</td>
-          <td>70 – 84 mmHg (Normal según NOM-030)</td>
-        </tr>
-        <tr>
-          <td><strong>Glucosa Capilar en Ayuno / Casual</strong></td>
-          <td class="texto-centro"><?= $avgGlucosa ?> mg/dL</td>
-          <td>70 – 99 mg/dL en ayuno (< 140 mg/dL casual)</td>
-        </tr>
-        <tr>
-          <td><strong>Índice de Masa Corporal Promedio (IMC)</strong></td>
-          <td class="texto-centro"><?= $avgImc ?> kg/m²</td>
-          <td>18.5 – 24.9 kg/m² (Normopeso según OMS)</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <!-- 6. PROTECCIÓN DE DATOS Y CONCLUSIONES -->
-    <div class="doc-seccion-titulo">6. Declaratoria de Privacidad y Cumplimiento Normativo</div>
-    
-    <p class="doc-parrafo">
-      Se hace constar expresamente que este informe fue elaborado con estricto apego a las directrices de anonimización y disociación de datos personales sensibles consagradas en la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP), la Ley General de Salud y la NOM-024-SSA3-2012. Ningún nombre, clave CURP, número de seguridad social, teléfono de contacto o domicilio residencial ha sido incluido en las tablas ni en los conjuntos de datos exportables.
-    </p>
-
-    <!-- Botón de Acción Rápida de Impresión Formal -->
-    <div class="no-imprimir" style="text-align: center; margin: 30px 0; padding: 18px; background: #f5f5f5; border: 1px dashed #000;">
-      <p style="font-size: 11pt; margin-bottom: 10px;"><strong>¿Deseas imprimir o guardar este dictamen formal en PDF?</strong> Cumple con todos los requisitos de Arial 12pt, márgenes de 2.5 cm y escala de grises para autoridades sanitarias y jurados de feria de ciencias.</p>
-      <button type="button" onclick="window.print()" style="font-family: Arial; font-size: 13pt; font-weight: bold; padding: 12px 32px; background: #000000; color: #ffffff; border: 0; border-radius: 4px; cursor: pointer;">
-        🖨️ Imprimir Dictamen Formal Completo (A4 / Carta)
-      </button>
-    </div>
-
-    <!-- Bloque de Firmas Formales -->
-    <div class="bloque-firmas">
-      <div class="firma-columna">
-        <div class="firma-linea"><?= e($responsableSanitario) ?></div>
-        <div>Responsable Sanitario / Dirección Médica</div>
-        <div>Cédula Profesional: <?= e($cedulaResponsable) ?></div>
-        <div><?= e($nombreInstitucion) ?></div>
-      </div>
-      <div class="firma-columna">
-        <div class="firma-linea">Comité de Estadística y Epidemiología Clínica</div>
-        <div>Área de Vigilancia Epidemiológica</div>
-        <div>Certificación de No Duplicidad y Disociación</div>
-        <div>Fecha: <?= date('d/m/Y') ?></div>
-      </div>
-    </div>
-
-  </article>
-
-</body>
-</html>
+<?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
