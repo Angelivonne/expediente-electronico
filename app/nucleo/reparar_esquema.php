@@ -62,7 +62,10 @@ function repararColumnaFaltante(string $tabla, string $columna, string $definici
         return;
     }
     try {
-        db()->exec("ALTER TABLE `$tabla` ADD COLUMN $definicion");
+        $sqlCol = (stripos($definicion, $columna) !== false || str_starts_with(trim($definicion), '`'))
+            ? $definicion
+            : "`$columna` $definicion";
+        db()->exec("ALTER TABLE `$tabla` ADD COLUMN $sqlCol");
         // Forzar recarga de caché para que el nuevo estado sea visible en esta ejecución
         $confirmar = columnaExiste($tabla, $columna, true);
         if ($confirmar) {
@@ -313,3 +316,13 @@ repararColumnaFaltante('usuarios', 'direccion', 'VARCHAR(255) NULL');
 repararColumnaFaltante('usuarios', 'actualizado_en', 'DATETIME NULL');
 repararColumnaFaltante('usuarios', 'eliminado_en', 'DATETIME NULL');
 repararColumnaFaltante('pagina_filas', 'notas', 'MEDIUMTEXT NULL');
+
+// 5. Columnas esenciales de finanzas
+repararColumnaFaltante('finanzas_movimientos', 'vence_en', 'DATE NULL');
+repararColumnaFaltante('finanzas_movimientos', 'servicio_id', 'INT UNSIGNED NULL');
+repararColumnaFaltante('finanzas_movimientos', 'establecimiento_id', 'INT UNSIGNED NULL');
+repararColumnaFaltante('finanzas_movimientos', 'factura_id', 'INT UNSIGNED NULL');
+repararColumnaFaltante('finanzas_movimientos', 'referencia', 'VARCHAR(80) NULL');
+repararColumnaFaltante('finanzas_movimientos', 'estado', "VARCHAR(20) NOT NULL DEFAULT 'pagado'");
+repararColumnaFaltante('finanzas_movimientos', 'metodo', "VARCHAR(30) NULL");
+repararColumnaFaltante('finanzas_movimientos', 'descripcion', "VARCHAR(255) NULL");

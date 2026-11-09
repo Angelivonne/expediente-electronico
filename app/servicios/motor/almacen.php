@@ -170,7 +170,9 @@ function motorListar(string $clave, array $opciones = []): array
     } else {
         foreach (array_keys($entidad['campos']) as $campo) {
             if (preg_match('/^[a-z0-9_]{1,40}$/', (string) $campo)) {
-                $select[] = 'c.`' . $campo . '`';
+                if (!function_exists('columnaExiste') || columnaExiste($tabla, (string) $campo)) {
+                    $select[] = 'c.`' . $campo . '`';
+                }
             }
         }
         if (!empty($entidad['titulo_sql'])) {
@@ -214,7 +216,7 @@ function motorListar(string $clave, array $opciones = []): array
 
     $orden = (string) ($entidad['orden'] ?? 'id');
     $ordenPedido = (string) ($opciones['orden'] ?? '');
-    if ($ordenPedido !== '' && campoMotor($clave, $ordenPedido)) {
+    if ($ordenPedido !== '' && campoMotor($clave, $ordenPedido) && (!function_exists('columnaExiste') || columnaExiste($tabla, $ordenPedido))) {
         $sentido = strtolower((string) ($opciones['dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
         $orden = 'c.`' . $ordenPedido . '` ' . $sentido;
     } elseif (!preg_match('/^[A-Za-z0-9_,`. ]+$/', $orden)) {

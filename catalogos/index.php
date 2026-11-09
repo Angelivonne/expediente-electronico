@@ -104,7 +104,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             <tr>
               <td class="bd-tabla__celda-titulo">
                 <?php if ($total !== null): ?>
-                  <a class="bd-tabla__titulo" href="<?= URL_BASE ?>/catalogos/editar.php?tabla=<?= e(urlencode($llave)) ?>">
+                  <a class="bd-tabla__titulo" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=<?= e(urlencode($llave)) ?>">
                     <?= icono('tabla') ?> <span><?= e($catalogo['titulo']) ?></span>
                   </a>
                 <?php else: ?>
