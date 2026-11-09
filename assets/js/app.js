@@ -1201,7 +1201,7 @@ function iniciarDictado(raiz) {
 
   const ponerEstado = (estado) => {
     raiz.dataset.estado = estado;
-    const etiqueta = { inactivo: 'Dictar', grabando: 'Terminar', procesando: 'Procesando…' }[estado];
+    const etiqueta = { inactivo: 'Traductor Cl�nico', grabando: 'Terminar', procesando: 'Procesando…' }[estado];
     globo.textContent = etiqueta;
     boton.setAttribute('aria-label', etiqueta);
     boton.disabled = estado === 'procesando';
@@ -1321,7 +1321,7 @@ function iniciarDictado(raiz) {
     if (!orbitaBurbuja || !orbitaTexto) return;
     let t = String(valor || '').replace(/\s+/g, ' ').trim();
     if (t.length > 300) t = '…' + t.slice(-300);
-    orbitaTexto.textContent = t || (raiz.dataset.estado === 'grabando' ? 'Escuchando…' : 'Dictado listo');
+    orbitaTexto.textContent = t || (raiz.dataset.estado === 'grabando' ? 'Escuchando…' : 'Traductor Cl�nico listo');
     orbitaBurbuja.hidden = false;
   };
 
@@ -1934,7 +1934,7 @@ function iniciarDictado(raiz) {
     estadoTexto.textContent = `Dictado terminado ${Math.round(duracion || segundos())} s`;
     calificar.hidden = false;
     calificar.querySelectorAll('button').forEach((b) => { b.disabled = false; b.setAttribute('aria-pressed', 'false'); });
-    actualizarBurbuja(texto.textContent || 'Dictado terminado');
+    actualizarBurbuja(texto.textContent || 'Traductor Cl�nico listo');
     if (raiz.dataset.minimizado == '1') { try { bolita?.apagar(); } catch (e) { /* sin motor */ } }
     if (llenados.size) mostrarNotificacion('exito', `Se llenaron ${llenados.size} campos. Revísalos antes de guardar.`);
   };
@@ -4089,3 +4089,4 @@ function iniciarAvisoDatos() {
   });
 }
 document.addEventListener('DOMContentLoaded', iniciarAvisoDatos);
+

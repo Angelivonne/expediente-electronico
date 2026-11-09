@@ -1322,7 +1322,7 @@ class Handler(BaseHTTPRequestHandler):
         listo = _modelo_listo.is_set() and _modelo is not None
         self._responder(200, {
             "ok": listo,
-            "modelo": MODELO,
+            "modelo": "Traductor Clínico (large-v3)",`n            "nombre": "Traductor Clínico",
             "listo": listo,
             "error": _modelo_error,
         })
@@ -1392,3 +1392,4 @@ if __name__ == "__main__":
     print(f"Cargando modelo {MODELO}â€¦ el servicio ya escucha en 127.0.0.1:{PUERTO}", flush=True)
     print("Deja esta ventana abierta mientras uses el dictado.", flush=True)
     server.serve_forever()
+
