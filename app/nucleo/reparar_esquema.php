@@ -24,11 +24,11 @@ function tablaExiste(string $tabla): bool
 }
 
 /** Cache en memoria de columnas existentes. */
-function columnaExiste(string $tabla, string $columna): bool
+function columnaExiste(string $tabla, string $columna, bool $forzarRecarga = false): bool
 {
     static $cacheColumnas = [];
     $clave = $tabla . '.' . $columna;
-    if (array_key_exists($clave, $cacheColumnas)) {
+    if (!$forzarRecarga && array_key_exists($clave, $cacheColumnas)) {
         return $cacheColumnas[$clave];
     }
     try {
@@ -45,10 +45,12 @@ function columnaExiste(string $tabla, string $columna): bool
             $consulta->execute([$tabla, $columna]);
             $cacheColumnas[$clave] = (int) $consulta->fetchColumn() > 0;
         } catch (Throwable $e2) {
-            $cacheColumnas[$clave] = false;
+            if (!$forzarRecarga) {
+                $cacheColumnas[$clave] = false;
+            }
         }
     }
-    return $cacheColumnas[$clave];
+    return $cacheColumnas[$clave] ?? false;
 }
 
 function repararColumnaFaltante(string $tabla, string $columna, string $definicion): void
@@ -61,8 +63,8 @@ function repararColumnaFaltante(string $tabla, string $columna, string $definici
     }
     try {
         db()->exec("ALTER TABLE `$tabla` ADD COLUMN $definicion");
-        // Actualizar cache
-        columnaExiste($tabla, $columna); // recalcula
+        // Forzar recarga de caché para que el nuevo estado sea visible en esta ejecución
+        columnaExiste($tabla, $columna, true);
         error_log('[reparar_esquema] añadido ' . $tabla . '.' . $columna);
     } catch (Throwable $e) {
         $msg = $e->getMessage();

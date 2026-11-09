@@ -31,9 +31,10 @@ function motorCondiciones(array $entidad, array $opciones): array
     $where   = [];
     $params  = [];
 
-    if (!empty($almacen['institucion'])) {
+    if (!empty($almacen['institucion']) && empty($opciones['_sin_institucion'])) {
         $tabla = (string) ($almacen['tabla'] ?? '');
-        $tieneInstitucion = true;
+        // Seguro por defecto: solo añadir el filtro si confirmamos que la columna existe
+        $tieneInstitucion = false;
         if (function_exists('columnaExiste') && $tabla !== '') {
             $tieneInstitucion = columnaExiste($tabla, 'institucion_id');
         }
@@ -184,9 +185,28 @@ function motorListar(string $clave, array $opciones = []): array
 
     [$where, $params] = motorCondiciones($entidad, $opciones);
 
-    $cuenta = db()->prepare("SELECT COUNT(*) FROM $desde WHERE $where");
-    $cuenta->execute($params);
-    $total = (int) $cuenta->fetchColumn();
+    try {
+        $cuenta = db()->prepare("SELECT COUNT(*) FROM $desde WHERE $where");
+        $cuenta->execute($params);
+        $total = (int) $cuenta->fetchColumn();
+    } catch (Throwable $e) {
+        // Si falla por columna faltante (ej. institucion_id en Railway), reintentar sin filtro de institución
+        if ($e->getCode() == '42S22' || strpos($e->getMessage(), '1054') !== false) {
+            error_log('[motorListar] columna faltante, reintentando sin institucion_id: ' . $e->getMessage());
+            $opcionesSinInst = $opciones;
+            $opcionesSinInst['_sin_institucion'] = true;
+            // Forzar recarga de caché para que se detecte el estado real
+            if (function_exists('columnaExiste')) {
+                columnaExiste($tabla, 'institucion_id', true);
+            }
+            [$where, $params] = motorCondiciones($entidad, $opcionesSinInst);
+            $cuenta = db()->prepare("SELECT COUNT(*) FROM $desde WHERE $where");
+            $cuenta->execute($params);
+            $total = (int) $cuenta->fetchColumn();
+        } else {
+            throw $e;
+        }
+    }
 
     $paginas = max(1, (int) ceil($total / $limite));
     $pagina  = min($pagina, $paginas);
