@@ -118,7 +118,7 @@ if (!$paginaActual) {
     </button>
 
     <div class="lateral-inicio">
-      <a class="lateral-inicio__pastilla<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/"><?= iconoRelleno('casa') ?><span>Inicio</span></a>
+      <a class="lateral-inicio__pastilla<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/" title="Inicio" aria-label="Inicio"><?= iconoRelleno('casa') ?><span>Inicio</span></a>
       <a class="boton-icono<?= $seccionActiva === 'asistente' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/asistente/" title="Asistente de IA"><?= iconoRelleno('mensaje') ?></a>
       <?php if (puede('agenda')): ?>
         <a class="boton-icono<?= $seccionActiva === 'agenda' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/agenda/" title="Agenda"><?= iconoRelleno('calendario') ?></a>

@@ -1,28 +1,80 @@
-/* Inicio y accesos rápidos comparten ancho; Inicio se reconoce por su icono y tooltip. */
+/* Inicio y accesos rápidos de la barra lateral */
 .lateral-inicio {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  align-items: center;
-  gap: 5px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 10px 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
-.lateral-inicio__inicio,
-.lateral-inicio > .boton-icono {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  min-width: 0;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #9a9a9a;
-  text-decoration: none;
+
+.lateral-inicio__pastilla {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  height: 32px !important;
+  padding: 0 12px 0 10px !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #d6d6d6 !important;
+  font-size: var(--fs-base, 14px) !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  transition: background var(--transicion, 150ms ease), color var(--transicion, 150ms ease) !important;
 }
-.lateral-inicio__inicio:hover,
-.lateral-inicio > .boton-icono:hover { background: #262626; color: #ededed; }
-.lateral-inicio__inicio.activo,
-.lateral-inicio > .boton-icono.activo { background: #2a2a2a; color: #fff; }
-.lateral-inicio__inicio svg.ir,
-.lateral-inicio > .boton-icono svg.ir { width: 17px; height: 17px; }
+
+.lateral-inicio__pastilla:hover {
+  background: #262626 !important;
+  color: #fff !important;
+  text-decoration: none !important;
+}
+
+.lateral-inicio__pastilla.activo {
+  background: #2a2a2a !important;
+  color: #fff !important;
+}
+
+.lateral-inicio__pastilla svg.ir {
+  width: 17px !important;
+  height: 17px !important;
+  flex-shrink: 0 !important;
+}
+
+.lateral-inicio .boton-icono {
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #9a9a9a !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  transition: background var(--transicion, 150ms ease), color var(--transicion, 150ms ease) !important;
+}
+
+.lateral-inicio .boton-icono:hover {
+  background: #262626 !important;
+  color: #ededed !important;
+}
+
+.lateral-inicio .boton-icono.activo {
+  background: #2a2a2a !important;
+  color: #fff !important;
+}
+
+.lateral-inicio .boton-icono svg.ir,
+.lateral-inicio .boton-icono svg.icono {
+  width: 17px !important;
+  height: 17px !important;
+  flex-shrink: 0 !important;
+}
