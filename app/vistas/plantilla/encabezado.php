@@ -320,6 +320,7 @@ if (!$paginaActual) {
             <button type="button" role="menuitem" data-pestanas-nueva><?= icono('agregar') ?> Nueva pestaña</button>
             <button type="button" role="menuitem" data-imprimir><?= icono('documento') ?> Imprimir</button>
             <button type="button" role="menuitem" data-exportar><?= icono('pdf') ?> Exportar</button>
+            <button type="button" role="menuitem" onclick="window.location.href='<?= URL_BASE ?>/pacientes/datos.php'"><?= icono('barras') ?> Datos</button>
           </div>
         </div>
       </div>
