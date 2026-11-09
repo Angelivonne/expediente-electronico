@@ -189,15 +189,19 @@ function registrarBitacora(string $tabla, int $registroId, string $accion,
                            ?string $campo = null, ?string $anterior = null, ?string $nuevo = null,
                            ?int $institucionId = null): void
 {
-    db()->prepare(
-        'INSERT INTO bitacora (tabla, registro_id, accion, campo, valor_anterior, valor_nuevo, usuario_id, institucion_id, ip)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    )->execute([
-        $tabla, $registroId, $accion, $campo, $anterior, $nuevo,
-        usuarioActual()['id'] ?? null,
-        $institucionId ?? (function_exists('institucionId') ? institucionId() : null),
-        $_SERVER['REMOTE_ADDR'] ?? null,
-    ]);
+    try {
+        db()->prepare(
+            'INSERT INTO bitacora (tabla, registro_id, accion, campo, valor_anterior, valor_nuevo, usuario_id, institucion_id, ip)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $tabla, $registroId, $accion, $campo, $anterior, $nuevo,
+            usuarioActual()['id'] ?? null,
+            $institucionId ?? (function_exists('institucionId') ? institucionId() : null),
+            $_SERVER['REMOTE_ADDR'] ?? null,
+        ]);
+    } catch (Throwable $e) {
+        error_log('[registrarBitacora] Fallo no critico al escribir bitacora: ' . $e->getMessage());
+    }
 }
 
 /* ---------- Mensajes entre redirecciones ---------- */

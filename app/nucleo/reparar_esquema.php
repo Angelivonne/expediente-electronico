@@ -14,11 +14,16 @@ function tablaExiste(string $tabla): bool
         return $cacheTablas[$tabla];
     }
     try {
-        $consulta = db()->prepare("SHOW TABLES LIKE ?");
+        $consulta = db()->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
         $consulta->execute([$tabla]);
         $cacheTablas[$tabla] = (bool) $consulta->fetchColumn();
     } catch (Throwable $e) {
-        $cacheTablas[$tabla] = false;
+        try {
+            $consulta = db()->query("SHOW TABLES LIKE " . db()->quote($tabla));
+            $cacheTablas[$tabla] = (bool) $consulta->fetchColumn();
+        } catch (Throwable $e2) {
+            $cacheTablas[$tabla] = false;
+        }
     }
     return $cacheTablas[$tabla];
 }
@@ -32,18 +37,16 @@ function columnaExiste(string $tabla, string $columna, bool $forzarRecarga = fal
         return $cacheColumnas[$clave];
     }
     try {
-        $consulta = db()->prepare("SHOW COLUMNS FROM `$tabla` LIKE ?");
-        $consulta->execute([$columna]);
+        $consulta = db()->prepare(
+            "SELECT 1 FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
+        );
+        $consulta->execute([$tabla, $columna]);
         $cacheColumnas[$clave] = (bool) $consulta->fetchColumn();
     } catch (Throwable $e) {
-        // Fallback a information_schema
         try {
-            $consulta = db()->prepare(
-                "SELECT COUNT(*) FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
-            );
-            $consulta->execute([$tabla, $columna]);
-            $cacheColumnas[$clave] = (int) $consulta->fetchColumn() > 0;
+            $consulta = db()->query("SHOW COLUMNS FROM `$tabla` LIKE " . db()->quote($columna));
+            $cacheColumnas[$clave] = (bool) $consulta->fetchColumn();
         } catch (Throwable $e2) {
             if (!$forzarRecarga) {
                 $cacheColumnas[$clave] = false;
@@ -129,6 +132,24 @@ try {
             valores JSON NULL,
             creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             KEY idx_plantillas_fila_pag (pagina_id, institucion_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+        if (!tablaExiste('bitacora')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS bitacora (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            tabla VARCHAR(40) NOT NULL,
+            registro_id INT UNSIGNED NOT NULL,
+            accion VARCHAR(40) NOT NULL DEFAULT 'crear',
+            campo VARCHAR(60) NULL,
+            valor_anterior TEXT NULL,
+            valor_nuevo TEXT NULL,
+            usuario_id INT UNSIGNED NULL,
+            institucion_id INT UNSIGNED NULL,
+            ip VARCHAR(45) NULL,
+            creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_bitacora_reg (tabla, registro_id),
+            KEY idx_bitacora_fecha (tabla, registro_id, creado_en)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
@@ -274,6 +295,84 @@ try {
         }
     }
 
+    if (!tablaExiste('camillas')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS camillas (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            institucion_id INT UNSIGNED NOT NULL DEFAULT 1,
+            codigo VARCHAR(30) NOT NULL,
+            area ENUM('urgencias','hospitalizacion','cirugia','terapia_intensiva') NOT NULL DEFAULT 'hospitalizacion',
+            piso VARCHAR(40) NULL,
+            tipo ENUM('camilla','cama_censable','cama_no_censable','cuna','incubadora') NOT NULL DEFAULT 'cama_censable',
+            estado ENUM('disponible','ocupada','limpieza','mantenimiento','reservada') NOT NULL DEFAULT 'disponible',
+            paciente_id INT UNSIGNED NULL,
+            ingreso_en DATETIME NULL,
+            diagnostico_ingreso VARCHAR(255) NULL,
+            medico_id INT UNSIGNED NULL,
+            notas TEXT NULL,
+            creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_inst_area (institucion_id, area),
+            INDEX idx_paciente (paciente_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    if (!tablaExiste('camillas_movimientos')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS camillas_movimientos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            institucion_id INT UNSIGNED NOT NULL DEFAULT 1,
+            camilla_id INT NOT NULL,
+            paciente_id INT NOT NULL,
+            tipo_movimiento ENUM('ingreso','alta','traslado') NOT NULL,
+            camilla_origen_id INT NULL,
+            motivo VARCHAR(255) NULL,
+            usuario_id INT UNSIGNED NULL,
+            fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_camilla (camilla_id),
+            INDEX idx_paciente (paciente_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    if (!tablaExiste('kardex_medicaciones')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS kardex_medicaciones (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            institucion_id INT UNSIGNED NOT NULL DEFAULT 1,
+            paciente_id INT UNSIGNED NOT NULL,
+            camilla_id INT NULL,
+            medicamento VARCHAR(150) NOT NULL,
+            dosis VARCHAR(80) NOT NULL,
+            via VARCHAR(50) NOT NULL,
+            frecuencia VARCHAR(80) NOT NULL,
+            horario VARCHAR(100) NULL,
+            fecha_inicio DATE NOT NULL,
+            fecha_fin DATE NULL,
+            indicaciones TEXT NULL,
+            estado ENUM('activo', 'suspendido', 'completado') NOT NULL DEFAULT 'activo',
+            medico_prescribe VARCHAR(120) NULL,
+            creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_paciente (paciente_id),
+            INDEX idx_camilla (camilla_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    if (!tablaExiste('kardex_administraciones')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS kardex_administraciones (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            institucion_id INT UNSIGNED NOT NULL DEFAULT 1,
+            medicacion_id INT NOT NULL,
+            paciente_id INT UNSIGNED NOT NULL,
+            turno ENUM('matutino', 'vespertino', 'nocturno') NOT NULL DEFAULT 'matutino',
+            fecha DATE NOT NULL,
+            hora_programada VARCHAR(10) NOT NULL,
+            hora_aplicacion DATETIME NULL,
+            estado ENUM('pendiente', 'aplicado', 'omitido', 'rechazado') NOT NULL DEFAULT 'pendiente',
+            enfermero_nombre VARCHAR(120) NULL,
+            observaciones VARCHAR(255) NULL,
+            creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_med (medicacion_id),
+            INDEX idx_pac_fecha (paciente_id, fecha)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     // Auto-sincronizar fotos de la clínica y subidas persistentes
     $dirPrivado = __DIR__ . '/../../privado/subidas';
     $dirPublico = __DIR__ . '/../../assets/subidas';
@@ -296,7 +395,7 @@ try {
 $tablasConInstitucion = [
     'usuarios', 'pacientes', 'historial_clinico', 'paginas', 'pagina_filas', 'citas',
     'conversiones', 'invitaciones', 'sincronizacion_cola', 'bitacora',
-    'users', 'notas_medicas', 'recetas', 'estudios',
+    'users', 'notas_medicas', 'recetas', 'estudios', 'camillas', 'camillas_movimientos', 'kardex_medicaciones', 'kardex_administraciones',
     'medicamentos', 'cie10', 'comentarios', 'registro_versiones',
     'finanzas_movimientos', 'finanzas_conceptos', 'finanzas_cierres',
     'finanzas_facturas', 'finanzas_presupuestos', 'finanzas_recurrentes',
@@ -418,14 +517,46 @@ repararColumnaFaltante('citas', 'recordatorio_enviado_en', 'DATETIME NULL');
 repararColumnaFaltante('citas', 'recordatorio_visto_en', 'DATETIME NULL');
 repararColumnaFaltante('citas', 'creado_por', 'INT UNSIGNED NULL');
 
-// Pacientes
+// Asegurar todas las columnas de la tabla pacientes (prevencion 1054)
 repararColumnaFaltante('pacientes', 'institucion_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
 repararColumnaFaltante('pacientes', 'folio', 'VARCHAR(30) NULL');
 repararColumnaFaltante('pacientes', 'curp', 'VARCHAR(20) NULL');
+repararColumnaFaltante('pacientes', 'nombre', 'VARCHAR(80) NOT NULL DEFAULT ""');
+repararColumnaFaltante('pacientes', 'primer_apellido', 'VARCHAR(60) NOT NULL DEFAULT ""');
+repararColumnaFaltante('pacientes', 'segundo_apellido', 'VARCHAR(60) NULL');
+repararColumnaFaltante('pacientes', 'fecha_nacimiento', 'DATE NULL');
+repararColumnaFaltante('pacientes', 'sexo', "ENUM('H','M','X') NOT NULL DEFAULT 'H'");
+repararColumnaFaltante('pacientes', 'entidad_nacimiento', 'CHAR(2) NULL');
+repararColumnaFaltante('pacientes', 'nacionalidad', 'VARCHAR(40) NULL');
+repararColumnaFaltante('pacientes', 'telefono', 'VARCHAR(30) NULL');
+repararColumnaFaltante('pacientes', 'correo', 'VARCHAR(120) NULL');
+repararColumnaFaltante('pacientes', 'domicilio', 'VARCHAR(200) NULL');
+repararColumnaFaltante('pacientes', 'municipio_estado', 'VARCHAR(120) NULL');
+repararColumnaFaltante('pacientes', 'contacto_emergencia', 'VARCHAR(120) NULL');
+repararColumnaFaltante('pacientes', 'telefono_emergencia', 'VARCHAR(30) NULL');
+repararColumnaFaltante('pacientes', 'alergias', 'VARCHAR(255) NULL');
+repararColumnaFaltante('pacientes', 'grupo_sanguineo', 'VARCHAR(12) NULL');
+repararColumnaFaltante('pacientes', 'padecimientos_cronicos', 'VARCHAR(255) NULL');
+repararColumnaFaltante('pacientes', 'medicamentos_actuales', 'VARCHAR(255) NULL');
+repararColumnaFaltante('pacientes', 'motivo_consulta', 'TEXT NULL');
 repararColumnaFaltante('pacientes', 'confirmacion_datos', 'TINYINT(1) NOT NULL DEFAULT 0');
 repararColumnaFaltante('pacientes', 'extras', 'JSON NULL');
 repararColumnaFaltante('pacientes', 'foto', 'VARCHAR(255) NULL');
+repararColumnaFaltante('pacientes', 'creado_en', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+repararColumnaFaltante('pacientes', 'actualizado_en', 'DATETIME NULL');
 repararColumnaFaltante('pacientes', 'eliminado_en', 'DATETIME NULL');
+
+// Columnas de bitacora
+repararColumnaFaltante('bitacora', 'tabla', 'VARCHAR(40) NOT NULL DEFAULT "pacientes"');
+repararColumnaFaltante('bitacora', 'registro_id', 'INT UNSIGNED NOT NULL DEFAULT 0');
+repararColumnaFaltante('bitacora', 'accion', 'VARCHAR(40) NOT NULL DEFAULT "crear"');
+repararColumnaFaltante('bitacora', 'campo', 'VARCHAR(60) NULL');
+repararColumnaFaltante('bitacora', 'valor_anterior', 'TEXT NULL');
+repararColumnaFaltante('bitacora', 'valor_nuevo', 'TEXT NULL');
+repararColumnaFaltante('bitacora', 'usuario_id', 'INT UNSIGNED NULL');
+repararColumnaFaltante('bitacora', 'institucion_id', 'INT UNSIGNED NULL');
+repararColumnaFaltante('bitacora', 'ip', 'VARCHAR(45) NULL');
+repararColumnaFaltante('bitacora', 'creado_en', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
 
 // Historial clínico
 repararColumnaFaltante('historial_clinico', 'institucion_id', 'INT UNSIGNED NOT NULL DEFAULT 1');

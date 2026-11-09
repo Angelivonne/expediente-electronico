@@ -118,6 +118,12 @@ $diagnosticos      = diagnosticosDelHistorial($historial);
 $medicamentos      = tratamientosActivosDelHistorial($historial);
 $hospitalizaciones = hospitalizacionesDelHistorial($historial);
 $hospitalizado     = array_values(array_filter($hospitalizaciones, fn ($h) => $h['activa']))[0] ?? null;
+$camillaAsignada = null;
+try {
+    $qCam = db()->prepare("SELECT * FROM camillas WHERE paciente_id = ? AND estado = 'ocupada' AND institucion_id = ? LIMIT 1");
+    $qCam->execute([(int)$p['id'], institucionId()]);
+    $camillaAsignada = $qCam->fetch(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {}
 
 // Identificación de localización: entidad reconocida en el domicilio
 require_once __DIR__ . '/../app/servicios/clinica/mapa.php';
@@ -132,15 +138,21 @@ const SEMANAS = 16;
 $hoy    = new DateTimeImmutable('today');
 $inicio = $hoy->modify('monday this week')->modify('-' . (SEMANAS - 1) . ' weeks');
 
-$actividad = db()->prepare(
-    "SELECT DATE(creado_en) AS dia, COUNT(*) AS total
-       FROM bitacora
-      WHERE tabla = 'pacientes' AND registro_id = ? AND accion IN ('crear', 'actualizar') AND creado_en >= ?
-      GROUP BY DATE(creado_en)"
-);
-$actividad->execute([$id, $inicio->format('Y-m-d')]);
-$porDia = array_column($actividad->fetchAll(), 'total', 'dia');
-$maximo = $porDia ? max($porDia) : 0;
+$porDia = [];
+$maximo = 0;
+try {
+    $actividad = db()->prepare(
+        "SELECT DATE(creado_en) AS dia, COUNT(*) AS total
+           FROM bitacora
+          WHERE tabla = 'pacientes' AND registro_id = ? AND accion IN ('crear', 'actualizar') AND creado_en >= ?
+          GROUP BY DATE(creado_en)"
+    );
+    $actividad->execute([$id, $inicio->format('Y-m-d')]);
+    $porDia = array_column($actividad->fetchAll(), 'total', 'dia');
+    $maximo = $porDia ? max($porDia) : 0;
+} catch (Throwable $e) {
+    error_log('[ver.php] actividad ignorada por esquema: ' . $e->getMessage());
+}
 
 /** Nivel de intensidad 0–4 relativo al día con más movimientos. */
 $nivel = fn (int $n): int => $n === 0 ? 0 : max(1, (int) ceil($n / $maximo * 4));
@@ -184,16 +196,20 @@ foreach ($plurales as $tipo => $nombre) {
 }
 
 $anio = (int) $hoy->format('Y');
-$movimientos = db()->prepare(
-    "SELECT YEAR(creado_en) AS anio, MONTH(creado_en) AS mes, COUNT(*) AS total
-       FROM bitacora
-      WHERE tabla = 'pacientes' AND registro_id = ? AND accion IN ('crear', 'actualizar') AND creado_en >= ?
-      GROUP BY YEAR(creado_en), MONTH(creado_en)"
-);
-$movimientos->execute([$id, $primerMes->modify('-12 months')->format('Y-m-d')]);
 $porAnioMes = [];
-foreach ($movimientos->fetchAll() as $m) {
-    $porAnioMes[(int) $m['anio']][(int) $m['mes']] = (int) $m['total'];
+try {
+    $movimientos = db()->prepare(
+        "SELECT YEAR(creado_en) AS anio, MONTH(creado_en) AS mes, COUNT(*) AS total
+           FROM bitacora
+          WHERE tabla = 'pacientes' AND registro_id = ? AND accion IN ('crear', 'actualizar') AND creado_en >= ?
+          GROUP BY YEAR(creado_en), MONTH(creado_en)"
+    );
+    $movimientos->execute([$id, $primerMes->modify('-12 months')->format('Y-m-d')]);
+    foreach ($movimientos->fetchAll() as $m) {
+        $porAnioMes[(int) $m['anio']][(int) $m['mes']] = (int) $m['total'];
+    }
+} catch (Throwable $e) {
+    error_log('[ver.php] movimientos ignorado por esquema: ' . $e->getMessage());
 }
 $mesActual = (int) $hoy->format('n');
 $graficas = [
@@ -376,10 +392,10 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
       <span><?= e($sexo) ?></span>
       <span>Nació el <?= e(fechaCorta($p['fecha_nacimiento'])) ?></span>
     </p>
-    <?php if (!$sinAlergias || $p['padecimientos_cronicos'] || $hospitalizado): ?>
+    <?php if (!$sinAlergias || $p['padecimientos_cronicos'] || $hospitalizado || !empty($camillaAsignada)): ?>
       <ul class="hoja-paciente__alertas">
         <?php if (!$sinAlergias): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--alergia"><?= icono('alerta') ?><span><b>Alergias</b> <?= e($p['alergias']) ?></span></li><?php endif; ?>
-        <?php if ($hospitalizado): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--hospital"><?= icono('clinico') ?><span><b>Hospitalizado</b> <?= e($hospitalizado['servicio'] ?: $hospitalizado['motivo']) ?> · desde <?= e(fechaCorta($hospitalizado['ingreso'])) ?></span></li><?php endif; ?>
+        <?php if (!empty($camillaAsignada)): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--hospital"><?= icono('clinico') ?><span><b>Cama:</b> <?= e($camillaAsignada['codigo']) ?> (<?= e(ucfirst($camillaAsignada['area'])) ?>) · <a href="<?= URL_BASE ?>/camillas/kardex.php?paciente_id=<?= (int)$p['id'] ?>" style="color: #93c5fd; text-decoration: underline; font-weight: 600;">Kardex de Medicación →</a></span></li><?php elseif ($hospitalizado): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--hospital"><?= icono('clinico') ?><span><b>Hospitalizado</b> <?= e($hospitalizado['servicio'] ?: $hospitalizado['motivo']) ?> · desde <?= e(fechaCorta($hospitalizado['ingreso'])) ?></span></li><?php endif; ?>
         <?php if ($p['padecimientos_cronicos']): ?><li class="hoja-paciente__alerta"><?= icono('corazon') ?><span><b>Crónicos</b> <?= e($p['padecimientos_cronicos']) ?></span></li><?php endif; ?>
       </ul>
     <?php endif; ?>

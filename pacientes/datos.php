@@ -400,7 +400,19 @@ if (isset($_GET['formato']) && $_GET['formato'] === 'json') {
 }
 
 // Regenerar o actualizar gráficas Matplotlib si es posible
+$rutasPython = [
+    'C:\\Users\\abelM\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
+    'python',
+    'python3'
+];
 $rutaPython = 'python';
+foreach ($rutasPython as $rp) {
+    if (file_exists($rp)) {
+        $rutaPython = $rp;
+        break;
+    }
+}
+$autor = usuarioActual() ?: ['nombre' => 'Dr. Responsable de Área Médica', 'cedula' => '12345678'];
 $scriptGraficas = __DIR__ . '/../app/servicios/ia/generar_graficas_datos.py';
 if (file_exists($scriptGraficas)) {
     $payloadJson = [
@@ -918,6 +930,14 @@ $imgCategorias = URL_BASE . '/assets/img/reportes/categorias_nosologicas.png?v='
     <p class="doc-parrafo">
       Se hace constar expresamente que este informe fue elaborado con estricto apego a las directrices de anonimización y disociación de datos personales sensibles consagradas en la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP), la Ley General de Salud y la NOM-024-SSA3-2012. Ningún nombre, clave CURP, número de seguridad social, teléfono de contacto o domicilio residencial ha sido incluido en las tablas ni en los conjuntos de datos exportables.
     </p>
+
+    <!-- Botón de Acción Rápida de Impresión Formal -->
+    <div class="no-imprimir" style="text-align: center; margin: 30px 0; padding: 18px; background: #f5f5f5; border: 1px dashed #000;">
+      <p style="font-size: 11pt; margin-bottom: 10px;"><strong>¿Deseas imprimir o guardar este dictamen formal en PDF?</strong> Cumple con todos los requisitos de Arial 12pt, márgenes de 2.5 cm y escala de grises para autoridades sanitarias y jurados de feria de ciencias.</p>
+      <button type="button" onclick="window.print()" style="font-family: Arial; font-size: 13pt; font-weight: bold; padding: 12px 32px; background: #000000; color: #ffffff; border: 0; border-radius: 4px; cursor: pointer;">
+        🖨️ Imprimir Dictamen Formal Completo (A4 / Carta)
+      </button>
+    </div>
 
     <!-- Bloque de Firmas Formales -->
     <div class="bloque-firmas">

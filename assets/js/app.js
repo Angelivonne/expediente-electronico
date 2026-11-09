@@ -1606,9 +1606,13 @@ function iniciarDictado(raiz) {
     texto.textContent = datos.texto || '';
     texto.scrollTop = texto.scrollHeight;
     const usados = new Set();
+    let ultimoCampoModificado = null;
     Object.entries(datos.campos || {}).forEach(([nombre, valor]) => {
       if (nombre === 'diagnostico' && !form.elements['diagnostico']) {
-        llenarDiagnostico(String(valor || ''));
+        if (llenarDiagnostico(String(valor || ''))) {
+          const ultimoDiag = [...form.querySelectorAll('[name="diagnostico[]"]')].pop();
+          if (ultimoDiag) ultimoCampoModificado = ultimoDiag;
+        }
         return;
       }
       const campo = campoDe(nombre);
@@ -1621,15 +1625,30 @@ function iniciarDictado(raiz) {
       void contenedor?.offsetWidth;
       contenedor?.classList.add('campo--dictado');
       llenados.add(nombre);
+      ultimoCampoModificado = campo;
     });
-    if (Array.isArray(datos.medicamentos) && datos.medicamentos.length) llenarMedicamentos(datos.medicamentos);
+    if (Array.isArray(datos.medicamentos) && datos.medicamentos.length) {
+      llenarMedicamentos(datos.medicamentos);
+      const ultimoMed = [...form.querySelectorAll('[name="medicamento[]"]')].pop();
+      if (ultimoMed) ultimoCampoModificado = ultimoMed;
+    }
+    // Desplazamiento automatico suave hacia el campo en transcripcion cuando hay espacio
+    if (ultimoCampoModificado) {
+      try {
+        const caja = ultimoCampoModificado.getBoundingClientRect();
+        const fueraDeVista = caja.top < 80 || caja.bottom > window.innerHeight - 80;
+        if (fueraDeVista) {
+          ultimoCampoModificado.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } catch (e) {}
+    }
     const claves = Object.keys(datos.campos || {});
     const hayCasilla = claves.some((nombre) => nombre === 'diagnostico'
       ? !!form.querySelector('[name="diagnostico[]"]')
       : !!campoDe(nombre));
     pintarAvisos(datos.avisos);
     if (claves.length && !hayCasilla) {
-      mostrarErrorDictado('Se transcribiÃ³ el audio, pero este formulario no tiene una casilla compatible. Revisa el texto.', false);
+      mostrarErrorDictado('Se transcribió el audio, pero este formulario no tiene una casilla compatible. Revisa el texto.', false);
     }
     actualizarBurbuja(texto.textContent);
   };

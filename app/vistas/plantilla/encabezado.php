@@ -134,6 +134,9 @@ if (!$paginaActual) {
       <?php if (puede('agenda')): ?>
         <a class="boton-icono<?= $seccionActiva === 'agenda' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/agenda/" title="Agenda"><?= iconoRelleno('calendario') ?></a>
       <?php endif; ?>
+      <?php if (($usuario['rol'] ?? '') !== 'paciente'): ?>
+        <button type="button" class="boton-icono<?= $seccionActiva === 'equipo' ? ' activo' : '' ?>" data-equipo-abrir aria-haspopup="dialog" aria-expanded="false" aria-controls="equipo-panel" title="Personas" aria-label="Personas"><?= iconoRelleno('usuarios') ?></button>
+      <?php endif; ?>
       <!-- Notificaciones: assets/js/modulos/notificaciones.js abre la bandeja y mantiene el punto de "sin leer" -->
       <button type="button" class="boton-icono campana" data-notificaciones-abrir aria-haspopup="dialog" aria-expanded="false" title="Notificaciones"><svg class="ir ir--campana" viewBox="0 0 24 24" aria-hidden="true"><g class="a-campana"><rect class="m" x="10.9" y="1.6" width="2.2" height="2.6" rx="1.1"/><path class="b" d="M12 3.2a6 6 0 0 0-6 6v3.4l-1.5 2.5a1.2 1.2 0 0 0 1 1.9h13a1.2 1.2 0 0 0 1-1.9L18 12.6V9.2a6 6 0 0 0-6-6z"/></g><path class="d a-badajo" d="M9.5 18.2h5a2.5 2.5 0 0 1-5 0z"/></svg><span class="campana__punto" data-notificaciones-punto hidden></span></button>
     </div>
@@ -141,6 +144,8 @@ if (!$paginaActual) {
     <!-- Cada sección se pliega con su título (se recuerda en este navegador) -->
     <div class="barra-lateral__desplazable">
       <script type="application/json" id="arbol-paginas"><?= json_encode($arbol, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
+
+      <a class="lateral-enlace<?= $seccionActiva === 'tablero' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/tablero/"<?= $seccionActiva === 'tablero' ? ' aria-current="page"' : '' ?>><?= icono('grafica') ?><span>Tablero</span></a>
 
       <?php if (puede('agenda')): $proximas = proximasCitas((int) $usuario['id'], 4); ?>
         <div class="lateral-seccion" data-plegable="eventos">
@@ -185,6 +190,11 @@ if (!$paginaActual) {
         </div>
         <div class="lateral-seccion__contenido">
           <a class="lateral-enlace<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/"<?= $enListado ? ' aria-current="page"' : '' ?>><?= iconoRelleno('usuarios') ?><span>Pacientes</span></a>
+          <a class="lateral-enlace<?= $seccionActiva === 'camillas' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/camillas/"<?= $seccionActiva === 'camillas' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('clinico') ?><span>Camillas y Hospitalización</span></a>
+          <a class="lateral-enlace<?= $seccionActiva === 'datos' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/datos.php"<?= $seccionActiva === 'datos' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('grafica') ?><span>Datos y Morbilidad</span></a>
+        <?php if (puede('conexiones') || puede('configurar')): ?>
+          <a class="lateral-enlace<?= $seccionActiva === 'conexiones' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/conexiones/"<?= $seccionActiva === 'conexiones' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('usuarios') ?><span>Conexiones con clínicas</span></a>
+        <?php endif; ?>
         </div>
       </div>
 
@@ -331,7 +341,7 @@ if (!$paginaActual) {
             <button type="button" role="menuitem" data-pestanas-nueva><?= icono('agregar') ?> Nueva pestaña</button>
             <button type="button" role="menuitem" data-imprimir><?= icono('documento') ?> Imprimir</button>
             <button type="button" role="menuitem" data-exportar><?= icono('pdf') ?> Exportar</button>
-            <button type="button" role="menuitem" onclick="window.location.href='<?= URL_BASE ?>/pacientes/datos.php'"><?= icono('barras') ?> Datos</button>
+            <a class="menu-mas__opcion" href="<?= URL_BASE ?>/pacientes/datos.php" role="menuitem" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; color: inherit; text-decoration: none; border-radius: var(--radio); font: inherit;"><?= icono('barras') ?> Datos y Morbilidad</a>
           </div>
         </div>
       </div>
