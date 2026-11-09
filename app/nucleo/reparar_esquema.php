@@ -64,13 +64,22 @@ function repararColumnaFaltante(string $tabla, string $columna, string $definici
     try {
         db()->exec("ALTER TABLE `$tabla` ADD COLUMN $definicion");
         // Forzar recarga de caché para que el nuevo estado sea visible en esta ejecución
-        columnaExiste($tabla, $columna, true);
-        error_log('[reparar_esquema] añadido ' . $tabla . '.' . $columna);
+        $confirmar = columnaExiste($tabla, $columna, true);
+        if ($confirmar) {
+            error_log('[reparar_esquema] OK añadido ' . $tabla . '.' . $columna);
+        } else {
+            // El ALTER corrió sin excepción pero la columna sigue sin aparecer — loguear como fallo crítico
+            error_log('[reparar_esquema] CRITICO: ALTER TABLE corrió sin error pero columna sigue faltando: ' . $tabla . '.' . $columna);
+        }
     } catch (Throwable $e) {
         $msg = $e->getMessage();
-        if (stripos($msg, 'Duplicate column') === false && stripos($msg, 'already exists') === false) {
-            error_log('[reparar_esquema] fallo ' . $tabla . '.' . $columna . ': ' . $msg);
+        // Si ya existe la columna por alguna condición de carrera, ignorar silenciosamente
+        if (stripos($msg, 'Duplicate column') !== false || stripos($msg, 'already exists') !== false) {
+            columnaExiste($tabla, $columna, true); // forzar recarga de caché
+            return;
         }
+        // Cualquier otro fallo lo logueamos con prominencia para no perderlo
+        error_log('[reparar_esquema] ERROR ALTER TABLE `' . $tabla . '` ADD COLUMN ' . $columna . ': ' . $msg);
     }
 }
 
@@ -229,6 +238,7 @@ try {
 }
 
 // 1. Lista de tablas que requieren institucion_id
+// IMPORTANTE: si añades una nueva tabla con institucion_id, agrégala aquí también.
 $tablasConInstitucion = [
     'usuarios', 'pacientes', 'historial_clinico', 'paginas', 'pagina_filas', 'citas',
     'conversiones', 'invitaciones', 'sincronizacion_cola', 'bitacora',

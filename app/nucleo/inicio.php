@@ -47,7 +47,12 @@ if (!usuarioActual() && (defined('ACCESO_AUTOMATICO') && ACCESO_AUTOMATICO) && !
 // En cada petición se confirma que la cuenta sigue activa y se toma su rol actual:
 // si el administrador la desactiva o le cambia el rol, la sesión abierta lo refleja de inmediato.
 if (usuarioActual()) {
-    $vigente = db()->prepare('SELECT nombre, rol, foto, paciente_id, institucion_id FROM usuarios WHERE id = ? AND activo = 1');
+    // Defensivo: solo pedir institucion_id si la columna ya existe (evita crash en BD sin migrar)
+    $colsUsuario = 'nombre, rol, foto, paciente_id';
+    if (function_exists('columnaExiste') && columnaExiste('usuarios', 'institucion_id')) {
+        $colsUsuario .= ', institucion_id';
+    }
+    $vigente = db()->prepare("SELECT {$colsUsuario} FROM usuarios WHERE id = ? AND activo = 1");
     $vigente->execute([usuarioActual()['id']]);
     $cuenta = $vigente->fetch();
     if (!$cuenta) {
@@ -57,8 +62,8 @@ if (usuarioActual()) {
         $_SESSION['usuario']['rol']    = $cuenta['rol'];
         $_SESSION['usuario']['nombre'] = $cuenta['nombre'];
         $_SESSION['usuario']['foto']   = $cuenta['foto'];
-        $_SESSION['usuario']['paciente_id'] = $cuenta['paciente_id'] !== null ? (int) $cuenta['paciente_id'] : null;
-        $_SESSION['usuario']['institucion_id'] = $cuenta['institucion_id'] !== null ? (int) $cuenta['institucion_id'] : null;
+        $_SESSION['usuario']['paciente_id'] = isset($cuenta['paciente_id']) && $cuenta['paciente_id'] !== null ? (int) $cuenta['paciente_id'] : null;
+        $_SESSION['usuario']['institucion_id'] = isset($cuenta['institucion_id']) && $cuenta['institucion_id'] !== null ? (int) $cuenta['institucion_id'] : null;
     }
 }
 

@@ -51,10 +51,6 @@ $tabla = [
 </div>
 
 <?php require __DIR__ . '/_nav.php'; ?>
-<div class="finanzas__accion">
-  <a class="boton boton--primario" href="<?= URL_BASE ?>/finanzas/nuevo.php"><?= icono('agregar') ?> Nuevo movimiento</a>
-  
-</div>
 
 <dl class="finanzas__resumen" aria-label="Resumen del mes">
   <div><dt>Ingresos registrados</dt><dd><?= e($dinero($ingresos)) ?>
@@ -73,6 +69,8 @@ $tabla = [
     <h2 class="bd__titulo">Movimientos registrados</h2>
     <div class="bd__herramientas">
       <button type="button" class="boton-icono" data-abrir-busqueda title="Buscar movimientos" aria-label="Buscar movimientos"><?= icono('buscar') ?></button>
+      <a class="boton-icono" href="<?= URL_BASE ?>/api/motor/exportar.php?entidad=finanzas_movimientos" title="Exportar movimientos" aria-label="Exportar movimientos"><?= icono('tabla') ?></a>
+      <a class="boton boton--primario bd__nuevo" href="<?= URL_BASE ?>/finanzas/nuevo.php"><?= icono('agregar') ?> Nuevo movimiento</a>
     </div>
   </div>
 <?php if ($busqueda !== ''): ?>
