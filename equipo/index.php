@@ -6,16 +6,13 @@
 require_once __DIR__ . '/../app/nucleo/inicio.php';
 require_once __DIR__ . '/../app/servicios/clinica/equipo.php';
 
-// El perfil y el listado son de uso interno del equipo; la comunidad de pacientes no los ve.
-if (usuarioActual()['rol'] === 'paciente') {
-    mensajeFlash('error', 'Los perfiles del personal no están disponibles para el portal del paciente.');
-    redirigir('/');
-}
+exigirPermiso('ver_expediente');
 
 $tituloPagina = 'Personas';
 $seccionActiva = 'equipo';
 $migas = [['texto' => 'Inicio', 'url' => URL_BASE . '/pacientes/'], ['texto' => 'Personas']];
-$claseContenido = 'pagina--expediente equipo-inicio';
+$claseContenido = 'pagina--ancha equipo-inicio';
+$mostrarBanner = false;
 $paginas = personalEquipo();
 $yo = (int) usuarioActual()['id'];
 $deRol = fn (string $rol): array => ROLES[$rol] ?? ['nombre' => $rol, 'descripcion' => ''];
@@ -30,6 +27,30 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
   <?php endif; ?>
 </header>
 
+<section class="equipo__actividad" data-equipo-actividad aria-label="Actividad del equipo">
+  <div class="equipo__actividad-pestanas" role="tablist" aria-label="Actividad de personas">
+    <button type="button" role="tab" aria-selected="true" data-equipo-vista="notificaciones">Notificaciones</button>
+    <button type="button" role="tab" aria-selected="false" data-equipo-vista="estadisticas">Estadísticas</button>
+  </div>
+  <div class="equipo__actividad-filtros" data-equipo-filtros>
+    <label><span class="sr-only">Buscar persona</span><input type="search" data-equipo-actividad-buscar placeholder="Buscar persona" autocomplete="off"></label>
+    <label><span class="sr-only">Periodo de actividad</span>
+      <select data-equipo-actividad-periodo>
+        <option value="24h">24 horas</option>
+        <option value="7d">7 días</option>
+        <option value="30d" selected>30 días</option>
+        <option value="90d">90 días</option>
+        <option value="todo">Todo</option>
+      </select>
+    </label>
+  </div>
+  <div class="equipo__actividad-contenido" data-equipo-actividad-contenido role="tabpanel" aria-live="polite">
+    <p class="equipo__actividad-cargando">Cargando actividad…</p>
+  </div>
+</section>
+
+<section class="equipo__directorio" aria-labelledby="equipo-directorio-titulo">
+  <h2 id="equipo-directorio-titulo">Directorio del equipo</h2>
 <ul class="equipo__lista" data-equipo-lista>
   <?php if (!$paginas): ?>
     <li class="equipo__vacio">Sin personas.</li>
@@ -54,6 +75,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     </li>
   <?php endforeach; ?>
 </ul>
+</section>
 
 <?php
 require __DIR__ . '/../app/vistas/plantilla/pie.php';

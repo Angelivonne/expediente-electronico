@@ -39,7 +39,6 @@ function configurarErrores(): void
             echo '<!DOCTYPE html><meta charset="utf-8"><title>Error</title>'
                . '<body style="background:#111;color:#e3e3e3;font-family:system-ui;padding:48px">'
                . '<h1 style="font-size:20px">Ocurrió un error interno</h1>'
-               . '<p style="color:#9b9b9b">' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</p>'
                . '<p style="color:#9b9b9b">Se registró para revisarlo. Vuelve a intentarlo en unos momentos.</p></body>';
         }
     });
@@ -75,7 +74,7 @@ function enviarCabecerasSeguridad(): void
 function iniciarSesionSegura(): void
 {
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] ?? '') === '443';
-    session_name('femeci_sesion');
+    session_name('clinica_sesion');
     session_start([
         'cookie_httponly' => true,
         'cookie_path'     => URL_BASE . '/',
@@ -146,6 +145,8 @@ const PERMISOS = [
     'historial'        => ['administrador', 'medico'],
     'asistente'        => ['administrador', 'medico', 'enfermeria'],
     'agenda'           => ['administrador', 'medico', 'enfermeria', 'recepcion'],
+    'flujo_clinico'    => ['administrador', 'medico', 'enfermeria', 'recepcion'],
+    'gestionar_cirugia' => ['administrador', 'medico', 'enfermeria'],
     'configurar'       => ['administrador'],
     'importar_exportar' => ['administrador', 'medico'],
     'finanzas'         => ['administrador', 'medico', 'recepcion'],
@@ -157,6 +158,8 @@ const DESCRIPCION_PERMISOS = [
     'editar_paciente' => 'Registrar pacientes y actualizar su ficha de identificación',
     'historial'       => 'Agregar notas, recetas, hospitalizaciones, estudios y consentimientos al historial clínico',
     'agenda'          => 'Agendar, mover y cancelar citas',
+    'flujo_clinico' => 'Mover pacientes entre etapas operativas de atención',
+    'gestionar_cirugia' => 'Administrar la agenda y los estados operativos de cirugía',
     'asistente'       => 'Usar el asistente de IA',
     'configurar'      => 'Invitar personas, aprobar cuentas, asignar roles y configurar el sistema',
     'importar_exportar' => 'Importar y exportar bases de datos (pacientes y bases del espacio de trabajo)',

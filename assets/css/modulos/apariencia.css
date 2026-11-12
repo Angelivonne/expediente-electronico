@@ -1,0 +1,103 @@
+html[data-tema="claro"] {
+  --bg: #f5f7fa;
+  --bg-elevado: #ffffff;
+  --bg-hover: #edf1f6;
+  --bg-boton: #edf1f6;
+  --bg-lateral: #f0f3f7;
+  --bg-tarjeta: #ffffff;
+  --borde: #e0e5ec;
+  --borde-fuerte: #cbd3df;
+  --linea-campo: #8d99aa;
+  --texto: #263244;
+  --texto-etiqueta: #475569;
+  --texto-fuerte: #111827;
+  --texto-suave: #596579;
+  --texto-tenue: #707c8f;
+  --primario: #1769aa;
+  --primario-hover: #12578f;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  html[data-tema="sistema"] {
+    --bg: #f5f7fa;
+    --bg-elevado: #ffffff;
+    --bg-hover: #edf1f6;
+    --bg-boton: #edf1f6;
+    --bg-lateral: #f0f3f7;
+    --bg-tarjeta: #ffffff;
+    --borde: #e0e5ec;
+    --borde-fuerte: #cbd3df;
+    --linea-campo: #8d99aa;
+    --texto: #263244;
+    --texto-etiqueta: #475569;
+    --texto-fuerte: #111827;
+    --texto-suave: #596579;
+    --texto-tenue: #707c8f;
+    --primario: #1769aa;
+    --primario-hover: #12578f;
+  }
+}
+
+html[data-tema="claro"] body { background: var(--bg); color: var(--texto); }
+
+html[data-tema="claro"] .barra-lateral,
+html[data-tema="claro"] .contenido,
+html[data-tema="claro"] .contenido__pagina,
+html[data-tema="claro"] .bd,
+html[data-tema="claro"] .configuracion,
+html[data-tema="claro"] .panel-lateral,
+html[data-tema="claro"] .modal {
+  background-color: var(--bg-elevado);
+  color: var(--texto);
+  border-color: var(--borde);
+}
+
+html[data-tema="claro"] .lateral-enlace:hover,
+html[data-tema="claro"] .lateral-enlace.activo,
+html[data-tema="claro"] .boton-icono:hover,
+html[data-tema="claro"] .bd-tabla tbody tr:hover { background-color: var(--bg-hover); }
+
+html[data-tema="claro"] input,
+html[data-tema="claro"] select,
+html[data-tema="claro"] textarea {
+  color: var(--texto);
+  background-color: var(--bg-elevado);
+  border-color: var(--borde-fuerte);
+}
+
+html[data-tema="claro"] .bd-tabla th,
+html[data-tema="claro"] .bd-tabla td { border-color: var(--borde); }
+
+@media (prefers-color-scheme: light) {
+  html[data-tema="sistema"] body { background: var(--bg); color: var(--texto); }
+  html[data-tema="sistema"] .barra-lateral,
+  html[data-tema="sistema"] .contenido,
+  html[data-tema="sistema"] .contenido__pagina,
+  html[data-tema="sistema"] .bd,
+  html[data-tema="sistema"] .configuracion,
+  html[data-tema="sistema"] .panel-lateral,
+  html[data-tema="sistema"] .modal {
+    background-color: var(--bg-elevado);
+    color: var(--texto);
+    border-color: var(--borde);
+  }
+  html[data-tema="sistema"] .lateral-enlace:hover,
+  html[data-tema="sistema"] .lateral-enlace.activo,
+  html[data-tema="sistema"] .boton-icono:hover,
+  html[data-tema="sistema"] .bd-tabla tbody tr:hover { background-color: var(--bg-hover); }
+  html[data-tema="sistema"] input,
+  html[data-tema="sistema"] select,
+  html[data-tema="sistema"] textarea {
+    color: var(--texto);
+    background-color: var(--bg-elevado);
+    border-color: var(--borde-fuerte);
+  }
+  html[data-tema="sistema"] .bd-tabla th,
+  html[data-tema="sistema"] .bd-tabla td { border-color: var(--borde); }
+}
+
+html[data-tamano-texto="grande"] { --fs-base: 1rem; --fs-sm: 0.9375rem; --fs-xs: 0.875rem; }
+html[data-densidad="compacta"] .bd-tabla th,
+html[data-densidad="compacta"] .bd-tabla td { padding-block: 5px; }
+html[data-densidad="compacta"] .lateral-enlace { min-height: 30px; }

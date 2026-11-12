@@ -184,7 +184,7 @@ if ($en) {
     $c = $pdo->prepare("SELECT valor FROM configuracion WHERE institucion_id = ? AND clave = 'demo_pacientes'");
     $c->execute([$en]);
     if ($c->fetchColumn()) {
-        exit("Esa clínica ya tiene los pacientes ficticios. Usa «eliminar --en=$en» antes de volver a crearlos.\n");
+        exit("Esa clínica ya tiene los pacientes ficticios. Usa «eliminar --en={$en}» antes de volver a crearlos.\n");
     }
     $c = $pdo->prepare("SELECT u.id, u.nombre, u.cedula_profesional, i.nombre AS clinica FROM usuarios u JOIN instituciones i ON i.id = u.institucion_id
                          WHERE u.institucion_id = ? AND u.rol = 'administrador' AND u.activo = 1 ORDER BY u.id LIMIT 1");

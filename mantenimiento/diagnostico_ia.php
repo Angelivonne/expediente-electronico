@@ -8,7 +8,7 @@ require_once __DIR__ . '/../app/nucleo/institucion.php';
 require_once __DIR__ . '/../app/servicios/ia/asistente.php';
 
 $token = $_GET['token'] ?? '';
-if ($token !== 'seeder100femeci' && PHP_SAPI !== 'cli') {
+if ($token !== 'seeder100Clínica' && PHP_SAPI !== 'cli') {
     http_response_code(403);
     die("Acceso denegado");
 }

@@ -94,6 +94,7 @@ function completarAcceso(array $usuario): void
     session_regenerate_id(true);
     $_SESSION['usuario']    = ['id' => (int) $usuario['id'], 'nombre' => $usuario['nombre'], 'rol' => $usuario['rol']];
     $_SESSION['inicio']     = time();
+    $_SESSION['sesion_anuncio'] = bin2hex(random_bytes(16));
     $_SESSION['regenerada'] = time();
     $_SESSION['ultimo_uso'] = time();
     registrarBitacora('usuarios', (int) $usuario['id'], 'acceso');

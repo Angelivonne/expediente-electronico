@@ -54,7 +54,7 @@ $stmtInst = $pdo->prepare("SELECT * FROM instituciones WHERE id = ?");
 $stmtInst->execute([$institucionId]);
 $institucion = $stmtInst->fetch(PDO::FETCH_ASSOC) ?: [];
 
-$nombreEstablecimiento = $prescriptor['establecimiento'] ?? ($institucion['nombre'] ?? config('nombre_establecimiento') ?: 'Expediente FEMECI');
+$nombreEstablecimiento = $prescriptor['establecimiento'] ?? ($institucion['nombre'] ?? config('nombre_establecimiento') ?: 'Establecimiento de salud');
 $domicilioEstablecimiento = $prescriptor['domicilio'] ?? ($institucion['domicilio'] ?? config('domicilio_establecimiento') ?: '');
 $telefonoEstablecimiento = $institucion['telefono'] ?? config('telefono_establecimiento') ?: '';
 $cluesEstablecimiento = $institucion['clues'] ?? '';

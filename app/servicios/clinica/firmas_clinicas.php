@@ -23,6 +23,35 @@ function huellaRegistroClinico(array $registro): string
     return hash('sha256', json_encode($canonico, JSON_UNESCAPED_UNICODE));
 }
 
+/** Huella estable para datos JSON, sin depender del orden de claves que usa MySQL al persistirlos. */
+function huellaDatosTranscripcion(mixed $datos): string
+{
+    $ordenar = static function (mixed $valor) use (&$ordenar): mixed {
+        if (is_object($valor)) {
+            $propiedades = get_object_vars($valor);
+            ksort($propiedades, SORT_STRING);
+            foreach ($propiedades as $clave => $contenido) {
+                $propiedades[$clave] = $ordenar($contenido);
+            }
+            return (object) $propiedades;
+        }
+        if (is_array($valor)) {
+            foreach ($valor as $indice => $contenido) {
+                $valor[$indice] = $ordenar($contenido);
+            }
+            if (!array_is_list($valor)) {
+                ksort($valor, SORT_STRING);
+            }
+        }
+        return $valor;
+    };
+    $json = json_encode($ordenar($datos), JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        throw new RuntimeException('No se pudieron calcular las huellas de la transcripción.');
+    }
+    return hash('sha256', $json);
+}
+
 /** Firma vigente de una entrada (o null). */
 function firmaDeRegistroClinico(int $historialId): ?array
 {

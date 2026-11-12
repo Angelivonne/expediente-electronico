@@ -48,7 +48,9 @@ $cuentaOError = function () use ($entrada, $yo, $pdo): array {
     if ($id === (int) $yo['id']) {
         responder(400, ['ok' => false, 'error' => 'No puedes cambiar tu propia cuenta desde aquí.']);
     }
-    $c = $pdo->prepare("SELECT id, nombre, correo, rol, activo FROM usuarios WHERE id = ? AND institucion_id = ? AND rol <> 'paciente'");
+    $c = $pdo->prepare("SELECT id, nombre, correo, rol, activo FROM usuarios
+                         WHERE id = ? AND institucion_id = ? AND rol <> 'paciente'
+                           AND correo NOT LIKE 'retirada+%@cuentas.invalid'");
     $c->execute([$id, institucionId()]);
     return $c->fetch() ?: responder(404, ['ok' => false, 'error' => 'La cuenta no existe.']);
 };

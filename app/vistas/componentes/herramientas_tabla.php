@@ -102,3 +102,24 @@ if ($solo === 'grupos') {
     </div>
   </form>
 </details>
+<details class="vistas-tabla" data-vistas-tabla data-entidad="<?= e((string) ($herramientas['clave'] ?? '')) ?>" data-url="<?= e(URL_BASE . '/api/tablas/vistas.php') ?>">
+  <summary class="boton-icono" title="Vistas guardadas y columnas" aria-label="Vistas guardadas y columnas"><?= icono('tabla') ?></summary>
+  <div class="vistas-tabla__panel">
+    <label>Vista guardada
+      <select data-vistas-select><option value="">Selecciona una vista</option></select>
+    </label>
+    <div class="vistas-tabla__acciones">
+      <button type="button" class="boton boton--secundario" data-vistas-aplicar>Aplicar</button>
+      <button type="button" class="boton boton--secundario" data-vistas-eliminar>Eliminar</button>
+    </div>
+    <details class="vistas-tabla__columnas">
+      <summary>Mostrar u ocultar columnas</summary>
+      <div data-vistas-columnas></div>
+    </details>
+    <label>Guardar vista
+      <input type="text" maxlength="80" placeholder="Ej. Consultas de hoy" data-vistas-nombre>
+    </label>
+    <button type="button" class="boton boton--primario" data-vistas-guardar>Guardar</button>
+    <p data-vistas-mensaje role="status" aria-live="polite"></p>
+  </div>
+</details>

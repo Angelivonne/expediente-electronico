@@ -14,6 +14,7 @@ function seccionesConfiguracion(): array
     $u = usuarioActual();
     $s = [
         ['Cuenta', 'cuenta', $u['nombre'], 'usuario', '/configuracion/'],
+        ['Cuenta', 'apariencia', 'Apariencia', 'aa', '/configuracion/?s=apariencia'],
         ['Cuenta', 'notificaciones', 'Notificaciones', 'campana', '/configuracion/?s=notificaciones'],
         ['Cuenta', 'memoria', 'Memoria de la IA', 'chispa', '/configuracion/?s=memoria'],
     ];
@@ -22,6 +23,7 @@ function seccionesConfiguracion(): array
             ['Clínica', 'clinica', 'General', 'casa', '/configuracion/?s=clinica'],
             ['Clínica', 'personas', 'Personas y permisos', 'usuarios', '/configuracion/personas.php'],
             ['Clínica', 'formatos', 'Importar y formatos', 'tabla', '/configuracion/?s=formatos'],
+            ['Clínica', 'flujo', 'Etapas de atención', 'flujo', '/configuracion/?s=flujo'],
         );
         if (puedeAdministrarRespaldos()) {
             array_push($s, ['Clínica', 'respaldos', 'Respaldos', 'carpeta', '/configuracion/respaldos.php'], ['Clínica', 'correo', 'Correo', 'correo', '/configuracion/correo.php']);

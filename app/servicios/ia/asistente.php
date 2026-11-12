@@ -84,7 +84,7 @@ function modelosDisponibles(string $proveedor, string $url, string $clave): arra
         $cabeceras = array_filter([$clave ? 'Authorization: Bearer ' . $clave : null]);
         if (str_contains($url, 'openrouter.ai')) {
             $cabeceras[] = 'HTTP-Referer: https://web-production-cdeee.up.railway.app';
-            $cabeceras[] = 'X-Title: FEMECI Expediente Electronico';
+            $cabeceras[] = 'X-Title: Expediente Clinico';
         }
         $curl = curl_init(rtrim($url, '/') . '/models');
         curl_setopt_array($curl, [
@@ -195,28 +195,23 @@ function transmitirAsistente(array $cfg, string $sistema, array $mensajes, strin
     if ($cfg['proveedor'] === 'anthropic') {
         transmitirAnthropic($cfg, $sistema, $mensajes, $esfuerzo, $emitir, $herramientas, $ejecutar);
     } else {
-        transmitirCompatibleOpenAI($cfg, $sistema, $mensajes, $emitir, $herramientas, $ejecutar);
+        transmitirCompatibleOpenAI($cfg, $sistema, $mensajes, $esfuerzo, $emitir, $herramientas, $ejecutar);
     }
 }
 
 function transmitirAnthropic(array $cfg, string $sistema, array $mensajes, string $esfuerzo, callable $emitir, array $herramientas = [], ?callable $ejecutar = null): void
 {
-    $cliente  = new ClienteAnthropic(apiKey: $cfg['clave']);
-    $opciones = [
-        'maxTokens' => 64000,
-        'model'     => $cfg['modelo'],
-        'system'    => $sistema,
-        // Si el modelo declina por políticas, el servidor reintenta con su respaldo predeterminado
-        'betas'     => ['server-side-fallback-2026-07-01'],
-        'fallbacks' => 'default',
-    ];
+    $cliente     = new ClienteAnthropic(apiKey: $cfg['clave']);
+    $pensamiento = null;
+    $salida      = null;
+    $tools       = null;
     if (claudeConRazonamientoAdaptativo($cfg['modelo'])) {
         // Razonamiento adaptativo; "summarized" devuelve un resumen legible para la herramienta de pensamiento
-        $opciones['thinking']     = ['type' => 'adaptive', 'display' => 'summarized'];
-        $opciones['outputConfig'] = ['effort' => $esfuerzo];
+        $pensamiento = ['type' => 'adaptive', 'display' => 'summarized'];
+        $salida      = ['effort' => $esfuerzo];
     }
     if ($herramientas && $ejecutar) {
-        $opciones['tools'] = herramientasAnthropic($herramientas);
+        $tools = herramientasAnthropic($herramientas);
     }
 
     try {
@@ -224,7 +219,18 @@ function transmitirAnthropic(array $cfg, string $sistema, array $mensajes, strin
             // El acumulador del SDK arma el mensaje completo (incluidos los bloques de razonamiento firmados
             // y las llamadas a herramientas) para devolverlo tal cual en la siguiente ronda
             $acumulador = MessageAccumulator::forBetaMessages();
-            $flujo = $cliente->beta->messages->createStream(...$opciones, messages: $mensajes);
+            $flujo = $cliente->beta->messages->createStream(
+                maxTokens: 64000,
+                messages: $mensajes,
+                model: $cfg['modelo'],
+                system: $sistema,
+                // Si el modelo declina por políticas, el servidor reintenta con su respaldo predeterminado
+                betas: ['server-side-fallback-2026-07-01'],
+                fallbacks: 'default',
+                thinking: $pensamiento,
+                outputConfig: $salida,
+                tools: $tools,
+            );
             foreach ($flujo as $evento) {
                 $acumulador->accumulate($evento);
                 if ($evento instanceof BetaRawContentBlockDeltaEvent) {
@@ -267,11 +273,11 @@ function transmitirAnthropic(array $cfg, string $sistema, array $mensajes, strin
     }
 }
 
-function transmitirCompatibleOpenAI(array $cfg, string $sistema, array $mensajes, callable $emitir, array $herramientas = [], ?callable $ejecutar = null): void
+function transmitirCompatibleOpenAI(array $cfg, string $sistema, array $mensajes, string $esfuerzo, callable $emitir, array $herramientas = [], ?callable $ejecutar = null): void
 {
     $historial = array_merge([['role' => 'system', 'content' => $sistema]], $mensajes);
     for ($vuelta = 0; $vuelta < IA_VUELTAS_MAXIMAS; $vuelta++) {
-        $turno = turnoCompatibleOpenAI($cfg, $historial, $emitir, $herramientas && $ejecutar ? herramientasOpenAI($herramientas) : []);
+        $turno = turnoCompatibleOpenAI($cfg, $historial, $emitir, $herramientas && $ejecutar ? herramientasOpenAI($herramientas) : [], $esfuerzo);
         if ($turno === null || !$turno['llamadas'] || !$ejecutar) {
             return;
         }
@@ -312,23 +318,32 @@ function resultadoParaCompatibles(string $resultado): string
     return json_encode($convertir($datos), JSON_UNESCAPED_UNICODE);
 }
 
+/** Incorpora un fragmento SSE de tool_calls, cuyos campos pueden llegar repartidos entre deltas. */
+function acumularLlamadaCompatibleOpenAI(array &$llamadas, array $parcial): void
+{
+    $indice = max(0, (int) ($parcial['index'] ?? 0));
+    $llamadas[$indice] ??= ['id' => '', 'nombre' => '', 'argumentos' => ''];
+    $llamadas[$indice]['id'] .= (string) ($parcial['id'] ?? '');
+    $llamadas[$indice]['nombre'] .= (string) ($parcial['function']['name'] ?? '');
+    $llamadas[$indice]['argumentos'] .= (string) ($parcial['function']['arguments'] ?? '');
+}
+
 /**
  * Una ronda con una API compatible con OpenAI (streaming SSE). Devuelve el texto y las llamadas
  * a herramientas que pidió el modelo, o null si hubo un error (ya emitido).
  */
-function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, array $herramientas): ?array
+function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, array $herramientas, string $esfuerzo): ?array
 {
     $url = rtrim($cfg['url'], '/') . '/chat/completions';
     $modelo = trim((string) $cfg['modelo']);
 
-    // Fallback inteligente para OpenRouter si se indicó un modelo inválido como "openrouter/free" o deprecado
-    if (str_contains($url, 'openrouter.ai')) {
-        if ($modelo === 'openrouter/free' || $modelo === 'free' || empty($modelo) || str_contains($modelo, ':free')) {
-            $modelo = 'qwen/qwen-2.5-72b-instruct';
-        }
-    }
-
     $peticion = ['model' => $modelo, 'messages' => $historial, 'stream' => true];
+    if (str_contains($url, 'openrouter.ai')) {
+        $peticion['include_reasoning'] = true;
+        $peticion['reasoning'] = ['effort' => in_array($esfuerzo, ['low', 'medium', 'high'], true) ? $esfuerzo : 'medium'];
+    } elseif (preg_match('/^(?:o[1-9](?:-|$)|gpt-5(?:[.-]|$))/i', $modelo)) {
+        $peticion['reasoning_effort'] = in_array($esfuerzo, ['low', 'medium', 'high'], true) ? $esfuerzo : 'medium';
+    }
     if ($herramientas) {
         $peticion['tools'] = $herramientas;
         $peticion['tool_choice'] = 'auto';
@@ -338,16 +353,41 @@ function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, a
     $pendiente     = '';
     $enPensamiento = false;   // modelos que razonan dentro de <think>…</think> (DeepSeek-R1, Qwen en Ollama)
     $errorCrudo    = '';
+    $errorFlujo    = null;
     $texto         = '';
     $llamadas      = [];      // por índice: id, nombre y argumentos que llegan en partes
 
+    $emitidoContenido = false;
+    $textoPendiente = '';
     // Separa <think>…</think> del texto visible aunque las etiquetas lleguen partidas entre fragmentos
-    $repartirTexto = function (string $fragmento) use (&$enPensamiento, &$texto, $emitir): void {
+    $repartirTexto = function (string $fragmento, bool $final = false) use (&$enPensamiento, &$texto, &$textoPendiente, &$emitidoContenido, $emitir): void {
+        $fragmento = $textoPendiente . $fragmento;
+        $textoPendiente = '';
         while ($fragmento !== '') {
             $etiqueta = $enPensamiento ? '</think>' : '<think>';
             $pos = strpos($fragmento, $etiqueta);
+            if ($pos === false && !$final) {
+                $sufijo = 0;
+                for ($longitud = min(strlen($etiqueta) - 1, strlen($fragmento)); $longitud > 0; $longitud--) {
+                    if (substr($fragmento, -$longitud) === substr($etiqueta, 0, $longitud)) {
+                        $sufijo = $longitud;
+                        break;
+                    }
+                }
+                $parte = $sufijo > 0 ? substr($fragmento, 0, -$sufijo) : $fragmento;
+                $textoPendiente = $sufijo > 0 ? substr($fragmento, -$sufijo) : '';
+                if ($parte !== '') {
+                    $emitidoContenido = true;
+                    $emitir($enPensamiento ? 'pensamiento' : 'texto', $parte);
+                    if (!$enPensamiento) {
+                        $texto .= $parte;
+                    }
+                }
+                return;
+            }
             $parte = $pos === false ? $fragmento : substr($fragmento, 0, $pos);
             if ($parte !== '') {
+                $emitidoContenido = true;
                 $emitir($enPensamiento ? 'pensamiento' : 'texto', $parte);
                 if (!$enPensamiento) {
                     $texto .= $parte;
@@ -363,12 +403,46 @@ function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, a
 
     // Reintentos de fallos transitorios (corte de red, proveedor saturado): solo mientras
     // no se haya pintado nada al usuario, para no duplicar texto.
-    $emitidoTexto = false;
-    $emitirMarca = function (string $tipo, string $dato) use ($emitir, &$emitidoTexto): void {
-        if ($tipo === 'texto') {
-            $emitidoTexto = true;
+    $emitirMarca = function (string $tipo, string $dato) use ($emitir, &$emitidoContenido): void {
+        if (in_array($tipo, ['texto', 'pensamiento', 'aviso', 'error'], true)) {
+            $emitidoContenido = true;
         }
         $emitir($tipo, $dato);
+    };
+
+    $procesarLinea = function (string $linea) use (&$errorFlujo, &$llamadas, $emitirMarca, $repartirTexto): void {
+        $linea = trim($linea);
+        if (!str_starts_with($linea, 'data:')) {
+            return;
+        }
+        $datos = trim(substr($linea, 5));
+        if ($datos === '' || $datos === '[DONE]') {
+            return;
+        }
+        $json = json_decode($datos, true);
+        if (!is_array($json)) {
+            return;
+        }
+        if (isset($json['error']['message'])) {
+            $errorFlujo = 'El proveedor respondió con un error: ' . mb_strimwidth((string) $json['error']['message'], 0, 240, '…');
+            return;
+        }
+        $delta = $json['choices'][0]['delta'] ?? [];
+        $razonamiento = $delta['reasoning_content'] ?? $delta['reasoning'] ?? null;
+        if (is_string($razonamiento) && $razonamiento !== '') {
+            $emitirMarca('pensamiento', $razonamiento);
+        }
+        if (isset($delta['content']) && is_string($delta['content'])) {
+            $repartirTexto($delta['content']);
+        }
+        foreach ($delta['tool_calls'] ?? [] as $parcial) {
+            if (is_array($parcial)) {
+                acumularLlamadaCompatibleOpenAI($llamadas, $parcial);
+            }
+        }
+        if (($json['choices'][0]['finish_reason'] ?? null) === 'length') {
+            $emitirMarca('aviso', 'La respuesta se cortó por longitud.');
+        }
     };
 
     $cabeceras = ['Content-Type: application/json'];
@@ -377,11 +451,19 @@ function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, a
     }
     if (str_contains($url, 'openrouter.ai')) {
         $cabeceras[] = 'HTTP-Referer: https://web-production-cdeee.up.railway.app';
-        $cabeceras[] = 'X-Title: FEMECI Expediente Clinico';
+        $cabeceras[] = 'X-Title: Expediente Clinico';
     }
 
     $intento = 0;
     while (true) {
+        // Cada reintento es una transmisión nueva: nunca mezclar tool_calls o SSE parcial.
+        $pendiente = '';
+        $enPensamiento = false;
+        $errorCrudo = '';
+        $errorFlujo = null;
+        $texto = '';
+        $textoPendiente = '';
+        $llamadas = [];
         $curl = curl_init($url);
         curl_setopt_array($curl, [
             CURLOPT_POST           => true,
@@ -391,45 +473,16 @@ function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, a
             CURLOPT_TIMEOUT        => 600,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_WRITEFUNCTION  => function ($c, string $fragmento) use (&$pendiente, &$errorCrudo, &$llamadas, $emitirMarca, $repartirTexto): int {
+            CURLOPT_WRITEFUNCTION  => function ($c, string $fragmento) use (&$pendiente, &$errorCrudo, $procesarLinea): int {
                 if (curl_getinfo($c, CURLINFO_RESPONSE_CODE) >= 400) {
                     $errorCrudo .= $fragmento;
                     return strlen($fragmento);
                 }
                 $pendiente .= $fragmento;
                 while (($fin = strpos($pendiente, "\n")) !== false) {
-                    $linea = trim(substr($pendiente, 0, $fin));
+                    $linea = substr($pendiente, 0, $fin);
                     $pendiente = substr($pendiente, $fin + 1);
-                    if (!str_starts_with($linea, 'data:')) {
-                        continue;
-                    }
-                    $datos = trim(substr($linea, 5));
-                    if ($datos === '[DONE]') {
-                        continue;
-                    }
-                    $json  = json_decode($datos, true);
-                    if (isset($json['error']['message'])) {   // error a mitad de la transmisión
-                        $emitirMarca('error', 'El proveedor respondió con un error: ' . mb_strimwidth((string) $json['error']['message'], 0, 240, '…'));
-                        continue;
-                    }
-                    $delta = $json['choices'][0]['delta'] ?? [];
-                    $razonamiento = $delta['reasoning_content'] ?? $delta['reasoning'] ?? null;
-                    if (is_string($razonamiento) && $razonamiento !== '') {
-                        $emitirMarca('pensamiento', $razonamiento);
-                    }
-                    if (isset($delta['content']) && is_string($delta['content'])) {
-                        $repartirTexto($delta['content']);
-                    }
-                    foreach ($delta['tool_calls'] ?? [] as $parcial) {
-                        $i = (int) ($parcial['index'] ?? 0);
-                        $llamadas[$i] ??= ['id' => '', 'nombre' => '', 'argumentos' => ''];
-                        $llamadas[$i]['id']         .= (string) ($parcial['id'] ?? '');
-                        $llamadas[$i]['nombre']     .= (string) ($parcial['function']['name'] ?? '');
-                        $llamadas[$i]['argumentos'] .= (string) ($parcial['function']['arguments'] ?? '');
-                    }
-                    if (($json['choices'][0]['finish_reason'] ?? null) === 'length') {
-                        $emitirMarca('aviso', 'La respuesta se cortó por longitud.');
-                    }
+                    $procesarLinea($linea);
                 }
                 return strlen($fragmento);
             },
@@ -439,12 +492,18 @@ function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, a
         $falla  = curl_error($curl);
         $errno  = curl_errno($curl);
         curl_close($curl);
+        if ($ok && $codigo < 400 && trim($pendiente) !== '') {
+            $procesarLinea($pendiente);
+        }
+        if ($ok && $codigo < 400) {
+            $repartirTexto('', true);
+        }
 
         // ¿Fallo transitorio y todavía no se ve nada en pantalla? Espera y reintenta (máx. 2 veces).
         $reintentable = !$ok
             ? in_array($errno, [6, 7, 28, 35, 56], true)
             : in_array($codigo, [429, 500, 502, 503, 504], true);
-        if ($reintentable && !$emitidoTexto && $intento < 2) {
+        if ($reintentable && !$emitidoContenido && $intento < 2) {
             $intento++;
             sleep($intento);   // 1 s y luego 2 s
             continue;
@@ -469,11 +528,17 @@ function turnoCompatibleOpenAI(array $cfg, array $historial, callable $emitir, a
         }
         break;
     }
-    $llamadas = array_values(array_filter($llamadas, fn ($l) => $l['nombre'] !== ''));
-    foreach ($llamadas as $i => &$l) {
-        $l['id'] = $l['id'] !== '' ? $l['id'] : 'llamada_' . $i;
+    if ($errorFlujo !== null) {
+        $emitir('error', $errorFlujo);
+        return null;
     }
-    unset($l);
+    $llamadas = array_values(array_filter($llamadas, fn ($l) => $l['nombre'] !== ''));
+    foreach ($llamadas as $i => $llamada) {
+        $llamadas[$i]['id'] = $llamada['id'] !== '' ? $llamada['id'] : 'llamada_' . $i;
+    }
+    if ($texto === '' && !$llamadas) {
+        $emitir('aviso', 'El proveedor terminó sin devolver texto ni solicitar una herramienta. Intenta de nuevo o revisa que el modelo admita herramientas.');
+    }
     return ['texto' => $texto, 'llamadas' => $llamadas];
 }
 
@@ -519,12 +584,19 @@ function sistemaAsistente(): string
     - Para reportes generales usa estadisticas_pacientes (datos agregados) y muéstralos con gráficas.
 
     TRABAJO CLÍNICO (con acceso al expediente):
-    - Si te preguntan si un paciente está registrado («¿tengo a Fernando?», «¿existe alguien con CURP …?», «busca al paciente de apellido X»), responde SIEMPRE con buscar_pacientes
-      (nombre, folio o CURP); si no aparece, reintenta con la parte del nombre que tengas (ej. solo el apellido). Si sigue sin aparecer, di que no hay registros con ese criterio.
-      Nunca digas que no puedes consultar: con acceso al expediente esa búsqueda es parte de tu trabajo.
+    - Los pacientes se buscan en Expedientes > Pacientes. Cuando pidan localizar, confirmar si existe, abrir o identificar un paciente («¿tengo a Fernando?», «busca al paciente X en expedientes»,
+      «¿existe alguien con CURP …?» o «muéstrame el expediente de …»), ejecuta SIEMPRE buscar_pacientes antes de responder, aunque el nombre esté dentro de una frase conversacional.
+      Puedes pasar la frase completa: la herramienta descarta palabras de contexto, o enviar solo el nombre, apellidos, CURP o folio. Si no hay resultados, reintenta con el nombre/apellido o identificador más distintivo.
+      Solo después de que la búsqueda y el reintento devuelvan cero pacientes puedes decir que no hay coincidencias; nunca inventes que no existe ni respondas basándote en recuerdos, el mapa del espacio o la lista reciente.
+      Si la herramienta falla o el acceso está restringido, explica ese impedimento en vez de afirmar que no hay pacientes.
+    - Si preguntan por medicamentos, productos o si existe alguno en el catálogo, usa SIEMPRE buscar_medicamentos con el nombre o los términos importantes, incluso cuando los escriban en plural o acompañados de palabras como «busca», «los» o «por favor».
+      No respondas que no existen sin consultar la herramienta; si no devuelve resultados, reintenta con el nombre en singular o una parte distintiva antes de concluir.
     - Para resumir o revisar a un paciente usa revisar_expediente: trae el expediente completo y alertas calculadas (alergias contra medicamentos, datos obligatorios
       faltantes según la NOM-004, IMC, tiempo sin consulta, próximas citas). Organiza el resumen: identificación, alertas, antecedentes, padecimientos y tratamiento
       actual, evolución reciente, pendientes. Señala lo relevante primero.
+    - Si solicitan revisar tratamientos o posibles discrepancias documentales, usa revisar_trazabilidad_medicamentos después de identificar al paciente. Compara únicamente
+      lo que registran las recetas, indicaciones del Kardex y administraciones; cita fecha y fuente. Describe diferencias como señales por verificar, no concluyas que una dosis fue
+      excesiva, insegura o causó un daño, ni atribuyas culpa. No sustituye una revisión clínica ni una fuente terapéutica validada.
     - Para cambiar cualquier dato del paciente usa actualizar_paciente (solo los campos que cambian). El historial clínico no se edita: se agrega una entrada nueva.
     - agregar_historial cubre los 9 registros de la NOM-004 (consulta, urgencias, interconsulta, referencia/traslado, egreso, receta, estudio, hospitalización, consentimiento). Si la herramienta responde que faltan datos obligatorios, pregúntalos al usuario; nunca los completes por tu cuenta.
     - Para registrar pacientes acepta los datos tal como los diga el usuario (fechas dd/mm/aaaa, «mujer», «Jalisco», «O positivo»): la herramienta los normaliza. Si avisa de un posible duplicado, pregunta antes de confirmar. Para imprimir o sacar PDF usa enlace_impresion; para dar acceso al portal o invitar personal, generar_codigo_acceso; para una característica nueva del paciente (ej. una escala), agregar_propiedad_pacientes y luego actualizar_paciente con propiedades.

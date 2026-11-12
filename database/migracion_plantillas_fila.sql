@@ -1,5 +1,5 @@
 -- Plantillas de fila para bases de datos: una fila con valores predefinidos que se reutiliza.
--- Ejecutar como root una sola vez:  mysql -u root -p expediente_expediente < database/migracion_plantillas_fila.sql
+-- Ejecutar como root una sola vez:  mysql -u root -p clinica < database/migracion_plantillas_fila.sql
 
 CREATE TABLE IF NOT EXISTS plantillas_fila (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -13,5 +13,5 @@ CREATE TABLE IF NOT EXISTS plantillas_fila (
   KEY idx_pfila_pagina (pagina_id, institucion_id, creado_en)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_expediente.plantillas_fila TO 'expediente_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON clinica.plantillas_fila TO 'clinica_app'@'localhost';
 FLUSH PRIVILEGES;

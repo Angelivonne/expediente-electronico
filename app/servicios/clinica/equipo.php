@@ -14,6 +14,8 @@ function personalEquipo(): array
            FROM usuarios u
            LEFT JOIN (SELECT usuario_id, MAX(visto_en) AS presencia_en FROM presencia GROUP BY usuario_id) p ON p.usuario_id = u.id
           WHERE u.institucion_id = ? AND u.rol <> 'paciente'
+             AND (u.activo = 1 OR u.ultimo_acceso IS NULL)
+             AND u.correo NOT LIKE 'retirada+%@cuentas.invalid'
           ORDER BY en_linea DESC, (ultimo_visto IS NULL), ultimo_visto DESC, u.nombre"
     );
     $q->execute([institucionId()]);
@@ -29,7 +31,8 @@ function personaEquipo(int $id): ?array
                 (u.activo = 1 AND p.presencia_en >= NOW() - INTERVAL 60 SECOND) AS en_linea
            FROM usuarios u
            LEFT JOIN (SELECT usuario_id, MAX(visto_en) AS presencia_en FROM presencia GROUP BY usuario_id) p ON p.usuario_id = u.id
-          WHERE u.id = ? AND u.institucion_id = ? AND u.rol <> 'paciente'"
+          WHERE u.id = ? AND u.institucion_id = ? AND u.rol <> 'paciente'
+            AND u.correo NOT LIKE 'retirada+%@cuentas.invalid'"
     );
     $q->execute([$id, institucionId()]);
     $p = $q->fetch();
@@ -141,6 +144,47 @@ function actividadPersona(int $id, int $limite = 12): array
         ];
     }
     return $lista;
+}
+
+/** Cambios auditados y tiempo activo aproximado por día, para la cuadrícula del perfil del personal. */
+function actividadDiariaPersona(int $id, int $semanas = 16): array
+{
+    $semanas = max(1, min(52, $semanas));
+    $hoy = new DateTimeImmutable('today');
+    $inicio = $hoy->modify('monday this week')->modify('-' . ($semanas - 1) . ' weeks');
+    $desde = $inicio->format('Y-m-d');
+    $hasta = $hoy->modify('+1 day')->format('Y-m-d');
+
+    $q = db()->prepare(
+        "SELECT DATE(creado_en) AS dia, COUNT(*) AS total
+           FROM bitacora
+          WHERE usuario_id = ? AND institucion_id = ?
+            AND accion IN ('crear', 'actualizar', 'eliminar')
+            AND creado_en >= ? AND creado_en < ?
+          GROUP BY DATE(creado_en)"
+    );
+    $q->execute([$id, institucionId(), $desde, $hasta]);
+    $cambios = array_column($q->fetchAll(), 'total', 'dia');
+
+    $q = db()->prepare(
+        'SELECT fecha, SUM(segundos_activos) AS segundos
+           FROM equipo_tiempo_activo
+          WHERE usuario_id = ? AND institucion_id = ? AND fecha >= ? AND fecha < ?
+          GROUP BY fecha'
+    );
+    $q->execute([$id, institucionId(), $desde, $hasta]);
+    $tiempo = array_column($q->fetchAll(), 'segundos', 'fecha');
+
+    $dias = [];
+    $maximo = 0;
+    for ($i = 0; $i < $semanas * 7; $i++) {
+        $fecha = $inicio->modify("+$i days")->format('Y-m-d');
+        $total = (int) ($cambios[$fecha] ?? 0);
+        $maximo = max($maximo, $total);
+        $dias[$fecha] = ['cambios' => $total, 'segundos' => (int) ($tiempo[$fecha] ?? 0)];
+    }
+
+    return ['inicio' => $desde, 'hoy' => $hoy->format('Y-m-d'), 'semanas' => $semanas, 'dias' => $dias, 'maximo' => $maximo];
 }
 
 /** Páginas del espacio de trabajo de una persona (propias y compartidas con ella) para el bloque «Páginas de …». */

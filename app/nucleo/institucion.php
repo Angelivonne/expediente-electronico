@@ -1,6 +1,6 @@
 <?php
 /**
- * Varias instituciones en una sola base de datos (expediente_expediente).
+ * Varias instituciones en una sola base de datos (clinica).
  *
  * Cada usuario pertenece a una institución (usuarios.institucion_id) y todo lo que ve o escribe
  * se acota a ella: pacientes, historial, citas, páginas, conversiones, invitaciones, códigos de

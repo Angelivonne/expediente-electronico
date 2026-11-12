@@ -5,7 +5,7 @@
 -- Repetirlo no duplica nada (IF NOT EXISTS).
 -- ==========================================================================
 
-USE expediente_expediente;
+USE clinica;
 
 -- --------------------------------------------------------
 -- A. CATÁLOGOS CLÍNICOS

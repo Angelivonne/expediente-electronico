@@ -6,43 +6,59 @@
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/db.php';
 
-/** Cache en memoria de tablas existentes. */
+/** Cache en memoria de tablas existentes. RENDIMIENTO: carga todas las tablas de la base
+ *  en UNA sola consulta la primera vez que se pregunta por cualquier tabla. */
 function tablaExiste(string $tabla): bool
 {
-    static $cacheTablas = [];
-    if (array_key_exists($tabla, $cacheTablas)) {
-        return $cacheTablas[$tabla];
-    }
-    try {
-        $consulta = db()->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
-        $consulta->execute([$tabla]);
-        $cacheTablas[$tabla] = (bool) $consulta->fetchColumn();
-    } catch (Throwable $e) {
+    static $cacheTablas = null;
+    if ($cacheTablas === null) {
+        $cacheTablas = [];
         try {
-            $consulta = db()->query("SHOW TABLES LIKE " . db()->quote($tabla));
-            $cacheTablas[$tabla] = (bool) $consulta->fetchColumn();
-        } catch (Throwable $e2) {
-            $cacheTablas[$tabla] = false;
+            $consulta = db()->prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()");
+            $consulta->execute([]);
+            foreach ($consulta->fetchAll(PDO::FETCH_COLUMN) as $nombreTabla) {
+                $cacheTablas[strtolower((string) $nombreTabla)] = true;
+            }
+        } catch (Throwable $e) {
+            $cacheTablas = null;
         }
     }
-    return $cacheTablas[$tabla];
+    if ($cacheTablas !== null) {
+        return isset($cacheTablas[strtolower($tabla)]);
+    }
+    // Respaldo si information_schema no respondió
+    try {
+        $consulta = db()->query("SHOW TABLES LIKE " . db()->quote($tabla));
+        return (bool) $consulta->fetchColumn();
+    } catch (Throwable $e2) {
+        return false;
+    }
 }
 
-/** Cache en memoria de columnas existentes. */
+/** Cache en memoria de columnas existentes. RENDIMIENTO: carga todas las columnas de la
+ *  tabla en UNA sola consulta (antes hacia una consulta por columna: ~30 consultas por página). */
 function columnaExiste(string $tabla, string $columna, bool $forzarRecarga = false): bool
 {
     static $cacheColumnas = [];
+    static $cachePorTabla = [];
     $clave = $tabla . '.' . $columna;
     if (!$forzarRecarga && array_key_exists($clave, $cacheColumnas)) {
         return $cacheColumnas[$clave];
     }
     try {
-        $consulta = db()->prepare(
-            "SELECT 1 FROM information_schema.columns
-             WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
-        );
-        $consulta->execute([$tabla, $columna]);
-        $cacheColumnas[$clave] = (bool) $consulta->fetchColumn();
+        if ($forzarRecarga || !array_key_exists($tabla, $cachePorTabla)) {
+            $consulta = db()->prepare(
+                "SELECT column_name FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = ?"
+            );
+            $consulta->execute([$tabla]);
+            $todas = [];
+            foreach ($consulta->fetchAll(PDO::FETCH_COLUMN) as $nombreColumna) {
+                $todas[strtolower((string) $nombreColumna)] = true;
+            }
+            $cachePorTabla[$tabla] = $todas;
+        }
+        $cacheColumnas[$clave] = isset($cachePorTabla[$tabla][strtolower($columna)]);
     } catch (Throwable $e) {
         try {
             $consulta = db()->query("SHOW COLUMNS FROM `$tabla` LIKE " . db()->quote($columna));
@@ -87,6 +103,23 @@ function repararColumnaFaltante(string $tabla, string $columna, string $definici
         // Cualquier otro fallo lo logueamos con prominencia para no perderlo
         error_log('[reparar_esquema] ERROR ALTER TABLE `' . $tabla . '` ADD COLUMN ' . $columna . ': ' . $msg);
     }
+}
+
+// RENDIMIENTO: la reparación completa solo debe correr una vez al día (o si cambió la base).
+// Antes se ejecutaba en CADA petición y hacía cientos de consultas a information_schema,
+// lo que volvía lenta toda la aplicación. Si la marca es del día y de la misma base, se
+// omite todo el trabajo con `return` (las funciones ya quedaron definidas arriba).
+// Para forzar una re-verificación manual: borra el archivo esquema_verificado.json de la carpeta temporal.
+$marcaEsquemaRuta = sys_get_temp_dir() . '/esquema_verificado.json';
+$huellaEsquema = DB_HOST . ':' . DB_PUERTO . '/' . DB_NOMBRE;
+$esquemaVerificado = false;
+if (is_file($marcaEsquemaRuta)) {
+    $marcaEsquema = json_decode((string) @file_get_contents($marcaEsquemaRuta), true) ?: [];
+    $esquemaVerificado = (($marcaEsquema['fecha'] ?? '') === date('Y-m-d')
+        && ($marcaEsquema['base'] ?? '') === $huellaEsquema);
+}
+if ($esquemaVerificado) {
+    return;
 }
 
 // 0. Tablas esenciales del sistema que pudieron faltar en despliegues sin migraciones ejecutadas
@@ -135,6 +168,21 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
+    if (!tablaExiste('equipo_tiempo_activo')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS equipo_tiempo_activo (
+            usuario_id INT UNSIGNED NOT NULL,
+            institucion_id INT UNSIGNED NOT NULL,
+            fecha DATE NOT NULL,
+            sesion_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+            inicio_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            ultimo_latido DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            segundos_activos INT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (usuario_id, fecha, sesion_hash),
+            KEY idx_equipo_tiempo_institucion_dia (institucion_id, fecha, usuario_id),
+            CONSTRAINT fk_equipo_tiempo_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
         if (!tablaExiste('bitacora')) {
         $pdo->exec("CREATE TABLE IF NOT EXISTS bitacora (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -165,6 +213,25 @@ try {
             resuelto_en DATETIME NULL,
             KEY idx_comentarios_entidad (institucion_id, entidad, registro_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    if (!tablaExiste('retroalimentacion_equipo')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS retroalimentacion_equipo (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            institucion_id INT UNSIGNED NOT NULL,
+            autor_id INT UNSIGNED NOT NULL,
+            persona_id INT UNSIGNED NOT NULL,
+            tipo ENUM('positivo','atencion') NOT NULL,
+            texto VARCHAR(1000) NOT NULL,
+            estado ENUM('pendiente','compartido','cerrado') NOT NULL DEFAULT 'pendiente',
+            revisado_por INT UNSIGNED NULL,
+            revisado_en DATETIME NULL,
+            compartido_en DATETIME NULL,
+            creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_feedback_persona (institucion_id, persona_id, estado, creado_en),
+            KEY idx_feedback_autor (institucion_id, autor_id, creado_en)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
 
     if (!tablaExiste('registro_versiones')) {
@@ -258,6 +325,46 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
+    if (!tablaExiste('farmacia_lotes')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS farmacia_lotes (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            institucion_id INT UNSIGNED NOT NULL,
+            medicamento_id INT UNSIGNED NOT NULL,
+            codigo_lote VARCHAR(80) NOT NULL,
+            caducidad DATE NOT NULL,
+            unidad VARCHAR(40) NOT NULL,
+            existencia DECIMAL(12,3) NOT NULL DEFAULT 0,
+            costo_unitario DECIMAL(12,2) NULL,
+            creado_por INT UNSIGNED NOT NULL,
+            creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_farmacia_lote (institucion_id, medicamento_id, codigo_lote, caducidad, unidad),
+            KEY idx_farmacia_existencia (institucion_id, existencia),
+            KEY idx_farmacia_caducidad (institucion_id, caducidad)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    if (!tablaExiste('farmacia_movimientos')) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS farmacia_movimientos (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            institucion_id INT UNSIGNED NOT NULL,
+            lote_id BIGINT UNSIGNED NOT NULL,
+            medicamento_id INT UNSIGNED NOT NULL,
+            tipo ENUM('entrada', 'ajuste_entrada', 'ajuste_salida', 'merma', 'dispensacion') NOT NULL,
+            cantidad DECIMAL(12,3) NOT NULL,
+            paciente_id INT UNSIGNED NULL,
+            receta_id INT UNSIGNED NULL,
+            confirmacion_revisada TINYINT(1) NOT NULL DEFAULT 0,
+            usuario_id INT UNSIGNED NOT NULL,
+            operacion_id CHAR(48) NOT NULL,
+            nota VARCHAR(500) NOT NULL,
+            creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_farmacia_operacion (operacion_id),
+            KEY idx_farmacia_mov_fecha (institucion_id, creado_en),
+            KEY idx_farmacia_mov_lote (lote_id, creado_en),
+            KEY idx_farmacia_mov_paciente (institucion_id, paciente_id, creado_en)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     // Auto-crear todas las tablas de catálogos si no existen
     $catalogosTablas = [
         'catalogo_procedimientos' => "clave VARCHAR(40) NOT NULL, nombre VARCHAR(160) NOT NULL, descripcion VARCHAR(300) NULL, activo TINYINT(1) NOT NULL DEFAULT 1",
@@ -314,6 +421,24 @@ try {
             INDEX idx_inst_area (institucion_id, area),
             INDEX idx_paciente (paciente_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    try {
+        $columnaEstado = $pdo->query("SHOW COLUMNS FROM `camillas` LIKE 'estado'")->fetch(PDO::FETCH_ASSOC);
+        $tipoEstado = (string) ($columnaEstado['Type'] ?? '');
+        if (preg_match('/^enum\\((.*)\\)$/i', $tipoEstado, $partesEnum)) {
+            preg_match_all("/'([^']*)'/", $partesEnum[1], $valoresEnum);
+            $estadosExistentes = $valoresEnum[1] ?? [];
+            $faltantesEstado = array_diff(['mantenimiento', 'reservada'], $estadosExistentes);
+            if ($faltantesEstado) {
+                $estadosCenso = array_values(array_unique(array_merge($estadosExistentes, ['mantenimiento', 'reservada'])));
+                $valoresEstado = implode(',', array_map(static fn (string $estado): string => $pdo->quote($estado), $estadosCenso));
+                $pdo->exec("ALTER TABLE `camillas` MODIFY `estado` ENUM($valoresEstado) NOT NULL DEFAULT 'disponible'");
+                error_log('[reparar_esquema] camillas.estado ampliado para estados operativos: ' . implode(', ', $faltantesEstado));
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('[reparar_esquema] ERROR ampliando camillas.estado: ' . $e->getMessage());
     }
 
     if (!tablaExiste('camillas_movimientos')) {
@@ -390,6 +515,8 @@ try {
     error_log('[reparar_esquema] error creando tablas base: ' . $e->getMessage());
 }
 
+repararColumnaFaltante('farmacia_movimientos', 'confirmacion_revisada', 'TINYINT(1) NOT NULL DEFAULT 0');
+
 // 1. Lista de tablas que requieren institucion_id
 // IMPORTANTE: si añades una nueva tabla con institucion_id, agrégala aquí también.
 $tablasConInstitucion = [
@@ -397,6 +524,7 @@ $tablasConInstitucion = [
     'conversiones', 'invitaciones', 'sincronizacion_cola', 'bitacora',
     'users', 'notas_medicas', 'recetas', 'estudios', 'camillas', 'camillas_movimientos', 'kardex_medicaciones', 'kardex_administraciones',
     'medicamentos', 'cie10', 'comentarios', 'registro_versiones',
+    'farmacia_lotes', 'farmacia_movimientos',
     'finanzas_movimientos', 'finanzas_conceptos', 'finanzas_cierres',
     'finanzas_facturas', 'finanzas_presupuestos', 'finanzas_recurrentes',
     'servicios_clinicos', 'imagenes_medicas', 'plantillas', 'plantillas_fila',
@@ -466,6 +594,9 @@ repararColumnaFaltante('usuarios', 'direccion', 'VARCHAR(255) NULL');
 repararColumnaFaltante('usuarios', 'actualizado_en', 'DATETIME NULL');
 repararColumnaFaltante('usuarios', 'eliminado_en', 'DATETIME NULL');
 repararColumnaFaltante('pagina_filas', 'notas', 'MEDIUMTEXT NULL');
+repararColumnaFaltante('presencia', 'cursor_x', 'DECIMAL(6,5) NULL');
+repararColumnaFaltante('presencia', 'cursor_y', 'DECIMAL(6,5) NULL');
+repararColumnaFaltante('presencia', 'cursor_en', 'DATETIME NULL');
 
 // 5. Columnas esenciales de finanzas
 repararColumnaFaltante('finanzas_movimientos', 'vence_en', 'DATE NULL');
@@ -566,6 +697,26 @@ repararColumnaFaltante('historial_clinico', 'tipo', 'VARCHAR(40) NOT NULL DEFAUL
 repararColumnaFaltante('historial_clinico', 'fecha', 'DATETIME NOT NULL');
 repararColumnaFaltante('historial_clinico', 'detalle', 'JSON NULL');
 
+// El ENUM de tipos debe admitir todo lo que ofrece el selector de notas. Se deriva de
+// TIPOS_REGISTRO para que agregar un tipo allá no vuelva a dejar la base desincronizada.
+// Ampliar un ENUM conserva los valores ya guardados; solo se ejecuta si falta alguno.
+if (tablaExiste('historial_clinico') && columnaExiste('historial_clinico', 'tipo')) {
+    try {
+        require_once __DIR__ . '/../datos/registros_clinicos.php';
+        $tipoColumna = (string) db()->query("SHOW COLUMNS FROM `historial_clinico` LIKE 'tipo'")->fetchColumn(1);
+        if (stripos($tipoColumna, 'enum(') === 0) {
+            $faltantes = array_filter(array_keys(TIPOS_REGISTRO), static fn ($t) => !str_contains($tipoColumna, "'" . $t . "'"));
+            if ($faltantes) {
+                $valores = implode(',', array_map(static fn ($t) => db()->quote($t), array_keys(TIPOS_REGISTRO)));
+                db()->exec("ALTER TABLE `historial_clinico` MODIFY `tipo` ENUM($valores) NOT NULL");
+                error_log('[reparar_esquema] historial_clinico.tipo ampliado con: ' . implode(', ', $faltantes));
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('[reparar_esquema] ERROR ampliando historial_clinico.tipo: ' . $e->getMessage());
+    }
+}
+
 // Conexiones clínicas y autorizaciones
 repararColumnaFaltante('conexiones_clinicas', 'institucion_a_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
 repararColumnaFaltante('conexiones_clinicas', 'institucion_b_id', 'INT UNSIGNED NOT NULL DEFAULT 1');
@@ -592,13 +743,58 @@ repararColumnaFaltante('conexiones_autorizaciones', 'vence_en', 'DATETIME NULL')
 repararColumnaFaltante('conexiones_autorizaciones', 'revocado_en', 'DATETIME NULL');
 repararColumnaFaltante('conexiones_autorizaciones', 'creado_por', 'INT UNSIGNED NULL');
 
-// Actualizacion automatica de modelo OpenRouter si tiene valor invalido o deprecado
-try {
-    $qModelo = db()->query("SELECT valor FROM configuracion WHERE clave = 'ia_modelo' LIMIT 1");
-    $mActual = $qModelo ? $qModelo->fetchColumn() : null;
-    if ($mActual === 'openrouter/free' || $mActual === 'free' || empty($mActual) || str_contains((string) $mActual, ':free')) {
-        db()->exec("UPDATE configuracion SET valor = 'qwen/qwen-2.5-72b-instruct' WHERE clave = 'ia_modelo'");
+if (!tablaExiste('consentimientos_morbilidad')) {
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS consentimientos_morbilidad (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  institucion_id INT UNSIGNED NOT NULL,
+  paciente_id INT UNSIGNED NOT NULL,
+  version VARCHAR(20) NOT NULL,
+  texto_consentimiento TEXT NOT NULL,
+  texto_sha256 CHAR(64) NOT NULL,
+  destinatario VARCHAR(200) NOT NULL,
+  otorgante_tipo ENUM('paciente','representante') NOT NULL,
+  otorgante_nombre VARCHAR(160) NOT NULL,
+  relacion VARCHAR(100) NULL,
+  fecha_otorgamiento DATE NOT NULL,
+  estado ENUM('vigente','revocado') NOT NULL DEFAULT 'vigente',
+  capturado_por INT UNSIGNED NOT NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revocado_en DATETIME NULL,
+  revocado_por INT UNSIGNED NULL,
+  KEY idx_cons_morb_vigencia (institucion_id, paciente_id, estado),
+  KEY idx_cons_morb_destino (institucion_id, version, estado, destinatario(100))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Throwable $e) {
+        error_log('[reparar_esquema] No se pudieron crear las tablas de consentimiento de morbilidad: ' . $e->getMessage());
     }
-} catch (Throwable $e) {
-    // Silencioso
 }
+if (!tablaExiste('consentimientos_morbilidad_eventos')) {
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS consentimientos_morbilidad_eventos (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  consentimiento_id BIGINT UNSIGNED NOT NULL,
+  institucion_id INT UNSIGNED NOT NULL,
+  paciente_id INT UNSIGNED NOT NULL,
+  tipo ENUM('otorgado','revocado') NOT NULL,
+  usuario_id INT UNSIGNED NOT NULL,
+  solicitante_tipo ENUM('paciente','representante') NOT NULL,
+  solicitante_nombre VARCHAR(160) NOT NULL,
+  relacion VARCHAR(100) NULL,
+  motivo VARCHAR(500) NULL,
+  evidencia_archivo VARCHAR(80) NULL,
+  evidencia_nombre VARCHAR(200) NULL,
+  evidencia_mime VARCHAR(40) NULL,
+  evidencia_sha256 CHAR(64) NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_cons_morb_eventos (institucion_id, paciente_id, creado_en),
+  KEY idx_cons_morb_evento_consentimiento (consentimiento_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Throwable $e) {
+        error_log('[reparar_esquema] No se pudo crear el historial de consentimientos de morbilidad: ' . $e->getMessage());
+    }
+}
+
+// Todo el esquema pasó la verificación de hoy: guardar la marca para que las
+// siguientes peticiones del día se salten este proceso (ver arriba).
+@file_put_contents($marcaEsquemaRuta, json_encode(['fecha' => date('Y-m-d'), 'base' => $huellaEsquema]));

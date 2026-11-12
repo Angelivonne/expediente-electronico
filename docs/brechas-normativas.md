@@ -18,7 +18,7 @@ Fuentes consultadas:
 | Notas de consulta, urgencias, interconsulta, referencia, egreso, receta, estudio, hospitalización, consentimiento, incapacidad | Cumple | `TIPOS_REGISTRO` (10 tipos) y validación `validarRegistroClinico()` |
 | Consentimiento informado con firmas (NOM-004 10.1) | Cumple | Documento de consentimiento con firmas de paciente, médico y testigos |
 | Receta con dosis, vía y periodicidad (NOM-004 6.2.6) | Cumple | Validación y documento de receta |
-| Registro de auditoría (NOM-024 3.42) | Cumple a nivel de aplicación | `bitacora`; `expediente_app` solo tiene SELECT/INSERT sobre la tabla |
+| Registro de auditoría (NOM-024 3.42) | Cumple a nivel de aplicación | `bitacora`; `clinica_app` solo tiene SELECT/INSERT sobre la tabla |
 | Control de acceso y roles (NOM-024) | Cumple | `PERMISOS`, roles, sesiones de 30 min de inactividad, bloqueo por intentos |
 | Contraseñas | Cumple | Mínimo 12 caracteres, lista de claves comunes, `password_hash` |
 | Respaldo | Parcial | Respaldo diario `mysqldump` con SHA-256; falta probar restauración y cifrar el archivo |

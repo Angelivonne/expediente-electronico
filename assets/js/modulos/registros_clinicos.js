@@ -7,7 +7,7 @@
   const raizCatalogo = form || campoCatalogoInicial?.closest('form');
 
   /* ---------- Búsqueda de diagnósticos y medicamentos del catálogo ---------- */
-  const baseApi = '/ExpedienteExpediente/api';
+  const baseApi = `${document.body.dataset.base ?? ''}/api`;
   let siguienteLista = 0;
   const temporizadores = new WeakMap();
   const solicitudes = new WeakMap();
@@ -51,17 +51,20 @@
         if (codigo) { codigo.value = item.codigo || ''; codigo.dispatchEvent(new Event('input', { bubbles: true })); }
       } else {
         entrada.value = item.principio || item.nombre;
-        const renglon = entrada.closest('[data-fila]');
+        const renglon = entrada.closest('[data-fila], [data-kardex-medicamento]');
         const idCatalogo = renglon?.querySelector('[data-medicamento-id]');
         if (idCatalogo) idCatalogo.value = item.id || '';
         const presentacion = renglon?.querySelector('[name="presentacion[]"]');
         const partes = [item.forma, item.concentracion].filter(Boolean);
         if (presentacion && partes.length) { presentacion.value = partes.join(' · ').slice(0, 120); presentacion.dispatchEvent(new Event('input', { bubbles: true })); }
-        else if (!renglon && item.concentracion) {
+        else if (!presentacion && item.concentracion) {
           entrada.value = `${entrada.value} ${item.concentracion}`;
         }
-        const via = renglon?.querySelector('[name="via[]"]');
-        if (via && item.via && [...via.options].some((opcion) => opcion.value.toLocaleLowerCase() === item.via.toLocaleLowerCase())) {
+        const via = renglon?.querySelector('[name="via[]"], [name="via"]');
+        if (via && item.via && via.tagName !== 'SELECT') {
+          via.value = item.via;
+          via.dispatchEvent(new Event('input', { bubbles: true }));
+        } else if (via && item.via && [...via.options].some((opcion) => opcion.value.toLocaleLowerCase() === item.via.toLocaleLowerCase())) {
           via.value = [...via.options].find((opcion) => opcion.value.toLocaleLowerCase() === item.via.toLocaleLowerCase()).value;
           via.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -115,7 +118,7 @@
         delete entrada.dataset.seleccionCatalogo;
       }
       if (entrada.dataset.catalogo === 'medicamentos' && entrada.dataset.seleccionCatalogo) {
-        const idCatalogo = entrada.closest('[data-fila]')?.querySelector('[data-medicamento-id]');
+        const idCatalogo = entrada.closest('[data-fila], [data-kardex-medicamento]')?.querySelector('[data-medicamento-id]');
         if (idCatalogo) idCatalogo.value = '';
         delete entrada.dataset.seleccionCatalogo;
       }

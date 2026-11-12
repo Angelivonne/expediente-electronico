@@ -1,13 +1,13 @@
 -- ==========================================================================
--- Expediente FEMECI — esquema de base de datos MySQL
+-- Expediente clínico — esquema de base de datos MySQL
 -- SQL estándar de MySQL 8; también corre en el MariaDB que trae XAMPP.
 -- ==========================================================================
 
-CREATE DATABASE IF NOT EXISTS expediente_femeci
+CREATE DATABASE IF NOT EXISTS clinica
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_spanish_ci;
 
-USE expediente_femeci;
+USE clinica;
 
 -- Usuarios del sistema (NOM-024 6.6.3 autenticación, 6.6.4 autorización por roles)
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -225,16 +225,54 @@ CREATE TABLE IF NOT EXISTS pagina_permisos (
   CONSTRAINT fk_permisos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Presencia: quién está en cada sección o página y si está editando (se renueva cada 15 s)
+-- Presencia: quién está en cada sección o página y si está editando (se renueva cada 10 s)
 CREATE TABLE IF NOT EXISTS presencia (
   usuario_id  INT UNSIGNED NOT NULL,
   clave       VARCHAR(60)  NOT NULL,                        -- p. ej. "pagina:12", "paciente:3", "pacientes:lista"
   editando    TINYINT(1)   NOT NULL DEFAULT 0,
   visto_en    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  cursor_x    DECIMAL(6,5) NULL,
+  cursor_y    DECIMAL(6,5) NULL,
+  cursor_en   DATETIME     NULL,
   PRIMARY KEY (usuario_id, clave),
   INDEX idx_presencia_clave (clave, visto_en),
   CONSTRAINT fk_presencia_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- Tiempo activo aproximado: solo segundos validados por latidos del navegador visible.
+-- No almacena teclas, contenido clínico, coordenadas ni páginas visitadas.
+CREATE TABLE IF NOT EXISTS equipo_tiempo_activo (
+  usuario_id       INT UNSIGNED NOT NULL,
+  institucion_id   INT UNSIGNED NOT NULL,
+  fecha            DATE NOT NULL,
+  sesion_hash      CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  inicio_en        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ultimo_latido    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  segundos_activos INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (usuario_id, fecha, sesion_hash),
+  KEY idx_equipo_tiempo_institucion_dia (institucion_id, fecha, usuario_id),
+  CONSTRAINT fk_equipo_tiempo_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+) ENGINE=InnoDB;
+
+-- Retroalimentación privada del equipo: solo la ve quien la envía y personal autorizado;
+-- se muestra al destinatario únicamente después de compartirla explícitamente.
+CREATE TABLE IF NOT EXISTS retroalimentacion_equipo (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  institucion_id  INT UNSIGNED NOT NULL,
+  autor_id        INT UNSIGNED NOT NULL,
+  persona_id      INT UNSIGNED NOT NULL,
+  tipo            ENUM('positivo','atencion') NOT NULL,
+  texto           VARCHAR(1000) NOT NULL,
+  estado          ENUM('pendiente','compartido','cerrado') NOT NULL DEFAULT 'pendiente',
+  revisado_por    INT UNSIGNED NULL,
+  revisado_en     DATETIME NULL,
+  compartido_en   DATETIME NULL,
+  creado_en       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_feedback_persona (institucion_id, persona_id, estado, creado_en),
+  KEY idx_feedback_autor (institucion_id, autor_id, creado_en)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Invitaciones: el administrador invita por correo con un rol; el enlace (token de un solo uso,
 -- guardado como SHA-256) abre el registro en tres pasos. Vencen a los 7 días.
@@ -341,7 +379,7 @@ CREATE TABLE IF NOT EXISTS peticiones_idempotentes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 -- ==========================================================================
--- Varias instituciones en una sola base (expediente_femeci) y códigos de acceso.
+-- Varias instituciones en una sola base (clinica) y códigos de acceso.
 -- Repetirlo no cambia nada (IF NOT EXISTS de MariaDB).
 -- ==========================================================================
 
@@ -1021,7 +1059,7 @@ CREATE TABLE IF NOT EXISTS recuperaciones_clave (
   KEY idx_recuperacion_usuario (usuario_id),
   CONSTRAINT fk_recuperacion_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-GRANT SELECT, INSERT, UPDATE ON expediente_femeci.recuperaciones_clave TO 'femeci_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON clinica.recuperaciones_clave TO 'clinica_app'@'localhost';
 
 -- Imágenes médicas (DICOM, JPG/PNG, PDF) por paciente, agrupadas en estudio y serie; archivos en privado/imagenes_medicas
 CREATE TABLE IF NOT EXISTS imagenes_medicas (
@@ -1049,7 +1087,7 @@ CREATE TABLE IF NOT EXISTS imagenes_medicas (
   CONSTRAINT fk_imagen_paciente FOREIGN KEY (paciente_id) REFERENCES pacientes (id),
   CONSTRAINT fk_imagen_institucion FOREIGN KEY (institucion_id) REFERENCES instituciones (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-GRANT SELECT, INSERT, DELETE ON expediente_femeci.imagenes_medicas TO 'femeci_app'@'localhost';
+GRANT SELECT, INSERT, DELETE ON clinica.imagenes_medicas TO 'clinica_app'@'localhost';
 
 -- Notas debajo de las secciones principales (Pacientes, Agenda y cada expediente), como el espacio para
 -- escribir bajo una base de datos . Una nota por sección e institución; no aparecen en el árbol.
@@ -1070,7 +1108,7 @@ CREATE TABLE IF NOT EXISTS asistente_memoria (
   KEY idx_memoria_usuario (usuario_id),
   CONSTRAINT fk_memoria_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_femeci.asistente_memoria TO 'femeci_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON clinica.asistente_memoria TO 'clinica_app'@'localhost';
 
 -- Página de cada fila de una base de datos: notas libres (panel lateral «Abrir»)
 ALTER TABLE pagina_filas ADD COLUMN IF NOT EXISTS notas MEDIUMTEXT NULL AFTER valores;
@@ -1134,6 +1172,86 @@ CREATE TABLE IF NOT EXISTS agentes_conversaciones (
   CONSTRAINT fk_agconv_agente FOREIGN KEY (agente_id) REFERENCES agentes (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_femeci.agentes TO 'femeci_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_femeci.agentes_memoria TO 'femeci_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_femeci.agentes_conversaciones TO 'femeci_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON clinica.agentes TO 'clinica_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON clinica.agentes_memoria TO 'clinica_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON clinica.agentes_conversaciones TO 'clinica_app'@'localhost';
+
+-- Inventario de farmacia: las cantidades pertenecen a lotes físicos; los movimientos no se actualizan ni borran.
+CREATE TABLE IF NOT EXISTS farmacia_lotes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  institucion_id INT UNSIGNED NOT NULL,
+  medicamento_id INT UNSIGNED NOT NULL,
+  codigo_lote VARCHAR(80) NOT NULL,
+  caducidad DATE NOT NULL,
+  unidad VARCHAR(40) NOT NULL,
+  existencia DECIMAL(12,3) NOT NULL DEFAULT 0,
+  costo_unitario DECIMAL(12,2) NULL,
+  creado_por INT UNSIGNED NOT NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_farmacia_lote (institucion_id, medicamento_id, codigo_lote, caducidad, unidad),
+  KEY idx_farmacia_existencia (institucion_id, existencia),
+  KEY idx_farmacia_caducidad (institucion_id, caducidad)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS farmacia_movimientos (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  institucion_id INT UNSIGNED NOT NULL,
+  lote_id BIGINT UNSIGNED NOT NULL,
+  medicamento_id INT UNSIGNED NOT NULL,
+  tipo ENUM('entrada', 'ajuste_entrada', 'ajuste_salida', 'merma', 'dispensacion') NOT NULL,
+  cantidad DECIMAL(12,3) NOT NULL,
+  paciente_id INT UNSIGNED NULL,
+  receta_id INT UNSIGNED NULL,
+  confirmacion_revisada TINYINT(1) NOT NULL DEFAULT 0,
+  usuario_id INT UNSIGNED NOT NULL,
+  operacion_id CHAR(48) NOT NULL,
+  nota VARCHAR(500) NOT NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_farmacia_operacion (operacion_id),
+  KEY idx_farmacia_mov_fecha (institucion_id, creado_en),
+  KEY idx_farmacia_mov_lote (lote_id, creado_en),
+  KEY idx_farmacia_mov_paciente (institucion_id, paciente_id, creado_en)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Consentimiento independiente para compartir estadísticas agregadas de morbilidad.
+-- Los términos aceptados y eventos se conservan; una revocación solo cierra la vigencia futura.
+CREATE TABLE IF NOT EXISTS consentimientos_morbilidad (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  institucion_id INT UNSIGNED NOT NULL,
+  paciente_id INT UNSIGNED NOT NULL,
+  version VARCHAR(20) NOT NULL,
+  texto_consentimiento TEXT NOT NULL,
+  texto_sha256 CHAR(64) NOT NULL,
+  destinatario VARCHAR(200) NOT NULL,
+  otorgante_tipo ENUM('paciente','representante') NOT NULL,
+  otorgante_nombre VARCHAR(160) NOT NULL,
+  relacion VARCHAR(100) NULL,
+  fecha_otorgamiento DATE NOT NULL,
+  estado ENUM('vigente','revocado') NOT NULL DEFAULT 'vigente',
+  capturado_por INT UNSIGNED NOT NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revocado_en DATETIME NULL,
+  revocado_por INT UNSIGNED NULL,
+  KEY idx_cons_morb_vigencia (institucion_id, paciente_id, estado),
+  KEY idx_cons_morb_destino (institucion_id, version, estado, destinatario(100))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS consentimientos_morbilidad_eventos (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  consentimiento_id BIGINT UNSIGNED NOT NULL,
+  institucion_id INT UNSIGNED NOT NULL,
+  paciente_id INT UNSIGNED NOT NULL,
+  tipo ENUM('otorgado','revocado') NOT NULL,
+  usuario_id INT UNSIGNED NOT NULL,
+  solicitante_tipo ENUM('paciente','representante') NOT NULL,
+  solicitante_nombre VARCHAR(160) NOT NULL,
+  relacion VARCHAR(100) NULL,
+  motivo VARCHAR(500) NULL,
+  evidencia_archivo VARCHAR(80) NULL,
+  evidencia_nombre VARCHAR(200) NULL,
+  evidencia_mime VARCHAR(40) NULL,
+  evidencia_sha256 CHAR(64) NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_cons_morb_eventos (institucion_id, paciente_id, creado_en),
+  KEY idx_cons_morb_evento_consentimiento (consentimiento_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

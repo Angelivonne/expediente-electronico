@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documentos Oficiales · FEMECI COA-SI-2135</title>
+    <title>Documentos del proyecto · COA-SI-2135</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #f8fafc; font-family: system-ui, -apple-system, sans-serif; color: #1e293b; }
@@ -17,7 +17,7 @@
 <div class="container">
     <div class="hero-card">
         <div class="hero-header text-center">
-            <span class="badge bg-light text-primary px-3 py-1 mb-2 fw-semibold">REDNACECCYT · FEMECI</span>
+            <span class="badge bg-light text-primary px-3 py-1 mb-2 fw-semibold">REDNACECCYT</span>
             <h1 class="h4 fw-bold mb-1">Registro de Prompts y Uso Ético de IA</h1>
             <p class="small mb-0 opacity-75">Proyecto: Sistema Inteligente de Expedientes Clínicos (FIPI: COA-SI-2135)</p>
             <p class="small mb-0 opacity-75">CECyTEC Plantel Sol de Oriente · Nivel Media Superior</p>

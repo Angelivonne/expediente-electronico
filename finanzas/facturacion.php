@@ -228,11 +228,3 @@ $tabla = [
 </div>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
-
-
-
-
-
-
-
-

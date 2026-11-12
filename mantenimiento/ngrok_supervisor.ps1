@@ -7,16 +7,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$project = 'C:\xampp\htdocs\ExpedienteFEMECI'
-$launcher = Join-Path $project 'ExpedienteFEMECI.bat'
-$localUrl = 'http://127.0.0.1/ExpedienteFEMECI/'
-$stateDir = Join-Path $env:LOCALAPPDATA 'ExpedienteFEMECI'
+$project = Split-Path -Parent $PSScriptRoot
+$projectName = Split-Path -Leaf $project
+$launcher = Join-Path $project 'iniciar_clinica.bat'
+$localUrl = "http://127.0.0.1/$projectName/"
+$stateDir = Join-Path $env:LOCALAPPDATA 'Clinica'
 $logPath = Join-Path $stateDir 'ngrok-supervisor.log'
 $pidPath = Join-Path $stateDir 'ngrok.pid'
 $stdoutPath = Join-Path $stateDir 'ngrok-agent.log'
 $stderrPath = Join-Path $stateDir 'ngrok-agent-error.log'
 $desktop = [Environment]::GetFolderPath('Desktop')
-$linkPath = Join-Path $desktop 'ExpedienteFEMECI-link.txt'
+$linkPath = Join-Path $desktop 'clinica-link.txt'
 $script:ngrokExe = $null
 
 New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
@@ -143,13 +144,13 @@ function Confirm-And-PublishTunnel {
         return $false
     }
 
-    $loginUrl = $publicUrl.TrimEnd('/') + '/ExpedienteFEMECI/'
+    $loginUrl = $publicUrl.TrimEnd('/') + "/$projectName/"
     if (-not (Test-LoginGate -Uri $loginUrl)) {
         return $false
     }
 
     $contents = @(
-        'Enlace verificado: ' + $publicUrl.TrimEnd('/') + '/ExpedienteFEMECI/'
+        'Enlace verificado: ' + $publicUrl.TrimEnd('/') + "/$projectName/"
         'Verificado: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
         'El acceso a la aplicación requiere iniciar sesión.'
     )
@@ -274,7 +275,7 @@ if ($Stop) {
     exit 0
 }
 
-$mutex = [System.Threading.Mutex]::new($false, 'Local\ExpedienteFEMECI-NgrokSupervisor')
+$mutex = [System.Threading.Mutex]::new($false, 'Local\Clinica-NgrokSupervisor')
 $ownsMutex = $false
 try {
     $ownsMutex = $mutex.WaitOne(0)

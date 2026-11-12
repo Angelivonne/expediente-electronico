@@ -1,6 +1,6 @@
 -- Versiones de registros del motor: guarda el estado ANTERIOR de cada cambio.
 -- Así se puede auditar y restaurar cualquier registro (pacientes, catálogos, medicamentos…).
--- Ejecutar como root una sola vez:  mysql -u root -p expediente_expediente < database/migracion_versiones.sql
+-- Ejecutar como root una sola vez:  mysql -u root -p clinica < database/migracion_versiones.sql
 
 CREATE TABLE IF NOT EXISTS registro_versiones (
   id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -15,5 +15,5 @@ CREATE TABLE IF NOT EXISTS registro_versiones (
   KEY idx_versiones_creado (creado_en)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-GRANT SELECT, INSERT, DELETE ON expediente_expediente.registro_versiones TO 'expediente_app'@'localhost';
+GRANT SELECT, INSERT, DELETE ON clinica.registro_versiones TO 'clinica_app'@'localhost';
 FLUSH PRIVILEGES;

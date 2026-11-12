@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Entrada de catálogos: abre directamente la tabla editable con sus registros reales.
  */

@@ -42,12 +42,6 @@ $titAcceso = $accesoDefecto === 'expediente'
     ? 'Acceso al expediente: se pueden compartir datos con el modelo'
     : 'Acceso restringido: no se envía ningún dato de pacientes';
 ?>
-<?php if ($modoAsistente === 'panel'): ?>
-  <a class="asistente-boton" href="<?= URL_BASE ?>/asistente/" data-asistente-abrir aria-expanded="false" aria-controls="asistente-panel" aria-label="Abrir el asistente de IA" title="Asistente de IA">
-    <?= icono('chispa') ?>
-  </a>
-<?php endif; ?>
-
 <<?= $modoAsistente === 'panel' ? 'aside' : 'section' ?> id="asistente-panel" class="asistente asistente--<?= $modoAsistente ?>" data-asistente data-modo="<?= $modoAsistente ?>" data-acceso-defecto="<?= $accesoDefecto ?>"<?= $modoAsistente === 'panel' ? ' hidden' : '' ?> aria-label="Asistente de IA">
   <?php if ($modoAsistente === 'panel'): ?>
     <div class="asistente__tirador" data-asistente-tirador role="separator" aria-orientation="vertical"
@@ -91,7 +85,9 @@ $titAcceso = $accesoDefecto === 'expediente'
           <span class="ajustes-ia__estado" data-ajustes-estado></span>
         </header>
 
-        <h3 class="ajustes-ia__seccion">Conexión</h3>
+        <div class="ajustes-ia__contenido">
+        <details class="ajustes-ia__grupo" open>
+          <summary>Conexión y modelo</summary>
         <div class="ajustes-ia__fila ajustes-ia__fila--apilada">
           <div class="ajustes-ia__etiqueta"><b>Clave de API</b><small data-ajuste-clave-ayuda>Al pegarla se reconoce el proveedor y se cargan sus modelos.</small></div>
           <div class="campo-ia">
@@ -121,7 +117,6 @@ $titAcceso = $accesoDefecto === 'expediente'
           </div>
         </div>
 
-        <h3 class="ajustes-ia__seccion">Modelo</h3>
         <div class="ajustes-ia__modelos">
           <div class="campo-ia">
             <?= icono('buscar') ?>
@@ -131,8 +126,10 @@ $titAcceso = $accesoDefecto === 'expediente'
           </div>
           <ul class="ajustes-ia__lista" data-lista-modelos role="listbox" aria-label="Modelos disponibles" hidden></ul>
         </div>
+        </details>
 
-        <h3 class="ajustes-ia__seccion">Comportamiento</h3>
+        <details class="ajustes-ia__grupo">
+          <summary>Comportamiento</summary>
         <div class="ajustes-ia__fila">
           <div class="ajustes-ia__etiqueta"><b>Profundidad</b><small>Cuánto razona antes de responder.</small></div>
           <div class="segmentado" role="radiogroup" data-ajuste-esfuerzo>
@@ -157,14 +154,16 @@ $titAcceso = $accesoDefecto === 'expediente'
           <div class="ajustes-ia__etiqueta"><b>Instrucciones del establecimiento</b><small>Se agregan a cada conversación.</small></div>
           <textarea class="area-ia" name="instrucciones" rows="3" maxlength="2000" aria-label="Instrucciones del establecimiento"></textarea>
         </div>
+        </details>
 
-        <h3 class="ajustes-ia__seccion">Privacidad</h3>
+        <details class="ajustes-ia__grupo">
+          <summary>Privacidad y uso</summary>
         <p class="ajustes-ia__destino" data-ajuste-destino></p>
-
-        <h3 class="ajustes-ia__seccion">Uso · últimos 30 días</h3>
         <dl class="ajustes-ia__uso" data-ajuste-uso></dl>
+        </details>
 
         <?php require __DIR__ . '/sincronizacion_ajustes.php'; ?>
+        </div>
 
         <div class="ajustes-ia__pie">
           <span class="ajustes-ia__prueba" data-ajustes-resultado></span>

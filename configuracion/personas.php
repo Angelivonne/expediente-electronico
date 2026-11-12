@@ -14,7 +14,8 @@ exigirPermiso('configurar');
 $yo = usuarioActual();
 $personas = db()->prepare(
     "SELECT id, nombre, correo, foto, rol, activo, cedula_profesional, cedula_estado, cedula_motivo, especialidad, ultimo_acceso, creado_en
-       FROM usuarios WHERE institucion_id = ? AND rol <> 'paciente' ORDER BY activo DESC, nombre"
+       FROM usuarios WHERE institucion_id = ? AND rol <> 'paciente'
+      ORDER BY activo DESC, nombre"
 );
 $personas->execute([institucionId()]);
 $personas = $personas->fetchAll();
@@ -35,10 +36,14 @@ $pacientesCodigo = db()->prepare(
 $pacientesCodigo->execute([institucionId()]);
 $pacientesCodigo = array_map(fn ($p) => ['id' => (int) $p['id'], 'nombre' => trim($p['nombre'])], $pacientesCodigo->fetchAll());
 
-$estado = fn (array $p): string => $p['activo'] ? 'activa' : ($p['ultimo_acceso'] === null ? 'pendiente' : 'desactivada');
+$estado = fn (array $p): string => str_starts_with((string) $p['correo'], 'retirada+')
+    ? 'desactivada'
+    : ($p['activo'] ? 'activa' : ($p['ultimo_acceso'] === null ? 'pendiente' : 'desactivada'));
 $textosEstado = ['activa' => 'Activa', 'pendiente' => 'Pendiente', 'desactivada' => 'Desactivada'];
 $coloresRol   = ['administrador' => 'morado', 'medico' => 'azul', 'enfermeria' => 'verde', 'recepcion' => 'naranja'];
 $pendientes   = count(array_filter($personas, fn ($p) => $estado($p) === 'pendiente'));
+$activas      = count(array_filter($personas, fn ($p) => $estado($p) !== 'desactivada'));
+$inactivas    = count($personas) - $activas;
 $permisos     = permisosVigentes();
 
 $tituloPagina   = textoEditable('personas_titulo', 'Personas y permisos');
@@ -81,6 +86,10 @@ abrirMarcoConfiguracion('personas', true);
 
   <!-- Personas -->
   <div class="bd__marco" data-vista-panel="personas">
+    <div class="personas__vistas personas__vistas--estado" role="group" aria-label="Filtrar cuentas por estado">
+      <button type="button" class="personas__vista activa" data-personas-estado="activa" aria-pressed="true">Activas y pendientes <span><?= $activas ?></span></button>
+      <button type="button" class="personas__vista" data-personas-estado="inactiva" aria-pressed="false">Inactivas <span><?= $inactivas ?></span></button>
+    </div>
     <table class="bd-tabla personas__tabla">
       <thead>
         <tr>
@@ -99,13 +108,14 @@ abrirMarcoConfiguracion('personas', true);
           $esYo = (int) $p['id'] === (int) $yo['id'];
           $e = $estado($p);
         ?>
-          <tr data-usuario="<?= (int) $p['id'] ?>" data-estado="<?= $e ?>" data-buscar="<?= e(mb_strtolower($p['nombre'] . ' ' . $p['correo'] . ' ' . ROLES[$p['rol']]['nombre'])) ?>">
+          <?php $cuentaRetirada = str_starts_with((string) $p['correo'], 'retirada+'); ?>
+          <tr data-usuario="<?= (int) $p['id'] ?>" data-estado="<?= $e ?>" data-buscar="<?= e(mb_strtolower($p['nombre'] . ' ' . ($cuentaRetirada ? 'correo liberado cuenta retirada' : $p['correo']) . ' ' . ROLES[$p['rol']]['nombre'])) ?>">
             <td><span class="personas__persona">
               <?= avatar((int) $p['id'], $p['nombre'], $p['foto']) ?>
               <span class="personas__nombre" data-editar-campo="nombre" title="Clic para editar"><?= e($p['nombre']) ?></span>
               <?php if ($esYo): ?><span class="personas__tu">Tú</span><?php endif; ?>
             </span></td>
-            <td class="personas__gris"><?= e($p['correo']) ?></td>
+            <td class="personas__gris"><?= $cuentaRetirada ? 'Correo liberado · cuenta retirada' : e($p['correo']) ?></td>
             <td>
               <button type="button" class="opcion opcion--<?= $coloresRol[$p['rol']] ?> personas__rol" data-cambiar-rol="<?= e($p['rol']) ?>"<?= $esYo ? ' disabled title="No puedes cambiar tu propio rol"' : '' ?>><?= e(ROLES[$p['rol']]['nombre']) ?></button>
             </td>
@@ -114,7 +124,7 @@ abrirMarcoConfiguracion('personas', true);
             <td class="personas__gris"><?= $p['ultimo_acceso'] ? e(hace($p['ultimo_acceso'])) : '—' ?></td>
             <td class="personas__gris"><?= e(fechaCorta($p['creado_en'])) ?></td>
             <td class="personas__acciones-col">
-              <?php if (!$esYo): ?>
+              <?php if (!$esYo && !$cuentaRetirada): ?>
                 <button type="button" class="personas__mas" data-persona-menu title="Acciones"><?= icono('mas') ?></button>
               <?php endif; ?>
             </td>

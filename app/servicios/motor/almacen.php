@@ -98,7 +98,11 @@ function motorCondiciones(array $entidad, array $opciones): array
             }
         }
         if ($camposBusqueda) {
-            [$filtroBusqueda, $parametrosBusqueda] = condicionBusqueda($camposBusqueda, $q);
+            [$filtroBusqueda, $parametrosBusqueda] = condicionBusqueda(
+                $camposBusqueda,
+                $q,
+                ($entidad['clave'] ?? '') === 'medicamentos'
+            );
             $where[] = $filtroBusqueda;
             $params = array_merge($params, $parametrosBusqueda);
         }
@@ -377,7 +381,9 @@ function motorValidar(string $clave, array $datos, bool $parcial = false, int $i
                 }
                 break;
             case 'opcion':
-                if (!in_array($texto, array_keys((array) ($definicion['opciones'] ?? [])), true)) {
+                if (!empty($definicion['relacion_dinamica'])) {
+                    $limpios[$campo] = $texto;
+                } elseif (!in_array($texto, array_keys((array) ($definicion['opciones'] ?? [])), true)) {
                     $errores[$campo] = 'Opción no válida';
                 } else {
                     $limpios[$campo] = $texto;
@@ -395,13 +401,13 @@ function motorValidar(string $clave, array $datos, bool $parcial = false, int $i
 
     $relacionesFinanzas = match ($clave) {
         'finanzas_movimientos' => [
-            'paciente_id' => ['tabla' => 'pacientes', 'institucion' => true],
+            'paciente_id' => ['tabla' => 'pacientes', 'institucion' => true, 'no_eliminado' => true],
             'profesional_id' => ['tabla' => 'usuarios', 'institucion' => true, 'activo' => true, 'profesional' => true],
             'establecimiento_id' => ['tabla' => 'catalogo_establecimientos', 'activo' => true],
             'factura_id' => ['tabla' => 'finanzas_facturas', 'institucion' => true],
         ],
         'finanzas_facturas' => [
-            'paciente_id' => ['tabla' => 'pacientes', 'institucion' => true],
+            'paciente_id' => ['tabla' => 'pacientes', 'institucion' => true, 'no_eliminado' => true],
         ],
         default => [],
     };
@@ -423,6 +429,9 @@ function motorValidar(string $clave, array $datos, bool $parcial = false, int $i
         }
         if (!empty($relacion['activo'])) {
             $sqlRelacion .= ' AND activo = 1';
+        }
+        if (!empty($relacion['no_eliminado'])) {
+            $sqlRelacion .= ' AND eliminado_en IS NULL';
         }
         if (!empty($relacion['profesional'])) {
             $sqlRelacion .= " AND rol <> 'paciente'";
@@ -769,7 +778,7 @@ function motorNotificarMenciones(string $texto, string $entidad, int $registroId
             default     => URL_BASE,
         };
         foreach (array_keys($avisados) as $usuarioId) {
-            crearNotificacion($usuarioId, 'mencion', 'Te mencionaron en un comentario', mb_substr($texto, 0, 200), $url);
+            crearNotificacion($usuarioId, 'mencion', 'Te mencionaron en un comentario', mb_substr($texto, 0, 200), $url, actorId: $autor);
         }
     } catch (Throwable $e) {
         // Una mención fallida no impide guardar el comentario

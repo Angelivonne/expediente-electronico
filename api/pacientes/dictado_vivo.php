@@ -1,8 +1,8 @@
 <?php
 /**
  * Dictado en vivo (navegadores sin Web Speech API, como Zen/Firefox).
- * Recibe un trozo WAV corto (16 kHz, mono, 16 bits) mientras el médico habla y devuelve
- * solo el texto transcrito por el servicio local Whisper (puerto 8766). Los campos y los
+ * Recibe un trozo WAV corto (16 kHz, mono, 16 bits) mientras el médico habla y devuelve el
+ * texto original de Whisper (puerto 8766) junto con una versión limpia para mostrar. Los campos y los
  * medicamentos se extraen al final con dictado.php en modo texto, no aquí: esta ruta debe
  * responder rápido para que las palabras aparezcan en pantalla mientras se dicta.
  */
@@ -63,5 +63,14 @@ if (!is_array($resultado) || !($resultado['ok'] ?? false)) {
     responderVivo(502, ['ok' => false, 'error' => $error ?: 'El servicio de transcripción de voz no está disponible en este momento.']);
 }
 
-responderVivo(200, ['ok' => true, 'texto' => trim((string) ($resultado['texto'] ?? ''))]);
+require_once __DIR__ . '/../../app/servicios/clinica/redaccion_dictado.php';
 
+// El texto en vivo se limpia de jerga frase por frase: se ve clínico mientras se dicta
+// sin romper la continuidad entre trozos. La redacción completa (persona y tiempo) la
+// hace dictado.php al terminar el dictado.
+$textoOriginal = trim((string) ($resultado['texto'] ?? ''));
+responderVivo(200, [
+    'ok' => true,
+    'texto' => dictadoSinJerga($textoOriginal),
+    'texto_original' => $textoOriginal,
+]);

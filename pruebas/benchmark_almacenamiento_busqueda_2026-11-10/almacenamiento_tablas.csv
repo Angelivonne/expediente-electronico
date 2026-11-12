@@ -1,0 +1,3 @@
+medicion,bytes,tablas,descripcion
+InnoDB dinámico,48021504,61,Archivos .ibd de tablas con datos
+InnoDB comprimido 8 KB,24723456,61,Copias comprimidas de las mismas tablas

@@ -187,6 +187,7 @@ switch ($accion) {
         foreach ($filasIniciales as $i => $valores) {
             $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)')
                 ->execute([$id, json_encode($valores, JSON_UNESCAPED_UNICODE), $i + 1]);
+            registrarAuditoriaFilaPagina($id, (int) $pdo->lastInsertId(), 'crear', 'fila');
         }
         registrarBitacora('paginas', $id, 'crear', 'tipo', null, $tipo);
         $pdo->commit();
@@ -409,6 +410,11 @@ switch ($accion) {
             if ($p['tipo'] === 'base_datos') {
                 $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) SELECT ?, valores, orden FROM pagina_filas WHERE pagina_id = ? ORDER BY orden, id')
                     ->execute([$nuevo, $origenId]);
+                $filas = $pdo->prepare('SELECT id FROM pagina_filas WHERE pagina_id = ? ORDER BY id');
+                $filas->execute([$nuevo]);
+                foreach ($filas->fetchAll(PDO::FETCH_COLUMN) as $filaId) {
+                    registrarAuditoriaFilaPagina($nuevo, (int) $filaId, 'crear', 'fila');
+                }
             }
             registrarBitacora('paginas', $nuevo, 'crear', 'tipo', null, $p['tipo']);
             foreach ($espacio as $h) {

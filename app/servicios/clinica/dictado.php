@@ -210,8 +210,19 @@ function dictadoFrase(string $texto): string
     if ($t === '') {
         return '';
     }
-    $primera = mb_strtoupper(mb_substr($t, 0, 1, 'UTF-8'), 'UTF-8');
-    return $primera . mb_substr($t, 1, null, 'UTF-8');
+    $primera = mb_substr($t, 0, 1, 'UTF-8');
+    if (preg_match('/\p{L}/u', $primera)) {
+        return mb_strtoupper($primera, 'UTF-8') . mb_substr($t, 1, null, 'UTF-8');
+    }
+    // Con signo de apertura ("¿desde cuándo…?") la mayúscula va en la primera LETRA.
+    if (!preg_match('/^[¿¡"\'«(\[]/u', $t) || !preg_match('/\p{L}/u', $t, $m, PREG_OFFSET_CAPTURE)) {
+        return $t;
+    }
+    // PREG_OFFSET_CAPTURE da bytes; se convierten a posición de carácter para no partir
+    // signos multibyte como ¿ ¡ «.
+    $posicion = mb_strlen(substr($t, 0, (int) $m[0][1]), 'UTF-8');
+    $mayuscula = mb_strtoupper(mb_substr($t, $posicion, 1, 'UTF-8'), 'UTF-8');
+    return mb_substr($t, 0, $posicion, 'UTF-8') . $mayuscula . mb_substr($t, $posicion + 1, null, 'UTF-8');
 }
 
 /** Del fragmento dado, devuelve los 10 dígitos del teléfono formateados o null. */
@@ -562,6 +573,14 @@ function camposDeDictado(string $texto): array
 {
     $campos = [];
     $texto = sanoTexto($texto);
+    if (str_contains($texto, '?') || str_contains($texto, '¿')) {
+        $fragmentos = preg_split('/(?<=[.!?;])\s+|\n+/u', $texto) ?: [];
+        $texto = implode(' ', array_filter(
+            $fragmentos,
+            static fn(string $fragmento): bool => !str_contains($fragmento, '?')
+                && !str_contains($fragmento, '¿')
+        ));
+    }
     $t = mb_strtolower(trim($texto), 'UTF-8');
     if ($t === '') {
         return $campos;
@@ -755,7 +774,8 @@ function camposDeDictado(string $texto): array
             array_shift($partes);
         }
         $finales = ['y', 'e', 'con', 'que', 'tiene', 'tengo', 'toma', 'padece', 'refiere',
-            'presenta', 'acude', 'viene', 'masculino', 'femenino', 'hombre', 'mujer', 'anos', 'edad'];
+            'presenta', 'acude', 'viene', 'masculino', 'femenino', 'hombre', 'mujer', 'anos', 'edad',
+            'me', 'dice', 'comenta', 'menciona', 'indica', 'reporta', 'explica'];
         while ($partes && in_array(dictadoSinAcentos((string) end($partes)), $finales, true)) {
             array_pop($partes);
         }
@@ -904,8 +924,11 @@ function camposDeDictado(string $texto): array
                 if (preg_match('/\b(?:madre|padre|herman[oa]s?|abuel[oa]s?|t[ií]os?|sobrin[oa]s?|primos?|familiar(?:es)?|familia)\b/iu', $clausula)) {
                     continue;
                 }
+                if (preg_match('/\b(?:niega|niegan|niego|no\s+(?:tiene|presenta|padece|refiere|ha\s+tenido|hab[ií]a\s+tenido)|nunca\s+(?:ha\s+tenido|he\s+tenido|tuvo|padeci[oó])|sin\s+(?:antecedente(?:s)?\s+de\s+)?|tampoco\s+(?:tiene|presenta|padece|ha\s+tenido))\b/iu', $clausula)) {
+                    continue;
+                }
                 $valor = (string) preg_replace('/\s+y\s+(?:padezco|padece|presento|presenta|tengo|tiene)\s+/iu', ', ', $valor);
-                $valor = trim((string) preg_split('/(?:,|\s+y|\s+e)\s*(?=(?:toma|toman|refiere|presenta|niega|acude|viene|consulta|el\s+paciente|la\s+paciente|no\s+tiene|tiene|padece|usa|utiliza|recibe)\b)/iu', $valor)[0]);
+                $valor = trim((string) preg_split('/(?:,|\s+y|\s+e)\s*(?=(?:toma|toman|tomo|tomas|refiere|presenta|niega|acude|viene|consulta|el\s+paciente|la\s+paciente|no\s+tiene|tiene|padece|usa|utiliza|recibe)\b)/iu', $valor)[0]);
                 // "refiere alergia a…" no es un padecimiento crónico; "refiere padre con…" es familiar.
                 if (preg_match('/^alergi[oa]/iu', $valor)
                     || preg_match('/^(?:padre|madre|herman[oa]|abuel[oa]|t[ií][oa]|sobrin[oa]|familiar|familia)/iu', $valor)) {
@@ -921,14 +944,16 @@ function camposDeDictado(string $texto): array
                 break;
             }
         }
-        // "con diabetes e hipertensión", sin verbo; se excluye el contexto familiar y negado.
+        // "con diabetes e hipertensión", sin verbo; se excluye el contexto familiar, negado
+        // y el "diagnóstico: gastritis" (eso va a la casilla de diagnóstico, no a crónicos).
         if (!isset($campos['padecimientos_cronicos'])
             && preg_match_all('/\b(?:' . DICTADO_CRONICOS . ')\b[^.;,\n]*/iu', $texto, $todas, PREG_OFFSET_CAPTURE)) {
             foreach ($todas[0] as [$candidato, $posicion]) {
                 $antes = substr($texto, max(0, $posicion - 60), min(60, $posicion));
                 $cola = preg_match('/[.;,\n]([^.;,\n]*)$/u', $antes, $mm) ? $mm[1] : $antes;
                 if (preg_match('/(?:madre|padre|hermano|hermana|abuelo|abuela|t[ií]o|t[ií]a|familiar|familia|heredofamiliares?)/iu', $cola)
-                    || preg_match('/\b(?:no|niega|niegan|sin)\b/iu', $cola)) {
+                    || preg_match('/\b(?:no|niega|niegan|niego|nunca|tampoco|sin)\b/iu', $cola)
+                    || preg_match('/(?:diagn[oó]stico|dx)\s*[:,]?\s*$/iu', $cola)) {
                     continue;
                 }
                 $campos['padecimientos_cronicos'] = dictadoFrase(trim($candidato));
@@ -949,7 +974,7 @@ function camposDeDictado(string $texto): array
     if (!isset($campos['medicamentos_actuales'])
         && preg_match('/(?:(?:(?:el|la)\s+paciente|mi\s+paciente|el\s+usuario|la\s+persona)\s+(?:toma|est[aá]\s+tomando|usa|utiliza|recibe)|(?:yo\s+)?(?:tomo|estoy\s+tomando|me\s+recetaron|le\s+recetaron|usa|utiliza)|(?:t[úu]\s+)?(?:tomas|est[aá]s\s+tomando|usas|utilizas)|(?<!no\s)(?<!niega\s)toma)\s+([^.;\n]+)/iu', $texto, $m)) {
         $valor = trim($m[1]);
-        $valor = trim((string) preg_split('/,\s*(?=(?:refiere|presenta|niega|acude|viene|el\s+paciente|la\s+paciente|no\s+tiene|tiene|padece)\b)/iu', $valor)[0]);
+        $valor = trim((string) preg_split('/,\s*(?=(?:refiere|presenta|niega|acude|viene|el\s+paciente|la\s+paciente|no\s+tiene|tiene|padece|me\s+recetaron|me\s+dieron|empec[eé])\b)/iu', $valor)[0]);
         if (!preg_match('/\b(?:agua|litros?|vasos?)\b/iu', $valor)) {
             $campos['medicamentos_actuales'] = dictadoFrase($valor);
         }
@@ -961,12 +986,20 @@ function camposDeDictado(string $texto): array
         $campos['motivo_consulta'] = dictadoFrase($m[1]);
     }
     if (!isset($campos['motivo_consulta'])) {
-        $sintomasAgudos = '(?:dolor(?:\s+(?:de|en\s+el|en\s+la|abdominal|tor[aá]cico|lumbar|articular))?|fiebre|calentura|tos|cefalea|jaqueca|n[aá]usea|ganas\s+de\s+vomitar|v[oó]mito|diarrea|chorrillo|est[oó]mago\s+suelto|mareo|v[eé]rtigo|disnea|falta\s+de\s+aire|sangrado|rash|prurito|comez[oó]n|ardor|agruras|acidez|malestar|debilidad|fatiga|cansancio|escalofr[ií]os|congesti[oó]n|mocos|gripe|gripa|catarro|sarpullido|ronchas|cuerpo\s+cortado)';
+        $sintomasAgudos = '(?:dolor(?:\s+(?:de|en\s+el|en\s+la|abdominal|tor[aá]cico|lumbar|articular))?|fiebre|calentura|tos|cefalea|jaqueca|n[aá]usea|ganas\s+de\s+vomitar|v[oó]mito|diarrea|chorrillo|est[oó]mago\s+suelto|mareo|v[eé]rtigo|disnea|falta\s+de\s+aire|sangrado|rash|prurito|comez[oó]n|ardor|agruras|acidez|malestar|debilidad|fatiga|cansancio|escalofr[ií]os|congesti[oó]n|mocos|gripe|gripa|catarro|sarpullido|ronchas|cuerpo\s+cortado|pan(?:za|sa)|barriga)';
         $disparadorSintoma = '(?:refiere|presenta|inicia|comienza|tiene|tengo|siento|siente|me\s+siento|me\s+dio|anda\s+con|viene\s+con|acude\s+por|consulta\s+por|se\s+queja\s+de)';
-        if (preg_match('/\b(?:me|le|nos)\s+duele(?:n)?\s+(?:mucho\s+)?(?:el|la|los|las)?\s*(?:cabeza|garganta|pecho|abdomen|est[oó]mago|panza|barriga|espalda|cintura|brazo|pierna|rodilla|cuerpo|o[ií]do|muela|diente|hombro|cuello|cadera|ri[nñ][oó]n)\b[^.;,\n]*/iu', $texto, $m)) {
-            $campos['motivo_consulta'] = dictadoFrase(trim($m[0]));
-        } elseif (preg_match('/' . $disparadorSintoma . '\s+(?:desde\s+|por\s+|con\s+)?(' . $sintomasAgudos . '\b[^.;,\n]*)/iu', $texto, $m)) {
-            $campos['motivo_consulta'] = dictadoFrase(trim($m[1]));
+        if (preg_match('/\b(?:me|le|nos)\s+duele(?:n)?\s+(?:mucho\s+)?(?:el|la|los|las)?\s*(?:cabeza|garganta|pecho|abdomen|est[oó]mago|pan(?:za|sa)|barriga|espalda|cintura|brazo|pierna|rodilla|cuerpo|o[ií]do|muela|diente|hombro|cuello|cadera|ri[nñ][oó]n)\b[^.;,\n]*/iu', $texto, $m, PREG_OFFSET_CAPTURE)) {
+            $inicioSintoma = (int) $m[0][1];
+            $contextoSintoma = substr($texto, max(0, $inicioSintoma - 40), min(40, $inicioSintoma));
+            if (!preg_match('/\b(?:no|nunca|niega|niego|tampoco)\s+(?:(?:yo|que)\s+)?$/iu', $contextoSintoma)) {
+                $campos['motivo_consulta'] = dictadoFrase(trim($m[0][0]));
+            }
+        } elseif (preg_match('/' . $disparadorSintoma . '\s+(?:desde\s+|por\s+|con\s+)?(' . $sintomasAgudos . '\b[^.;,\n]*)/iu', $texto, $m, PREG_OFFSET_CAPTURE)) {
+            $inicioSintoma = (int) $m[0][1];
+            $contextoSintoma = substr($texto, max(0, $inicioSintoma - 40), min(40, $inicioSintoma));
+            if (!preg_match('/\b(?:no|nunca|niega|niego|tampoco)\s*$/iu', $contextoSintoma)) {
+                $campos['motivo_consulta'] = dictadoFrase(trim($m[1][0]));
+            }
         } elseif (preg_match('/^\s*(' . $sintomasAgudos . '\b[^.;,\n]*)/iu', $texto, $m)) {
             $campos['motivo_consulta'] = dictadoFrase(trim($m[1]));
         }
@@ -1052,6 +1085,24 @@ function camposDeDictado(string $texto): array
         if ($tel !== null) {
             $campos['telefono_emergencia'] = $tel;
         }
+    }
+
+    /* ---------- Redacción clínica ----------
+       Jerga → término médico y habla del paciente → tercera persona, dentro de cada valor.
+       Se hace AL FINAL porque la extracción necesita el texto tal como se dijo: los
+       patrones de arriba reconocen "me duele", "tengo", "empecé" del habla directa. */
+    $campos = dictadoRedactarCampos($campos);
+
+    /* ---------- Dictado sin etiquetas ----------
+       Si el dictado no nombró ninguna sección y no se reconoció ninguna casilla, el texto
+       completo se redacta y se enruta a la casilla narrativa que corresponde según su
+       vocabulario (el formulario la resuelve por sus alias). */
+    $sintomaNegado = preg_match(
+        '/\b(?:no|nunca|niega|niego|tampoco)\b[^.;\n]{0,50}\b(?:dolor|fiebre|calentura|tos|cefalea|jaqueca|n[aá]usea|v[oó]mito|diarrea|mareo|v[eé]rtigo|disnea|sangrado|rash|prurito|comez[oó]n|ardor|agruras|acidez|malestar|debilidad|fatiga|cansancio|escalofr[ií]os|congesti[oó]n|mocos|gripe|gripa|catarro|ronchas|pan(?:za|sa)|barriga)\b/iu',
+        $texto
+    );
+    if (empty($campos) && !$sintomaNegado && mb_strlen($texto) >= 15 && !preg_match('/[?¿]/u', $texto)) {
+        $campos[dictadoCampoNarrativoDe($texto)] = dictadoRedactarNarracion(trim($texto), true);
     }
 
     return $campos;

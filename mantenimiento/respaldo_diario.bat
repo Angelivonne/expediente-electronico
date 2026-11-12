@@ -1,5 +1,5 @@
 @echo off
-rem Respaldo diario de la base expediente_expediente para el Programador de tareas de Windows.
+rem Respaldo diario de la base clinica para el Programador de tareas de Windows.
 rem Si la app ya hizo el respaldo de hoy, no repite. Instrucciones: docs\respaldos.md
 rem Deja constancia de cada ejecucion en privado\registros\respaldos.log
 cd /d "%~dp0"

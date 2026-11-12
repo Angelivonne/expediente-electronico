@@ -1,5 +1,5 @@
 -- Conexiones entre instituciones y autorizaciones individuales de intercambio.
--- Aplicar una sola vez sobre expediente_expediente antes de habilitar /conexiones/.
+-- Aplicar una sola vez sobre clinica antes de habilitar /conexiones/.
 
 CREATE TABLE IF NOT EXISTS conexiones_clinicas (
   id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -52,6 +52,6 @@ CREATE TABLE IF NOT EXISTS conexiones_autorizaciones (
 ) ENGINE=InnoDB;
 
 -- Privilegios mínimos para que la aplicación lea, registre y revoque vínculos y autorizaciones.
--- Ejecutar este archivo con una cuenta administradora de MySQL (el usuario expediente_app no crea tablas).
-GRANT SELECT, INSERT, UPDATE ON expediente_expediente.conexiones_clinicas TO 'expediente_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE ON expediente_expediente.conexiones_autorizaciones TO 'expediente_app'@'localhost';
+-- Ejecutar este archivo con una cuenta administradora de MySQL (el usuario clinica_app no crea tablas).
+GRANT SELECT, INSERT, UPDATE ON clinica.conexiones_clinicas TO 'clinica_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON clinica.conexiones_autorizaciones TO 'clinica_app'@'localhost';

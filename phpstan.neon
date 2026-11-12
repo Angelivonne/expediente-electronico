@@ -1,0 +1,9 @@
+parameters:
+    level: 3
+    paths:
+        - .
+    excludePaths:
+        analyseAndScan:
+            - vendor/*
+            - backups/*
+            - privado/*

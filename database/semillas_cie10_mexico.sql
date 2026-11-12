@@ -6,7 +6,7 @@
 -- Repetirlo no duplica (INSERT IGNORE por uq_cie10_codigo).
 -- ==========================================================================
 
-USE expediente_expediente;
+USE clinica;
 
 SET @INST := NULL;  -- ejemplo: SET @INST := 1;
 

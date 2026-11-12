@@ -1,5 +1,5 @@
 """
-Generador de Gráficas Estadísticas Formales con Matplotlib para Expediente FEMECI
+Generador de Gráficas Estadísticas Formales con Matplotlib para Expediente Clínica
 Estilo estricto: Letra negra, tipografía Arial, escala de grises / monocromático, 300 DPI.
 """
 import os
@@ -23,7 +23,6 @@ plt.rcParams['axes.linewidth'] = 1.0
 plt.rcParams['figure.dpi'] = 300
 
 OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'assets', 'img', 'reportes'))
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def generar_grafica_top_morbilidad(datos, ruta_salida):
     """
@@ -201,9 +200,11 @@ def main():
             ]
         }
 
-    r1 = os.path.join(OUTPUT_DIR, 'morbilidad_top10.png')
-    r2 = os.path.join(OUTPUT_DIR, 'piramide_etaria.png')
-    r3 = os.path.join(OUTPUT_DIR, 'categorias_nosologicas.png')
+    output_dir = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else OUTPUT_DIR
+    os.makedirs(output_dir, exist_ok=True)
+    r1 = os.path.join(output_dir, 'morbilidad_top10.png')
+    r2 = os.path.join(output_dir, 'piramide_etaria.png')
+    r3 = os.path.join(output_dir, 'categorias_nosologicas.png')
 
     generar_grafica_top_morbilidad(data['top_morbilidad'], r1)
     generar_grafica_piramide_edad(data['piramide_edad'], r2)

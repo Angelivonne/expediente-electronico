@@ -1,10 +1,10 @@
-# Expedientes Clínicos
+# Clínica
 
-Expediente clínico electrónico para establecimientos de salud en México, basado en la
+Sistema clínico electrónico para establecimientos de salud en México, basado en la
 NOM-004-SSA3-2012 (expediente clínico), la NOM-024-SSA3-2012 (sistemas de información en salud)
 y la LFPDPPP (protección de datos personales). PHP 8.2 + MySQL/MariaDB (XAMPP) + JavaScript sin frameworks.
 
-Todo vive en **una sola base de datos**: `expediente_expediente`.
+Todo vive en **una sola base de datos**: `clinica`.
 
 ## Estructura
 
@@ -15,6 +15,8 @@ acceso/                  Iniciar sesión (correo → contraseña → código de 
 pacientes/               Tabla de pacientes, registro/edición, perfil, nuevos registros clínicos
                          (nuevo_registro.php), guardado del historial y documento completo (evento.php)
 agenda/                  Calendario de citas (día, semana, mes, lista) con recordatorios
+cirugia/                 Agenda quirúrgica operativa, transiciones de estado e historial auditable
+flujo/                   Tablero e historial de etapas del recorrido de atención
 paginas/                 Espacio de trabajo: carpetas, notas (editor por bloques) y bases de datos
 datos/                   Importar y exportar (CSV, Excel, JSON, XML, SQL, SQLite, HL7, FHIR) con bitácora
 asistente/               Asistente de IA a pantalla completa
@@ -45,6 +47,8 @@ app/                     Código interno (bloqueado al navegador)
 config/                  config.php (constantes) y db.php (conexión PDO)
 database/                esquema.sql (todas las tablas) y usuario_aplicacion.sql (permisos MySQL)
 docs/                    Investigación normativa (también la usa el asistente) y requisitos
+iniciar_clinica.bat      Inicio y validación de los servicios locales
+instalar.bat             Instalación local para una base nueva
 assets/
   css/estilos.css        Estilos base; css/modulos/*.css se cargan solos en cada página
   js/                    app, espacio, gráficas, markdown, razonamiento; js/modulos/*.js se cargan solos
@@ -58,16 +62,41 @@ vendor/                  SDK oficial de Anthropic (Composer; bloqueado)
 
 ## Puesta en marcha
 
-1. Importar `database/esquema.sql` en MySQL (crea `expediente_expediente`).
-2. Crear el usuario de la aplicación con `database/usuario_aplicacion.sql` y guardar sus credenciales en
-   `privado/bd.php` (`return ['usuario' => 'expediente_app', 'clave' => '…'];`). Sin ese archivo la app usa root.
+La aplicación calcula automáticamente su URL local a partir del nombre de la carpeta. En XAMPP,
+la ubicación recomendada es `C:\xampp\htdocs\clinica`, disponible en `http://localhost/clinica/`.
+
+1. Importar `database/esquema.sql` en MySQL (crea `clinica`).
+2. Crear el usuario de la aplicación con `database/usuario_aplicacion.sql`, usando una contraseña aleatoria
+   para `__APP_DB_PASSWORD__`; si habilitas restauraciones, usa otra para `__BACKUP_DB_PASSWORD__`.
+   Guardar cada valor en `privado/bd.php` y `privado/respaldo_bd.php`, respectivamente. Para una instalación local nueva, `instalar.bat` genera automáticamente la contraseña
+   de la aplicación y se detiene si ya existe `privado/bd.php` o la base de datos configurada.
 3. Para habilitar **Conexiones con clínicas**, importar `database/migracion_conexiones_clinicas.sql` como administrador
-   de MySQL, después de crear `expediente_app`. El script crea las tablas y concede los permisos mínimos requeridos.
-4. Abrir `http://localhost/ExpedienteExpediente/`. La primera cuenta que se registra es la del administrador.
-5. Correo: en desarrollo (`MAIL_MODO = 'archivo'`) los correos se guardan en `C:/xampp/mailoutput`.
+   de MySQL, después de crear `clinica_app`. El script crea las tablas y concede los permisos mínimos requeridos.
+4. El instalador crea automáticamente la búsqueda FULLTEXT de notas. En una instalación existente,
+   `iniciar_clinica.bat` revisa y actualiza la base al iniciar; genera un respaldo previo y mantiene
+   los triggers incluso al restaurar. Si la cuenta configurada no tiene privilegios de migración, lo
+   informa sin cambiar la base. La función usa un índice auxiliar, sin modificar filas clínicas; aumenta
+   el almacenamiento. Para desactivarla, usar
+   `database/migracion_busqueda_historial_revertir.sql`.
+   Para instalaciones existentes que incorporen la agenda quirúrgica, ejecutar como administrador
+   `database/migracion_preferencias_usuario.sql` y después `database/migracion_cirugia_permisos.sql`.
+5. Abrir `http://localhost/clinica/`. La primera cuenta que se registra es la del administrador.
+6. Correo: en desarrollo (`MAIL_MODO = 'archivo'`) los correos se guardan en `C:/xampp/mailoutput`.
    En producción, `MAIL_MODO = 'mail'` con SMTP configurado y `URL_ORIGEN` con el dominio real.
-6. Voz: `iniciar_servicio_stt.bat` (raíz) inicia el servicio local de dictado.
-7. Asistente: el administrador pega la API del proveedor en ⚙ (se guarda cifrada con AES-256-GCM).
+7. Voz: `iniciar_clinica.bat` inicia los servicios locales.
+8. Asistente: el administrador pega la API del proveedor en ⚙ (se guarda cifrada con AES-256-GCM).
+
+## Análisis y formato
+
+Con Composer instalado, ejecuta `php composer.phar run analyse` para PHPStan y
+`php composer.phar run format:check` para revisar PSR-12 sin modificar archivos.
+`php composer.phar run format` aplica el formato; revisa el diff antes de conservar los cambios.
+
+## Agenda quirúrgica
+
+La agenda registra horario, procedimiento, sala, personal, transiciones de estado y su autoría. Es una
+herramienta logística; no sustituye una valoración preoperatoria, la lista de verificación quirúrgica ni
+las notas clínicas firmadas.
 
 ## Catálogos para la captura clínica
 
@@ -76,7 +105,7 @@ catálogos de la institución mientras se escribe. Al elegir un resultado CIE-10
 clave; al elegir medicamento se completa el nombre y la presentación oficial.
 
 En el servidor local ya cargué **14,497 diagnósticos CIE-10** y **1,983 medicamentos oficiales** para la
-institución 1. La cuenta `expediente_app` permite insertar filas, pero no modificar el esquema; por eso la carga
+institución 1. La cuenta `clinica_app` permite insertar filas, pero no modificar el esquema; por eso la carga
 actual guarda nombre, clave y presentación resumida dentro de las columnas existentes. El archivo oficial
 de medicamentos sigue disponible en Descargas y la semilla SQL conserva además la descripción e indicaciones
 completas.
@@ -127,7 +156,7 @@ central (otra instalación de este mismo código) cuando hay conexión.
 
 ## Respaldos y trabajo sin conexión
 
-- Respaldo diario automático de `expediente_expediente` en `privado/respaldos` (comprimido, con suma SHA-256,
+- Respaldo diario automático de `clinica` en `privado/respaldos` (comprimido, con suma SHA-256,
   se conservan 14). Configuración → Respaldos: descargar, respaldar ahora, verificar y `CHECK TABLE`.
   Para programarlo con Windows: `mantenimiento/respaldo_diario.bat`. Detalle en `docs/respaldos.md`.
 - MySQL con escritura segura ante apagones (`innodb_flush_log_at_trx_commit=1`, doublewrite) y

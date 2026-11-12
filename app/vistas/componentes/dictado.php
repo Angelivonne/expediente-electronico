@@ -9,7 +9,7 @@
   <section class="dictado__panel" data-dictado-panel hidden aria-label="Transcripción del dictado">
     <header class="dictado__cabecera" data-dictado-asa title="Arrastrar el panel">
       <span class="dictado__asa"><?= icono('agarre') ?></span>
-      <span class="dictado__cabecera-titulo">Traductor Cl�nico</span>
+      <span class="dictado__cabecera-titulo">Transcriptor clínico</span>
       <button type="button" class="boton-icono" data-dictado-minimizar title="Minimizar a bolita" aria-label="Minimizar a bolita"><?= icono('contraer') ?></button>
     </header>
     <div class="dictado__hoja">
@@ -54,4 +54,3 @@
     <button type="button" class="dictado-orbita__bolita" data-dictado-orbita-bolita title="Volver al dictado" aria-label="Volver al dictado"></button>
   </span>
 </div>
-

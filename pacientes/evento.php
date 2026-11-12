@@ -80,6 +80,20 @@ if ($comentariosDelEvento) {
 }
 
 $d         = json_decode($h['detalle'], true) ?: [];
+$transcripcion = is_array($d['_transcripcion'] ?? null) ? $d['_transcripcion'] : null;
+$transcripcionIntegra = false;
+if ($transcripcion) {
+    $detalleParaHuella = json_decode((string) $h['detalle']);
+    if (is_object($detalleParaHuella)) {
+        unset($detalleParaHuella->_transcripcion);
+    }
+    $huellaTexto = hash('sha256', (string) ($transcripcion['texto_original'] ?? ''));
+    $huellaDetalle = huellaDatosTranscripcion($detalleParaHuella);
+    $transcripcionIntegra = is_object($detalleParaHuella)
+        && isset($transcripcion['huella_texto_sha256'], $transcripcion['huella_detalle_sha256'])
+        && hash_equals((string) $transcripcion['huella_texto_sha256'], $huellaTexto)
+        && hash_equals((string) $transcripcion['huella_detalle_sha256'], $huellaDetalle);
+}
 $tipo      = $h['tipo'];
 $documento = nombreTipoRegistro($tipo, 'documento');
 $paciente  = trim("{$h['nombre']} {$h['primer_apellido']} {$h['segundo_apellido']}");
@@ -165,6 +179,22 @@ if ($modoPaciente) {
   <div class="documento__contenido">
     <?php $registro = $h; $modoDetalle = 'documento'; require __DIR__ . '/../app/vistas/componentes/historial_detalle.php'; ?>
   </div>
+
+  <?php if (!$modoPaciente && $transcripcion): ?>
+    <details class="documento__trazabilidad">
+      <summary>Procedencia del dictado · <?= $transcripcionIntegra ? 'huellas coincidentes' : 'huellas no coincidentes' ?></summary>
+      <dl>
+        <div><dt>Revisó y confirmó</dt><dd><?= e((string) ($transcripcion['confirmado_nombre'] ?? 'No registrado')) ?></dd></div>
+        <div><dt>Fecha y hora de confirmación</dt><dd><?= e((string) ($transcripcion['confirmado_en_utc'] ?? 'No registrada')) ?> UTC</dd></div>
+        <div><dt>Motor</dt><dd><?= e((string) ($transcripcion['motor'] ?? 'No identificado')) ?></dd></div>
+        <div><dt>Huella del texto fuente</dt><dd><code><?= e((string) ($transcripcion['huella_texto_sha256'] ?? '')) ?></code></dd></div>
+        <div><dt>Huella de los datos finales</dt><dd><code><?= e((string) ($transcripcion['huella_detalle_sha256'] ?? '')) ?></code></dd></div>
+      </dl>
+      <p>Las huellas permiten detectar diferencias respecto a esta copia; no son una firma electrónica ni una certificación legal.</p>
+      <h2>Texto original reconocido</h2>
+      <pre><?= e((string) ($transcripcion['texto_original'] ?? '')) ?></pre>
+    </details>
+  <?php endif; ?>
 
   <?php if ($tipo === 'consentimiento'): ?>
     <!-- NOM-004 10.1.1: nombre y firma de quien otorga, del médico y de dos testigos -->

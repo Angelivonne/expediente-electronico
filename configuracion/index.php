@@ -10,6 +10,8 @@ require_once __DIR__ . '/../app/nucleo/inicio.php';
 require_once __DIR__ . '/../app/servicios/cuenta/instituciones.php';
 require_once __DIR__ . '/../app/servicios/cuenta/cedula.php';
 require_once __DIR__ . '/../app/servicios/cuenta/smtp.php';
+require_once __DIR__ . '/../app/servicios/cuenta/preferencias.php';
+require_once __DIR__ . '/../app/servicios/clinica/flujo.php';
 require_once __DIR__ . '/../app/servicios/sistema/respaldos.php';
 
 $usuario   = usuarioActual();
@@ -19,7 +21,7 @@ $institucion = institucionActual();
 
 require_once __DIR__ . '/../app/vistas/componentes/configuracion_marco.php';
 // Secciones que se editan aquí mismo; Personas, Respaldos y Correo tienen su página dentro del mismo marco
-$claves = array_values(array_intersect(array_column(seccionesConfiguracion(), 1), ['cuenta', 'notificaciones', 'memoria', 'clinica', 'formatos', 'asistente', 'personas', 'respaldos', 'correo']));
+$claves = array_values(array_intersect(array_column(seccionesConfiguracion(), 1), ['cuenta', 'apariencia', 'notificaciones', 'memoria', 'clinica', 'flujo', 'formatos', 'asistente', 'personas', 'respaldos', 'correo']));
 $s = in_array($_GET['s'] ?? '', $claves, true) ? $_GET['s'] : 'cuenta';
 $errores = [];
 
@@ -39,6 +41,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $s === 'memoria') {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $s === 'apariencia') {
+    if (!csrfValido()) {
+        $errores['general'] = 'La sesión expiró. Vuelve a intentarlo.';
+    } else {
+        try {
+            guardarPreferenciasVisuales($usuarioId, $_POST);
+            mensajeFlash('exito', 'Preferencias de apariencia guardadas.');
+            redirigir('/configuracion/?s=apariencia');
+        } catch (InvalidArgumentException $e) {
+            $errores['general'] = $e->getMessage();
+        }
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $s === 'flujo' && $esAdmin) {
+    if (!csrfValido()) {
+        $errores['general'] = 'La sesión expiró. Vuelve a intentarlo.';
+    } else {
+        try {
+            $etapas = leerEtapasFlujoTexto(is_string($_POST['etapas'] ?? null) ? $_POST['etapas'] : '');
+            guardarConfig('flujo_etapas', json_encode($etapas, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+            mensajeFlash('exito', 'Etapas de atención guardadas.');
+            redirigir('/configuracion/?s=flujo');
+        } catch (InvalidArgumentException $e) {
+            $errores['general'] = $e->getMessage();
+        }
+    }
+}
+
 // Guardar los datos de la clínica
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $s === 'clinica' && $esAdmin && $institucion) {
     if (!csrfValido()) {
@@ -53,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $s === 'clinica' && $esAdmin && $in
     }
 }
 
-$c = db()->prepare('SELECT correo, rol, cedula_profesional, cedula_estado, especialidad, ultimo_acceso FROM usuarios WHERE id = ?');
+$c = db()->prepare('SELECT id, nombre, foto, correo, rol, cedula_profesional, cedula_estado, especialidad, ultimo_acceso FROM usuarios WHERE id = ?');
 $c->execute([$usuarioId]);
 $cuenta = $c->fetch();
 
@@ -75,6 +106,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     <h1 class="configuracion__titulo">Mi cuenta</h1>
     <p class="configuracion__subtitulo">Tus datos de acceso y la seguridad de tu cuenta</p>
     <h2 class="configuracion__seccion">Datos</h2>
+    <?= $fila('Foto de perfil', 'JPG, PNG o WebP · máximo 5 MB. Se utiliza en las vistas del equipo.', '<label class="cuenta__foto-control">' . avatar((int) $cuenta['id'], (string) $cuenta['nombre'], $cuenta['foto'] ?: null, 'cuenta__avatar') . '<span>Cambiar foto</span><input type="file" accept="image/jpeg,image/png,image/webp" data-foto-perfil hidden></label>') ?>
     <?= $fila('Correo', 'Con él inicias sesión y recibes los códigos de verificación.', '<span class="conf-fila__valor">' . e($cuenta['correo']) . '</span>') ?>
     <?= $fila('Rol', ROLES[$cuenta['rol']]['descripcion'] ?? '', '<span class="conf-fila__valor">' . e(ROLES[$cuenta['rol']]['nombre'] ?? ucfirst($cuenta['rol'])) . '</span>') ?>
     <?php if ($cuenta['cedula_profesional']): ?>
@@ -92,6 +124,39 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     <p class="configuracion__subtitulo">Qué avisos recibes y dónde</p>
     <?= $fila('Aura de citas', 'Un borde de luz delgado alrededor de la pantalla cuando se acerca un paciente que te toca atender: aqua a 30 min, ámbar a 10 min y rojo cuando ya empezó o es urgente. Se guarda en este navegador.', '<button type="button" class="cal-opcion conf-interruptor" role="switch" aria-checked="true" data-aura-alternar aria-label="Aura de citas"><i class="interruptor" aria-hidden="true"></i></button>') ?>
     <div data-push-ajustes-pagina></div>
+
+  <?php elseif ($s === 'apariencia'): ?>
+    <?php $apariencia = preferenciasVisuales($usuarioId); ?>
+    <h1 class="configuracion__titulo">Apariencia</h1>
+    <p class="configuracion__subtitulo">Ajusta el contraste y la densidad de la interfaz para tu cuenta. Se aplica en tus dispositivos.</p>
+    <form method="post" class="conf-formulario">
+      <?= campoCsrf() ?>
+      <?php
+        $selectApariencia = static function (string $campo, array $opciones, string $actual): string {
+            $html = '<select class="conf-fila__selector" name="' . e($campo) . '">';
+            foreach ($opciones as $valor => $etiqueta) {
+                $html .= '<option value="' . e($valor) . '"' . ($actual === $valor ? ' selected' : '') . '>' . e($etiqueta) . '</option>';
+            }
+            return $html . '</select>';
+        };
+      ?>
+      <?= $fila('Tema', 'Oscuro, claro o seguir el ajuste del sistema operativo.', $selectApariencia('tema', ['oscuro' => 'Oscuro', 'claro' => 'Claro', 'sistema' => 'Según mi dispositivo'], (string) $apariencia['tema'])) ?>
+      <?= $fila('Densidad', 'La vista compacta muestra más filas; la cómoda facilita la lectura.', $selectApariencia('densidad', ['comoda' => 'Cómoda', 'compacta' => 'Compacta'], (string) $apariencia['densidad'])) ?>
+      <?= $fila('Tamaño del texto', 'Aumenta la tipografía de la interfaz sin cambiar los datos clínicos.', $selectApariencia('tamano_texto', ['normal' => 'Normal', 'grande' => 'Grande'], (string) $apariencia['tamano_texto'])) ?>
+      <div class="conf-formulario__acciones"><button class="boton boton--primario" type="submit">Guardar preferencias</button></div>
+    </form>
+
+  <?php elseif ($s === 'flujo' && $esAdmin): ?>
+    <?php $etapasFlujoActuales = etapasFlujo(); ?>
+    <h1 class="configuracion__titulo">Etapas de atención</h1>
+    <p class="configuracion__subtitulo">Define las columnas del tablero operativo de tu clínica. Los movimientos ya registrados se conservan; no puedes quitar una etapa que tenga pacientes activos.</p>
+    <form method="post" class="conf-formulario">
+      <?= campoCsrf() ?>
+      <label class="configuracion__seccion" for="flujo-etapas">Una etapa por línea · clave|nombre</label>
+      <textarea id="flujo-etapas" name="etapas" class="conf-fila__entrada--ancha" rows="12" spellcheck="false"><?= e(isset($_POST['etapas']) && is_string($_POST['etapas']) ? $_POST['etapas'] : textoEtapasFlujo($etapasFlujoActuales)) ?></textarea>
+      <p class="pagina__descripcion">La clave es estable y no lleva espacios (por ejemplo, <code>observacion</code>). Conserva <code>registro</code> como primera etapa y <code>egreso</code> como última. “Hospitalización”, “Cirugía” y “Recuperación” son estados de seguimiento; la documentación clínica y la asignación de camas siguen en sus módulos especializados.</p>
+      <div class="conf-formulario__acciones"><button class="boton boton--primario" type="submit">Guardar etapas</button></div>
+    </form>
 
   <?php elseif ($s === 'clinica'): ?>
     <h1 class="configuracion__titulo">General</h1>

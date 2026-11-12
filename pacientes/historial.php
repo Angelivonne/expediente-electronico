@@ -13,6 +13,7 @@
  */
 require_once __DIR__ . '/../app/nucleo/inicio.php';
 require_once __DIR__ . '/../app/servicios/clinica/registros.php';
+require_once __DIR__ . '/../app/servicios/clinica/firmas_clinicas.php';
 
 $id       = (int) ($_POST['paciente_id'] ?? 0);
 $tipo     = is_string($_POST['tipo'] ?? null) ? $_POST['tipo'] : '';
@@ -46,17 +47,55 @@ if (!$paciente) {
     'titulo' => $titulo, 'detalle' => $detalle, 'momento' => $momento, 'errores' => $errores,
 ] = validarRegistroClinico($tipo, $_POST, $paciente, $completo, (int) usuarioActual()['id']);
 
+$textoTranscripcion = is_string($_POST['transcripcion_original'] ?? null) ? trim($_POST['transcripcion_original']) : '';
+$motorTranscripcion = is_string($_POST['transcriptor_motor'] ?? null) ? $_POST['transcriptor_motor'] : '';
+$confirmacionTranscripcion = is_string($_POST['confirmar_transcripcion'] ?? null) && $_POST['confirmar_transcripcion'] === '1';
+$dictadoToken = is_string($_POST['dictado_contexto'] ?? null) ? $_POST['dictado_contexto'] : '';
+$contextoSesion = $_SESSION['dictado_contextos'][$dictadoToken] ?? null;
+$dictadoPendiente = $_SESSION['dictado_clinico_pendiente'][$dictadoToken] ?? null;
+$dictadoVerificado = false;
+if (!preg_match('/^[a-f0-9]{48}$/', $dictadoToken)
+    || !is_array($contextoSesion)
+    || (int) ($contextoSesion['creado_en'] ?? 0) < time() - 86400
+    || (int) ($contextoSesion['paciente_id'] ?? 0) !== $id
+    || ($contextoSesion['tipo'] ?? '') !== $tipo) {
+    $dictadoPendiente = null;
+} elseif (is_array($dictadoPendiente) && (int) ($dictadoPendiente['actualizado_en'] ?? 0) >= time() - 86400
+    && (int) ($dictadoPendiente['paciente_id'] ?? 0) === $id && ($dictadoPendiente['tipo'] ?? '') === $tipo
+    && ($dictadoPendiente['token'] ?? '') === $dictadoToken) {
+    $dictadoVerificado = true;
+    if ($textoTranscripcion === '' || !is_string($dictadoPendiente['texto_original'] ?? null)
+        || !hash_equals($dictadoPendiente['texto_original'], $textoTranscripcion)) {
+        $errores[] = 'La transcripción cambió o no llegó completa. Vuelve a dictar y revisar el texto antes de guardar.';
+    }
+    $motorTranscripcion = (string) $dictadoPendiente['motor'];
+}
+if ($textoTranscripcion !== '' && !$dictadoVerificado) {
+    $errores[] = 'La sesión ya no conserva la fuente original del dictado. Vuelve a dictar la información antes de guardar.';
+}
+if (mb_strlen($textoTranscripcion) > 60000) {
+    $errores[] = 'La transcripción supera el tamaño permitido; vuelve a dictar una parte más corta.';
+} elseif ($textoTranscripcion !== '' && !$confirmacionTranscripcion) {
+    $errores[] = 'Revisa la transcripción y confirma antes de guardar la nota.';
+}
+if ($textoTranscripcion !== '' && !in_array($motorTranscripcion, ['web_speech', 'stt_local'], true)) {
+    $errores[] = 'No se pudo identificar el motor de transcripción. Vuelve a dictar la nota.';
+}
+
 if ($errores) {
     if ($completo) {
         // Se conserva lo escrito para devolverlo al formulario (sin el token)
         $limpiar = function ($valor) use (&$limpiar) {
             return is_array($valor) ? array_map($limpiar, array_slice($valor, 0, 40, true)) : mb_substr((string) $valor, 0, 5000);
         };
+        $datosBorrador = $limpiar(array_diff_key($_POST, ['csrf' => 1, 'nota_bloques' => 1]));
+        $datosBorrador['transcripcion_original'] = mb_substr($textoTranscripcion, 0, 60000);
+        $datosBorrador['transcriptor_motor'] = in_array($motorTranscripcion, ['web_speech', 'stt_local'], true) ? $motorTranscripcion : '';
+        $datosBorrador['confirmar_transcripcion'] = '';
         $_SESSION['borrador_registro'] = [
             'paciente' => $id,
             'tipo'     => $tipo,
-            'datos'    => $limpiar(array_diff_key($_POST, ['csrf' => 1, 'cuerpo' => 1, 'nota_bloques' => 1]))
-                + (is_string($_POST['cuerpo'] ?? null) ? ['cuerpo' => mb_substr($_POST['cuerpo'], 0, 60000)] : [])
+            'datos'    => $datosBorrador
                 + (is_array($_POST['nota_bloques'] ?? null) ? ['nota_bloques' => array_map(fn ($v) => is_string($v) ? mb_substr($v, 0, 60000) : '', array_slice($_POST['nota_bloques'], 0, 40, true))] : []),
             'errores'  => $errores,
         ];
@@ -66,13 +105,7 @@ if ($errores) {
 }
 
 /* ---------- Guardado ---------- */
-// Cuerpo libre escrito con el motor de bloques de la nota (solo texto, ya validado).
 require_once __DIR__ . '/../app/vistas/componentes/bloques_nota.php';
-$cuerpo = sanearBloquesNota($_POST['cuerpo'] ?? []);
-$cuerpoEscrito = array_filter($cuerpo, fn ($b) => !in_array($b['t'], ['h1', 'h2', 'h3', 'separador'], true));
-if ($cuerpoEscrito) {
-    $detalle['cuerpo'] = $cuerpo;
-}
 
 // Bloques del panel de nota en cada campo de texto: viajan con la entrada y conservan el formato.
 foreach ((array) ($_POST['nota_bloques'] ?? []) as $cbCampo => $cbValor) {
@@ -102,6 +135,18 @@ if ($institucionRegistro) {
         'clues' => $institucionRegistro['clues'],
     ];
 }
+if ($textoTranscripcion !== '') {
+    $detalle['_transcripcion'] = [
+        'version' => 1,
+        'motor' => $motorTranscripcion,
+        'texto_original' => $textoTranscripcion,
+        'huella_texto_sha256' => hash('sha256', $textoTranscripcion),
+        'huella_detalle_sha256' => huellaDatosTranscripcion($detalle),
+        'confirmado_por' => (int) $autor['id'],
+        'confirmado_nombre' => (string) $autor['nombre'],
+        'confirmado_en_utc' => gmdate('Y-m-d\TH:i:s\Z'),
+    ];
+}
 
 $pdo = db();
 $pdo->beginTransaction();
@@ -114,7 +159,11 @@ $pdo->prepare(
 ]);
 $nuevoId = (int) $pdo->lastInsertId();
 registrarBitacora('pacientes', $id, 'crear', 'historial_' . $tipo, null, mb_substr($titulo, 0, 200));
+if ($textoTranscripcion !== '') {
+    registrarBitacora('historial_clinico', $nuevoId, 'crear', 'confirmacion_transcripcion', null, 'Transcripción revisada y confirmada por el autor de la nota');
+}
 $pdo->commit();
+unset($_SESSION['dictado_clinico_pendiente'][$dictadoToken], $_SESSION['dictado_contextos'][$dictadoToken]);
 
 // Aviso por umbral "signo vital fuera de rango" (push.php; solo encola, nunca interrumpe el registro).
 // Va fuera de la transacción: si falla, no deshace el guardado de la entrada.

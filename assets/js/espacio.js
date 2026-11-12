@@ -1378,11 +1378,7 @@ const Editor = {
 
   /** Editor de formulario: los bloques se envían con el POST del registro, sin tocar la API de páginas. */
   sincronizarFormulario() {
-    if (this.alSincronizar) { this.alSincronizar(this.serializar()); return; }
-    const campo = this.formulario?.closest('form')?.querySelector('#registro-cuerpo');
-    if (!campo) return;
-    campo.value = JSON.stringify(this.serializar());
-    campo.dispatchEvent(new Event('input', { bubbles: true }));
+    if (this.alSincronizar) this.alSincronizar(this.serializar());
   },
 
   async guardar(alSalir = false) {
@@ -3050,6 +3046,9 @@ const Actividad = {
   datos: null,
   pestana: 'notificaciones',
   temporizador: null,
+  temporizadorFiltro: null,
+  cargandoMas: false,
+  filtros: { persona: '', periodo: '30d' },
 
   iniciar() {
     this.boton = document.querySelector('[data-actividad-abrir]');
@@ -3082,13 +3081,83 @@ const Actividad = {
       this.panel.querySelectorAll('[data-panel-pestana]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
       this.pintarPanel();
     }));
+    this.panel.addEventListener('input', (ev) => {
+      if (!ev.target.matches('[data-actividad-persona]')) return;
+      this.filtros.persona = ev.target.value;
+      clearTimeout(this.temporizadorFiltro);
+      this.temporizadorFiltro = setTimeout(() => this.aplicarFiltros(), 300);
+    });
+    this.panel.addEventListener('change', (ev) => {
+      if (!ev.target.matches('[data-actividad-periodo]')) return;
+      this.filtros.periodo = ev.target.value;
+      this.aplicarFiltros();
+    });
+    this.panel.addEventListener('click', async (ev) => {
+      const botonMas = ev.target.closest('[data-actividad-mas]');
+      if (!botonMas) return;
+      this.panel.querySelectorAll('.actividad-filtros__error').forEach((aviso) => aviso.remove());
+      botonMas.disabled = true;
+      botonMas.textContent = 'Cargando…';
+      try {
+        await this.cargarMas();
+      } catch (e) {
+        const aviso = document.createElement('p');
+        aviso.className = 'actividad-filtros__error';
+        aviso.setAttribute('role', 'status');
+        aviso.textContent = e.message;
+        botonMas.after(aviso);
+        botonMas.disabled = false;
+        botonMas.textContent = 'Reintentar';
+      }
+    });
   },
 
   async cargar() {
-    this.datos = this.seccion && !PAGINA_ID
-      ? await api(`actividad_seccion.php?seccion=${encodeURIComponent(this.seccion)}`)
-      : await api(`paginas/paginas.php?actividad=${PAGINA_ID}`);
+    if (this.seccion && !PAGINA_ID) {
+      const parametros = new URLSearchParams({
+        seccion: this.seccion,
+        persona: this.filtros.persona,
+        periodo: this.filtros.periodo,
+      });
+      this.datos = await api(`actividad_seccion.php?${parametros}`);
+    } else {
+      this.datos = await api(`paginas/paginas.php?actividad=${PAGINA_ID}`);
+    }
     return this.datos;
+  },
+
+  async aplicarFiltros() {
+    if (!this.panel || this.panel.hidden) return;
+    const cuerpo = this.panel.querySelector('[data-panel-cuerpo]');
+    cuerpo.innerHTML = '<p class="panel-lateral__vacio">Buscando actividad…</p>';
+    try {
+      await this.cargar();
+      this.pintarPanel();
+    } catch (e) {
+      cuerpo.innerHTML = `<p class="panel-lateral__vacio">${escaparHtml(e.message)}</p>`;
+    }
+  },
+
+  async cargarMas() {
+    if (!this.seccion || !this.datos?.hay_mas || !this.datos.cursor || this.cargandoMas) return;
+    this.cargandoMas = true;
+    const scrollTop = this.panel.querySelector('[data-panel-cuerpo]').scrollTop;
+    try {
+      const parametros = new URLSearchParams({
+        seccion: this.seccion,
+        persona: this.filtros.persona,
+        periodo: this.filtros.periodo,
+        antes: String(this.datos.cursor),
+      });
+      const siguiente = await api(`actividad_seccion.php?${parametros}`);
+      this.datos.detalle.push(...siguiente.detalle);
+      this.datos.cursor = siguiente.cursor;
+      this.datos.hay_mas = siguiente.hay_mas;
+      this.pintarPanel();
+      this.panel.querySelector('[data-panel-cuerpo]').scrollTop = scrollTop;
+    } finally {
+      this.cargandoMas = false;
+    }
   },
 
   async tarjeta() {
@@ -3127,17 +3196,37 @@ const Actividad = {
     if (!this.datos) return;
     const titulo = escaparHtml(document.body.dataset.titulo || '');
     if (this.pestana === 'notificaciones') {
-      cuerpo.innerHTML = this.datos.detalle.length
-        ? `<ul class="notificaciones-lista">${this.datos.detalle.map((d) => `
-            <li>
+      const filtros = this.seccion ? `
+        <div class="actividad-filtros" role="search">
+          <label class="sr-only" for="actividad-persona">Buscar cambios por persona</label>
+          <input id="actividad-persona" type="search" placeholder="Buscar persona" value="${escaparHtml(this.filtros.persona)}" autocomplete="off" data-actividad-persona>
+          <label class="sr-only" for="actividad-periodo">Periodo de actividad</label>
+          <select id="actividad-periodo" data-actividad-periodo>
+            <option value="24h"${this.filtros.periodo === '24h' ? ' selected' : ''}>24 horas</option>
+            <option value="7d"${this.filtros.periodo === '7d' ? ' selected' : ''}>7 días</option>
+            <option value="30d"${this.filtros.periodo === '30d' ? ' selected' : ''}>30 días</option>
+            <option value="90d"${this.filtros.periodo === '90d' ? ' selected' : ''}>90 días</option>
+            <option value="todo"${this.filtros.periodo === 'todo' ? ' selected' : ''}>Todo el historial</option>
+          </select>
+        </div>` : '';
+      const lista = this.datos.detalle.length
+        ? `<ul class="notificaciones-lista">${this.datos.detalle.map((d) => {
+            const contenido = `
               ${avatarHtml(d.usuario_id, d.nombre, '', d.foto)}
               <div>
                 <p><b>${escaparHtml(d.tu ? 'Tú' : d.nombre)}</b> ${escaparHtml(d.texto)} en <b>${titulo}</b></p>
                 ${d.detalle ? `<p class="notificaciones-detalle">${escaparHtml(d.detalle)}</p>` : ''}
                 <small><time datetime="${escaparHtml(d.fecha)}">${escaparHtml(haceTexto(d.hace))}</time></small>
-              </div>
-            </li>`).join('')}</ul>`
-        : '<p class="panel-lateral__vacio">Aún no hay actividad en esta página.</p>';
+              </div>`;
+            return d.url
+              ? `<li><a class="notificaciones-lista__vinculo" href="${escaparHtml(d.url)}">${contenido}</a></li>`
+              : `<li>${contenido}</li>`;
+          }).join('')}</ul>`
+        : '<p class="panel-lateral__vacio">Aún no hay actividad con estos filtros.</p>';
+      const cargarMas = this.seccion && this.datos.hay_mas
+        ? '<button type="button" class="actividad-filtros__mas" data-actividad-mas>Cargar más actividad</button>'
+        : '';
+      cuerpo.innerHTML = filtros + lista + cargarMas;
       return;
     }
     const e = this.datos.estadisticas;
@@ -3173,14 +3262,54 @@ function marcarEditando() {
 const Presencia = {
   clave: document.body.dataset.presencia,
   caja: null,
+  botonCursor: null,
+  capaCursor: null,
   personas: [],
   temporizador: null,
+  enCurso: false,
+  cursorActivo: true,
+  ultimoCursor: 0,
+  coloresCursor: ['#e9c7d4', '#c8d8f4', '#c6e8d5', '#f2d2b9', '#d9cefa', '#efe2a8', '#bfe6e9', '#e8c9b8'],
 
   iniciar() {
     this.caja = document.querySelector('[data-presencia-burbujas]');
-    if (!this.caja || !this.clave) return;
-    this.latir();
-    this.temporizador = setInterval(() => { if (!document.hidden) this.latir(); }, 15000);
+    this.botonCursor = document.querySelector('[data-cursores-toggle]');
+    if (!this.clave) {
+      if (this.botonCursor) this.botonCursor.hidden = true;
+      return;
+    }
+    if (!this.caja) return;
+    this.capaCursor = document.createElement('div');
+    this.capaCursor.className = 'presencia-cursores';
+    this.capaCursor.setAttribute('aria-hidden', 'true');
+    document.body.append(this.capaCursor);
+    const claveCursor = `expediente-cursores-${document.body.dataset.usuario || ''}`;
+    this.cursorActivo = Boolean(this.botonCursor);
+    if (this.botonCursor) {
+      try { this.cursorActivo = localStorage.getItem(claveCursor) !== '0'; } catch (e) { /* preferencia opcional */ }
+    }
+    this.actualizarBotonCursor();
+    this.botonCursor?.addEventListener('click', () => {
+      this.cursorActivo = !this.cursorActivo;
+      try { localStorage.setItem(claveCursor, this.cursorActivo ? '1' : '0'); } catch (e) { /* preferencia opcional */ }
+      this.actualizarBotonCursor();
+      if (!this.cursorActivo) this.latir(null);
+      else this.latir();
+      this.pintar();
+    });
+    document.querySelector('.contenido__pagina')?.addEventListener('pointermove', (evento) => {
+      if (!this.cursorActivo || evento.pointerType === 'touch' || Date.now() - this.ultimoCursor < 1000) return;
+      this.ultimoCursor = Date.now();
+      this.latir({
+        x: Math.min(1, Math.max(0, evento.clientX / Math.max(1, window.innerWidth))),
+        y: Math.min(1, Math.max(0, evento.clientY / Math.max(1, window.innerHeight))),
+      });
+    });
+    document.querySelector('.contenido__pagina')?.addEventListener('pointerleave', (evento) => {
+      if (this.cursorActivo && !evento.relatedTarget) this.latir(null);
+    });
+    this.latir(this.cursorActivo ? undefined : null);
+    this.temporizador = setInterval(() => { if (!document.hidden) this.latir(); }, 10000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.latir(); });
     // Cualquier escritura en un formulario de la página cuenta como "editando"
     document.querySelector('.contenido__pagina')?.addEventListener('input', (ev) => {
@@ -3196,15 +3325,29 @@ const Presencia = {
       } catch (e) { /* al salir no importa */ }
     });
     this.caja.addEventListener('click', () => this.lista());
+    window.addEventListener('resize', () => this.pintar());
   },
 
-  async latir() {
-    if (!this.caja) return;
+  actualizarBotonCursor() {
+    if (!this.botonCursor) return;
+    this.botonCursor.hidden = false;
+    this.botonCursor.classList.toggle('activo', this.cursorActivo);
+    this.botonCursor.setAttribute('aria-pressed', String(this.cursorActivo));
+    this.botonCursor.title = this.cursorActivo ? 'Ocultar cursores del equipo' : 'Mostrar cursores del equipo';
+    this.botonCursor.setAttribute('aria-label', this.botonCursor.title);
+  },
+
+  async latir(cursor = undefined) {
+    if (!this.caja || this.enCurso) return;
+    this.enCurso = true;
     try {
-      const r = await api('presencia.php', { clave: this.clave, editando: Date.now() - ultimaEdicionLocal < 12000 });
+      const entrada = { clave: this.clave, editando: Date.now() - ultimaEdicionLocal < 12000 };
+      if (cursor !== undefined) entrada.cursor = cursor;
+      const r = await api('presencia.php', entrada);
       this.personas = r.personas;
       this.pintar();
-    } catch (e) { /* sin conexión: se reintenta en el siguiente latido */ }
+    } catch (e) { console.warn('[presencia] No se pudo actualizar el equipo en esta página.', e); }
+    finally { this.enCurso = false; }
   },
 
   pintar() {
@@ -3217,6 +3360,14 @@ const Presencia = {
       </span>`).join('') + (resto > 0 ? `<span class="presencia__mas" title="${resto} ${resto === 1 ? 'persona más' : 'personas más'}"><span class="presencia__puntos" aria-hidden="true">···</span>+${resto}</span>` : '');
     this.caja.setAttribute('aria-label', this.personas.map((p) => `${p.nombre}${p.editando ? ' (editando)' : ''}`).join(', '));
     this.caja.hidden = !this.personas.length;
+    if (!this.capaCursor) return;
+    const cursores = this.cursorActivo
+      ? this.personas.filter((p) => !p.tu && p.cursor && Number.isFinite(p.cursor.x) && Number.isFinite(p.cursor.y))
+      : [];
+    this.capaCursor.innerHTML = cursores.map((p) => {
+      const color = this.coloresCursor[Number(p.id) % this.coloresCursor.length];
+      return `<span class="presencia-cursor" style="--cursor-color:${color};--cursor-x:${(p.cursor.x * 100).toFixed(3)}%;--cursor-y:${(p.cursor.y * 100).toFixed(3)}%"><svg viewBox="0 0 20 24"><path d="M2 1 17 13l-6.5 1.2L7 21z"/></svg><span>${escaparHtml(p.nombre)}</span></span>`;
+    }).join('');
   },
 
   lista() {
@@ -3229,6 +3380,102 @@ const Presencia = {
   },
 };
 
+/* ---------- Retroalimentación privada y moderada del equipo ---------- */
+const EquipoFeedback = {
+  caja: null,
+  lista: null,
+  formulario: null,
+  mensaje: null,
+  personaId: 0,
+  puedeModerar: false,
+
+  iniciar() {
+    this.caja = document.querySelector('[data-equipo-feedback]');
+    if (!this.caja) return;
+    this.lista = this.caja.querySelector('[data-feedback-lista]');
+    this.formulario = this.caja.querySelector('[data-feedback-form]');
+    this.mensaje = this.caja.querySelector('[data-feedback-mensaje-general]');
+    this.personaId = Number(this.caja.dataset.personaId || 0);
+    this.puedeModerar = this.caja.dataset.puedeModerar === '1';
+    this.formulario?.addEventListener('submit', (evento) => this.enviar(evento));
+    this.lista?.addEventListener('click', (evento) => {
+      const boton = evento.target.closest('[data-feedback-accion]');
+      if (boton) this.moderar(boton);
+    });
+    this.cargar();
+  },
+
+  async cargar() {
+    if (!this.lista || !this.personaId) return;
+    this.lista.innerHTML = '<p class="persona__sin-datos">Cargando retroalimentación…</p>';
+    try {
+      const respuesta = await api('equipo/retroalimentacion.php', { accion: 'listar', persona_id: this.personaId });
+      this.lista.innerHTML = respuesta.items.length
+        ? respuesta.items.map((item) => this.itemHtml(item)).join('')
+        : '<p class="persona__sin-datos">No hay notas compartidas ni pendientes para mostrar.</p>';
+    } catch (error) {
+      this.lista.innerHTML = `<p class="persona__feedback-error">${escaparHtml(error.message || 'No se pudo cargar la retroalimentación.')}</p>`;
+    }
+  },
+
+  itemHtml(item) {
+    const tipo = item.clase === 'positivo' ? 'positivo' : 'atencion';
+    const comentario = escaparHtml(item.texto).replace(/\r?\n/g, '<br>');
+    const acciones = this.puedeModerar && item.puede_moderar && item.estado_clave === 'pendiente'
+      ? `<div class="persona__feedback-acciones"><button type="button" class="boton boton--sutil" data-feedback-accion="compartir" data-feedback-id="${item.id}">Compartir con la persona</button><button type="button" class="boton boton--sutil" data-feedback-accion="cerrar" data-feedback-id="${item.id}">Cerrar sin compartir</button></div>`
+      : '';
+    return `<article class="persona__feedback-item">
+      <header><span class="persona__feedback-tipo persona__feedback-tipo--${tipo}">${escaparHtml(item.tipo)}</span><strong>${escaparHtml(item.estado)}</strong></header>
+      <p>${comentario}</p>
+      <footer>${escaparHtml(item.autor)} · ${escaparHtml(item.fecha)}</footer>
+      ${acciones}
+    </article>`;
+  },
+
+  async enviar(evento) {
+    evento.preventDefault();
+    if (!this.formulario) return;
+    const datos = new FormData(this.formulario);
+    const boton = this.formulario.querySelector('[type="submit"]');
+    const mensaje = this.formulario.querySelector('[data-feedback-mensaje]');
+    boton.disabled = true;
+    mensaje.textContent = '';
+    try {
+      await api('equipo/retroalimentacion.php', {
+        accion: 'crear',
+        persona_id: this.personaId,
+        tipo: datos.get('tipo'),
+        texto: datos.get('texto'),
+      });
+      this.formulario.reset();
+      mensaje.textContent = 'Enviado de forma privada para revisión.';
+      await this.cargar();
+    } catch (error) {
+      mensaje.textContent = error.message || 'No se pudo enviar el comentario.';
+    } finally {
+      boton.disabled = false;
+    }
+  },
+
+  async moderar(boton) {
+    if (!this.puedeModerar) return;
+    const accion = boton.dataset.feedbackAccion;
+    const id = Number(boton.dataset.feedbackId || 0);
+    if (!['compartir', 'cerrar'].includes(accion) || !id) return;
+    boton.disabled = true;
+    try {
+      await api('equipo/retroalimentacion.php', { accion, persona_id: this.personaId, id });
+      this.mensaje.textContent = accion === 'compartir'
+        ? 'Comentario compartido con la persona.'
+        : 'Comentario cerrado sin compartir.';
+      await this.cargar();
+    } catch (error) {
+      boton.disabled = false;
+      this.mensaje.textContent = error.message || 'No se pudo revisar el comentario.';
+    }
+  },
+};
+
 /* ---------- Inicio ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   Arbol.iniciar();
@@ -3238,6 +3485,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Bdp.iniciar();
   Actividad.iniciar();
   Presencia.iniciar();
+  EquipoFeedback.iniciar();
   // "Última edición hace…" se mantiene al día sin recargar
   setInterval(() => {
     const el = document.querySelector('[data-ultima-edicion]');
@@ -3262,7 +3510,9 @@ document.addEventListener('change', async (ev) => {
   try {
     const r = await (await fetch(`${BASE}/api/configuracion/foto_perfil.php`, { method: 'POST', headers: { 'X-CSRF-Token': TOKEN_CSRF }, body: datos })).json();
     if (!r.ok) throw new Error(r.error);
-    entrada.closest('label').querySelector('.avatar').innerHTML = `<img src="${escaparHtml(r.url)}" alt="">`;
+    document.querySelectorAll('.barra-lateral__foto .avatar, .cuenta__avatar').forEach((avatar) => {
+      avatar.innerHTML = `<img src="${escaparHtml(r.url)}" alt="">`;
+    });
     document.body.dataset.usuarioFoto = r.url;
     mostrarNotificacion('exito', 'Foto de perfil actualizada.');
     Presencia.latir();
@@ -3298,7 +3548,7 @@ document.addEventListener('click', async (ev) => {
   caja.className = 'portadas';
   caja.innerHTML = `
     <div class="portadas__cabecera"><span>Galería</span>${boton.dataset.tiene ? '<button type="button" data-quitar-portada>Quitar</button>' : ''}</div>
-    <div class="portadas__galeria">${galeria.map((g) => `<button type="button" data-ruta="${escaparHtml(g.ruta)}" style="background-image:url('${escaparHtml(g.url)}')" aria-label="Usar esta imagen"></button>`).join('')}</div>
+    <div class="portadas__galeria">${galeria.map((g) => `<button type="button" data-ruta="${escaparHtml(g.ruta)}" style="background-image:url('${escaparHtml(g.url)}')" aria-label="Usar portada: ${escaparHtml(g.nombre || g.ruta)}" title="${escaparHtml(g.nombre || g.ruta)}"></button>`).join('')}</div>
     <label class="portadas__subir">${ico('agregar')}<span>Subir una imagen</span><small>JPG, PNG o WebP, al menos 600 × 150 px</small><input type="file" accept="image/jpeg,image/png,image/webp" hidden></label>`;
   abrirPopover(boton, caja, { clase: 'popover--portadas', alinear: 'derecha' });
   caja.addEventListener('click', async (e) => {
@@ -3360,9 +3610,28 @@ function iniciarPersonas() {
 
   // Buscar en la vista actual
   const buscar = raiz.querySelector('[data-personas-buscar]');
-  buscar.addEventListener('input', () => {
+  let filtroEstadoPersonas = 'activa';
+  const aplicarFiltroPersonas = () => {
     const termino = normalizarTexto(buscar.value.trim());
-    raiz.querySelectorAll('tr[data-buscar]').forEach((tr) => { tr.hidden = !!termino && !normalizarTexto(tr.dataset.buscar).includes(termino); });
+    raiz.querySelectorAll('tr[data-buscar]').forEach((tr) => {
+      const esFilaPersona = tr.closest('[data-vista-panel="personas"]');
+      const estadoOculto = esFilaPersona && (
+        filtroEstadoPersonas === 'inactiva' ? tr.dataset.estado !== 'desactivada' : tr.dataset.estado === 'desactivada'
+      );
+      tr.hidden = Boolean(estadoOculto || (termino && !normalizarTexto(tr.dataset.buscar).includes(termino)));
+    });
+  };
+  buscar.addEventListener('input', aplicarFiltroPersonas);
+  raiz.querySelectorAll('[data-personas-estado]').forEach((boton) => {
+    boton.addEventListener('click', () => {
+      filtroEstadoPersonas = boton.dataset.personasEstado;
+      raiz.querySelectorAll('[data-personas-estado]').forEach((otro) => {
+        const seleccionado = otro === boton;
+        otro.classList.toggle('activa', seleccionado);
+        otro.setAttribute('aria-pressed', String(seleccionado));
+      });
+      aplicarFiltroPersonas();
+    });
   });
   buscar.closest('label').addEventListener('click', () => buscar.closest('label').classList.add('abierto'));
 
@@ -3404,17 +3673,17 @@ function iniciarPersonas() {
     })));
   }));
 
-  // "…" de cada persona: aprobar, rechazar, desactivar o reactivar
+  // "…" de cada persona: aprobar, desactivar o reactivar la cuenta sin borrar sus datos
   raiz.querySelectorAll('[data-persona-menu]').forEach((boton) => boton.addEventListener('click', () => {
     const tr = boton.closest('tr');
     const id = Number(tr.dataset.usuario);
     const hacer = (nombre) => async () => { try { await accion({ accion: nombre, usuario_id: id }); recargar(); } catch (e) { mostrarNotificacion('error', e.message); } };
-    const opciones = {
+    const opcionesEstado = {
       pendiente: [{ icono: 'casilla', texto: 'Aprobar cuenta', accion: hacer('aprobar') }, { icono: 'cerrar', texto: 'Rechazar', peligro: true, accion: hacer('desactivar') }],
       activa: [{ icono: 'cerrar', texto: 'Desactivar cuenta', peligro: true, accion: hacer('desactivar') }],
       desactivada: [{ icono: 'reabrir', texto: 'Reactivar cuenta', accion: hacer('reactivar') }],
     }[tr.dataset.estado];
-    abrirMenu(boton, opciones, { alinear: 'derecha' });
+    abrirMenu(boton, opcionesEstado, { alinear: 'derecha' });
   }));
 
   // "…" de cada invitación: reenviar o cancelar
@@ -3528,14 +3797,17 @@ document.addEventListener('DOMContentLoaded', iniciarPersonas);
       const visibles = datos.columnas.filter((c) => !q || normalizarTexto(`${c.titulo} ${c.original}`).includes(q));
       const mostradas = visibles.filter((c) => !c.oculta);
       const ocultas = visibles.filter((c) => c.oculta);
+      caja.querySelector('[data-props-resumen]').textContent = termino
+        ? `${visibles.length} coincidencia${visibles.length === 1 ? '' : 's'}`
+        : `${datos.columnas.filter((c) => !c.oculta).length} de ${datos.columnas.length} visibles`;
       caja.querySelector('[data-props-lista]').innerHTML = `
         ${mostradas.length ? `<div class="props__grupo"><span>Mostradas en la tabla</span>${datos.editable && mostradas.length > 1 ? '<button type="button" data-todas="ocultar">Ocultar todas</button>' : ''}</div>${mostradas.map(fila).join('')}` : ''}
         ${ocultas.length ? `<div class="props__grupo"><span>Ocultas</span>${datos.editable ? '<button type="button" data-todas="mostrar">Mostrar todas</button>' : ''}</div>${ocultas.map(fila).join('')}` : ''}
         ${!visibles.length ? '<div class="props__vacio">Ninguna propiedad coincide.</div>' : ''}`;
     };
     caja.innerHTML = `
-      <div class="props__cabecera"><span>Propiedades</span><small>${datos.columnas.filter((c) => !c.oculta).length} de ${datos.columnas.length} visibles</small></div>
-      <label class="props__buscar">${ico('buscar')}<input type="search" placeholder="Buscar una propiedad" aria-label="Buscar una propiedad" data-props-buscar></label>
+      <div class="props__cabecera"><span>Propiedades</span><small data-props-resumen aria-live="polite"></small></div>
+      <label class="props__buscar">${ico('buscar')}<input type="search" placeholder="Buscar por nombre" aria-label="Buscar una propiedad por nombre" data-props-buscar></label>
       <div class="props__lista" data-props-lista></div>
       ${datos.editable ? `
       <div class="props__pie">
@@ -3556,7 +3828,10 @@ document.addEventListener('DOMContentLoaded', iniciarPersonas);
       const previas = claves.map((k) => [k, datos.columnas.find((c) => c.clave === k).oculta]);
       claves.forEach((k) => { datos.columnas.find((c) => c.clave === k).oculta = oculta; });
       pintar();
-      caja.querySelector('.props__cabecera small').textContent = `${datos.columnas.filter((c) => !c.oculta).length} de ${datos.columnas.length} visibles`;
+      const visibles = datos.columnas.filter((c) => !termino || normalizarTexto(`${c.titulo} ${c.original}`).includes(normalizarTexto(termino))).length;
+      caja.querySelector('[data-props-resumen]').textContent = termino
+        ? `${visibles} coincidencia${visibles === 1 ? '' : 's'}`
+        : `${datos.columnas.filter((c) => !c.oculta).length} de ${datos.columnas.length} visibles`;
       try {
         for (const k of claves) await guardar({ accion: 'ocultar', clave: k, oculta });
         cambio = true;

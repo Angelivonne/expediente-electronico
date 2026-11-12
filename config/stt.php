@@ -1,6 +1,6 @@
 <?php
 /**
- * Configuración del motor de voz a texto (STT) para ExpedienteExpediente.
+ * Configuración del motor de voz a texto (STT) para el expediente clínico.
  * Modelo: Parakeet TDT 0.6B v3 (NVIDIA) - 485 MB, español, código abierto CC-BY-4.0.
  *
  * Archivo del modelo: models/stt/parakeet-tdt-0.6b-v3-Q4_K_M.gguf

@@ -2,7 +2,7 @@
 
 ## Respaldos automáticos
 
-- **Qué se respalda:** la base `expediente_expediente` completa (todas las tablas, sin `CREATE DATABASE`), con
+- **Qué se respalda:** la base `clinica` completa (todas las tablas, sin `CREATE DATABASE`), con
   `C:/xampp/mysql/bin/mysqldump --single-transaction` (no bloquea a quien está capturando).
 - **Dónde:** `privado/respaldos/respaldo-AAAAMMDD-HHMMSS-motivo.sql.gz` y, al lado, su suma
   `…sql.gz.sha256` (formato de `sha256sum -c`). `privado/` está bloqueado a la web.
@@ -23,14 +23,14 @@ El respaldo perezoso depende de que alguien abra la app ese día. Para tenerlo a
 
 1. Abre **Programador de tareas** → *Crear tarea básica…*
 2. Nombre: `Expedientes Clínicos - respaldo diario`. Desencadenador: *Diariamente*, por ejemplo 23:30.
-3. Acción: *Iniciar un programa* → `C:\xampp\htdocs\ExpedienteExpediente\mantenimiento\respaldo_diario.bat`.
+3. Acción: *Iniciar un programa* → `C:\xampp\htdocs\clinica\mantenimiento\respaldo_diario.bat`.
 4. En *Propiedades*: marca *Ejecutar tanto si el usuario inició sesión como si no* y
    *Ejecutar la tarea lo antes posible si no se pudo a la hora programada*.
 
 O desde una consola de administrador:
 
 ```
-schtasks /Create /TN "Expedientes Clinicos - respaldo diario" /TR "C:\xampp\htdocs\ExpedienteExpediente\mantenimiento\respaldo_diario.bat" /SC DAILY /ST 23:30
+schtasks /Create /TN "Expedientes Clinicos - respaldo diario" /TR "C:\xampp\htdocs\clinica\mantenimiento\respaldo_diario.bat" /SC DAILY /ST 23:30
 ```
 
 MySQL debe estar encendido a esa hora. Para forzar un respaldo a mano: `C:\xampp\php\php.exe mantenimiento\respaldar.php --forzar`.
@@ -40,21 +40,23 @@ MySQL debe estar encendido a esa hora. Para forzar un respaldo a mano: `C:\xampp
 Es destructivo: reemplaza toda la base por la del respaldo. Solo el administrador, escribiendo `RESTAURAR`,
 y siempre se hace antes un respaldo automático del estado actual (`…-antes_de_restaurar.sql.gz`).
 
-La app normal (`expediente_app`) no puede borrar ni crear tablas, así que restaurar usa un usuario aparte. Para
+La app normal (`clinica_app`) no puede borrar ni crear tablas, así que restaurar usa un usuario aparte. Para
 activarlo, como root (una sola vez), ejecuta la sección *Respaldos* de `database/usuario_aplicacion.sql` con
 una contraseña propia y guárdala en `privado/respaldo_bd.php`:
 
 ```php
-<?php return ['usuario' => 'expediente_respaldo', 'clave' => 'LA_CONTRASEÑA'];
+<?php return ['usuario' => 'clinica_respaldo', 'clave' => 'LA_CONTRASEÑA'];
 ```
 
 Mientras no exista, la opción *Restaurar…* lo indica en su menú. Con ese usuario los respaldos también
 incluyen los triggers de la cola de sincronización; con el de la app no se pueden leer, así que después de
-restaurar se regeneran con `database/sincronizacion_triggers.php`. Restaurar regresa la base local a un punto
-anterior: revisa después la sincronización con el servidor central. Restauración manual equivalente:
+restaurar se regeneran con `database/sincronizacion_triggers.php`. Si está habilitada la búsqueda clínica,
+también se reconstruyen los triggers que mantienen su índice FULLTEXT auxiliar. En el siguiente arranque,
+el actualizador automático completa una migración interrumpida si es necesario. Restaurar regresa la base
+local a un punto anterior: revisa después la sincronización con el servidor central. Restauración manual equivalente:
 
 ```
-C:\xampp\mysql\bin\mysql -u root expediente_expediente < respaldo.sql   (después de descomprimir el .gz)
+C:\xampp\mysql\bin\mysql -u root clinica < respaldo.sql   (después de descomprimir el .gz)
 ```
 
 ## Durabilidad de MySQL (`C:/xampp/mysql/bin/my.ini`)

@@ -2,7 +2,7 @@
 -- Expediente Expediente - Llenar catálogos con datos reales de México
 -- ==========================================================================
 
-USE expediente_expediente;
+USE clinica;
 
 -- --------------------------------------------------------
 -- A. CATÁLOGOS CLÍNICOS
@@ -127,39 +127,40 @@ INSERT IGNORE INTO catalogo_principios_activos (clave, nombre, descripcion, acti
 -- --------------------------------------------------------
 
 -- Entidades federativas (32 estados)
+-- Claves de entidad de dos letras usadas por CURP (RENAPO).
 INSERT IGNORE INTO catalogo_entidades (clave, nombre, activo) VALUES
-('AGU', 'Aguascalientes', 1),
-('BCN', 'Baja California', 1),
-('BCS', 'Baja California Sur', 1),
-('CAM', 'Campeche', 1),
-('CHP', 'Chiapas', 1),
-('CHH', 'Chihuahua', 1),
-('CDX', 'Ciudad de México', 1),
-('COA', 'Coahuila', 1),
-('COL', 'Colima', 1),
-('DUR', 'Durango', 1),
-('GTO', 'Guanajuato', 1),
-('GRO', 'Guerrero', 1),
-('HGO', 'Hidalgo', 1),
-('JAL', 'Jalisco', 1),
-('MEX', 'Estado de México', 1),
-('MIC', 'Michoacán', 1),
-('MOR', 'Morelos', 1),
-('NAY', 'Nayarit', 1),
-('NLE', 'Nuevo León', 1),
-('OAX', 'Oaxaca', 1),
-('PUE', 'Puebla', 1),
-('QRO', 'Querétaro', 1),
-('ROO', 'Quintana Roo', 1),
-('SLP', 'San Luis Potosí', 1),
-('SIN', 'Sinaloa', 1),
-('SON', 'Sonora', 1),
-('TAB', 'Tabasco', 1),
-('TAM', 'Tamaulipas', 1),
-('TLA', 'Tlaxcala', 1),
-('VER', 'Veracruz', 1),
-('YUC', 'Yucatán', 1),
-('ZAC', 'Zacatecas', 1);
+('AS', 'Aguascalientes', 1),
+('BC', 'Baja California', 1),
+('BS', 'Baja California Sur', 1),
+('CC', 'Campeche', 1),
+('CS', 'Chiapas', 1),
+('CH', 'Chihuahua', 1),
+('DF', 'Ciudad de México', 1),
+('CL', 'Coahuila', 1),
+('CM', 'Colima', 1),
+('DG', 'Durango', 1),
+('GT', 'Guanajuato', 1),
+('GR', 'Guerrero', 1),
+('HG', 'Hidalgo', 1),
+('JC', 'Jalisco', 1),
+('MC', 'Estado de México', 1),
+('MN', 'Michoacán', 1),
+('MS', 'Morelos', 1),
+('NT', 'Nayarit', 1),
+('NL', 'Nuevo León', 1),
+('OC', 'Oaxaca', 1),
+('PL', 'Puebla', 1),
+('QT', 'Querétaro', 1),
+('QR', 'Quintana Roo', 1),
+('SP', 'San Luis Potosí', 1),
+('SL', 'Sinaloa', 1),
+('SR', 'Sonora', 1),
+('TC', 'Tabasco', 1),
+('TS', 'Tamaulipas', 1),
+('TL', 'Tlaxcala', 1),
+('VZ', 'Veracruz', 1),
+('YN', 'Yucatán', 1),
+('ZS', 'Zacatecas', 1);
 
 -- Municipios (ejemplos principales por entidad)
 INSERT IGNORE INTO catalogo_municipios (entidad_id, clave, nombre, activo) VALUES
@@ -422,7 +423,7 @@ INSERT IGNORE INTO catalogo_municipios (entidad_id, clave, nombre, activo)
 SELECT e.id, '006', 'Irapuato', 1 FROM catalogo_entidades e WHERE e.clave = 'GT';
 
 -- 2. Cada grupo de municipios a su entidad (por clave, no por id supuesto)
-UPDATE catalogo_municipios m JOIN catalogo_entidades e ON e.clave = 'AG'
+UPDATE catalogo_municipios m JOIN catalogo_entidades e ON e.clave = 'AS'
    SET m.entidad_id = e.id
  WHERE m.nombre IN ('Aguascalientes', 'Asientos', 'Calvillo', 'Jesús María', 'Pabellón de Arteaga');
 
@@ -438,11 +439,11 @@ UPDATE catalogo_municipios m JOIN catalogo_entidades e ON e.clave = 'GR'
    SET m.entidad_id = e.id
  WHERE m.nombre IN ('Acapulco', 'Chilpancingo', 'Iguala', 'Taxco', 'Zihuatanejo');
 
-UPDATE catalogo_municipios m JOIN catalogo_entidades e ON e.clave = 'JA'
+UPDATE catalogo_municipios m JOIN catalogo_entidades e ON e.clave = 'JC'
    SET m.entidad_id = e.id
  WHERE m.nombre IN ('Guadalajara', 'Zapopan', 'Tlaquepaque', 'Tonalá', 'Tlajomulco');
 
-UPDATE catalogo_municipios m JOIN catalogo_entidades e ON e.clave = 'CD'
+UPDATE catalogo_municipios m JOIN catalogo_entidades e ON e.clave = 'DF'
    SET m.entidad_id = e.id
  WHERE m.nombre IN ('Cuauhtémoc', 'Miguel Hidalgo', 'Benito Juárez', 'Venustiano Carranza', 'Gustavo A. Madero');
 

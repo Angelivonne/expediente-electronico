@@ -13,6 +13,7 @@
   const punto = boton.querySelector('[data-notificaciones-punto]');
   const CLAVE_ULTIMA = `expediente-notificaciones-ultima-${document.body.dataset.usuario}`;
   const INTERVALO = 60000;
+  const puedeVerActividad = document.body.dataset.actividadEquipo === '1';
 
   const svg = (trazo, clase = 'icono') => `<svg class="${clase}" viewBox="0 0 24 24" aria-hidden="true">${trazo}</svg>`;
   const ICONOS = {
@@ -50,6 +51,11 @@
     hayMas: false,
     cargando: false,
     panel: null,
+    actividad: null,
+    actividadRevision: 0,
+    actividadPersona: '',
+    actividadPeriodo: '30d',
+    actividadTemporizador: null,
   };
 
   /* ---------- Peticiones ---------- */
@@ -63,6 +69,16 @@
     let datos = {};
     try { datos = await r.json(); } catch (e) { /* sin cuerpo */ }
     if (!r.ok || datos.ok === false) throw new Error(datos.error || 'No se pudo completar la acción.');
+    return datos;
+  }
+
+  async function pedirActividad(consulta) {
+    const r = await fetch(`${BASE}/api/actividad_seccion.php?${consulta}`, {
+      headers: { Accept: 'application/json' },
+    });
+    let datos = {};
+    try { datos = await r.json(); } catch (e) { /* sin cuerpo */ }
+    if (!r.ok || datos.ok === false) throw new Error(datos.error || 'No se pudo cargar la actividad.');
     return datos;
   }
 
@@ -100,7 +116,7 @@
     if (!estado.panel) return;
     const cuenta = estado.panel.querySelector('[data-cuenta]');
     cuenta.textContent = estado.noLeidas > 0 ? String(estado.noLeidas) : '';
-    estado.panel.querySelector('[data-todas]').hidden = estado.noLeidas === 0;
+    estado.panel.querySelector('[data-todas]').hidden = estado.noLeidas === 0 || estado.filtro === 'equipo';
   }
 
   /* ---------- Bandeja ---------- */
@@ -119,16 +135,27 @@
         <div class="bandeja__pestanas" role="tablist" aria-label="Filtro">
           <button type="button" role="tab" data-filtro="no_leidas" aria-selected="${estado.filtro === 'no_leidas'}">Sin leer <span class="bandeja__cuenta" data-cuenta></span></button>
           <button type="button" role="tab" data-filtro="todas" aria-selected="${estado.filtro === 'todas'}">Todas</button>
+          ${puedeVerActividad ? `<button type="button" role="tab" data-filtro="equipo" aria-selected="${estado.filtro === 'equipo'}">Cambios</button>` : ''}
         </div>
         <div class="bandeja__cuerpo" data-cuerpo role="tabpanel"></div>
-      </div>`, { clase: 'popover--bandeja', alinear: 'izquierda', alCerrar: () => { estado.panel = null; } });
+      </div>`, { clase: 'popover--bandeja', alinear: 'izquierda', alCerrar: () => {
+        clearTimeout(estado.actividadTemporizador);
+        estado.panel = null;
+        estado.actividadRevision++;
+      } });
     estado.panel = el;
     pintarConteo(estado.noLeidas);
     el.addEventListener('click', alHacerClic);
+    el.addEventListener('input', alCambiarFiltroActividad);
+    el.addEventListener('change', alCambiarFiltroActividad);
     cargar(true);
   }
 
   async function cargar(reiniciar) {
+    if (estado.filtro === 'equipo') {
+      cargarActividad(reiniciar);
+      return;
+    }
     if (estado.cargando) return;
     estado.cargando = true;
     const cuerpo = estado.panel?.querySelector('[data-cuerpo]');
@@ -144,6 +171,111 @@
       if (cuerpo) cuerpo.innerHTML = `<p class="bandeja__cargando">${escaparHtml(e.message)}</p>`;
     } finally {
       estado.cargando = false;
+    }
+  }
+
+  async function cargarActividad(reiniciar) {
+    if (!puedeVerActividad || !estado.panel) return;
+    const revision = ++estado.actividadRevision;
+    const anterior = estado.actividad;
+    if (reiniciar || !anterior) {
+      estado.actividad = { detalle: [], cursor: null, hay_mas: false, cargando: true, error: null };
+    } else {
+      estado.actividad = { ...anterior, cargando: true, error: null };
+    }
+    pintarActividad();
+    const pagina = estado.actividad;
+    const consulta = new URLSearchParams({
+      seccion: 'equipo',
+      periodo: estado.actividadPeriodo,
+    });
+    if (estado.actividadPersona.trim()) consulta.set('persona', estado.actividadPersona.trim());
+    if (!reiniciar && anterior?.cursor) consulta.set('antes', String(anterior.cursor));
+    try {
+      const datos = await pedirActividad(consulta.toString());
+      if (revision !== estado.actividadRevision || estado.filtro !== 'equipo' || !estado.panel) return;
+      estado.actividad = {
+        ...datos,
+        detalle: reiniciar ? datos.detalle : (anterior?.detalle || []).concat(datos.detalle),
+        cargando: false,
+        error: null,
+      };
+    } catch (e) {
+      if (revision !== estado.actividadRevision || estado.filtro !== 'equipo' || !estado.panel) return;
+      estado.actividad = { ...pagina, cargando: false, error: e.message };
+    }
+    if (revision === estado.actividadRevision && estado.filtro === 'equipo' && estado.panel) pintarActividad();
+  }
+
+  function iniciales(nombre) {
+    return String(nombre || 'Sistema').trim().split(/\s+/).slice(0, 2).map((parte) => parte.charAt(0)).join('').toLocaleUpperCase('es-MX');
+  }
+
+  function pintarActividad() {
+    const cuerpo = estado.panel?.querySelector('[data-cuerpo]');
+    if (!cuerpo) return;
+    const restaurarFoco = document.activeElement?.matches('[data-actividad-persona]') || false;
+    const posicionCursor = restaurarFoco ? document.activeElement.selectionStart : null;
+    const datos = estado.actividad;
+    const detalle = datos?.detalle || [];
+    let html = `
+      <div class="bandeja__cambio-filtros">
+        <label><span class="sr-only">Buscar persona</span><input type="search" data-actividad-persona value="${escaparHtml(estado.actividadPersona)}" placeholder="Buscar persona" autocomplete="off"></label>
+        <label><span class="sr-only">Periodo</span><select data-actividad-periodo>
+          <option value="24h"${estado.actividadPeriodo === '24h' ? ' selected' : ''}>24 horas</option>
+          <option value="7d"${estado.actividadPeriodo === '7d' ? ' selected' : ''}>7 días</option>
+          <option value="30d"${estado.actividadPeriodo === '30d' ? ' selected' : ''}>30 días</option>
+          <option value="90d"${estado.actividadPeriodo === '90d' ? ' selected' : ''}>90 días</option>
+          <option value="todo"${estado.actividadPeriodo === 'todo' ? ' selected' : ''}>Todo</option>
+        </select></label>
+      </div>`;
+    if (datos?.error && !detalle.length) {
+      html += `<p class="bandeja__cargando bandeja__cargando--error">${escaparHtml(datos.error)}</p>`;
+    } else if (datos?.cargando && !detalle.length) {
+      html += '<p class="bandeja__cargando">Cargando cambios…</p>';
+    } else if (!detalle.length) {
+      html += `<div class="bandeja__vacio">${ILUSTRACION}<p>${datos?.cargando ? 'Cargando cambios…' : 'No hay cambios para estos filtros.'}</p></div>`;
+    } else {
+      if (datos?.error) html += `<p class="bandeja__cargando bandeja__cargando--error">${escaparHtml(datos.error)}</p>`;
+      html += '<div class="bandeja__grupo" role="list">';
+      detalle.forEach((cambio) => {
+        const f = new Date(cambio.fecha);
+        const fechaValida = Number.isFinite(f.getTime());
+        const actor = cambio.tu ? 'Tú' : (cambio.nombre || 'Sistema');
+        const descripcion = `${actor} ${cambio.texto || 'realizó un cambio'}`;
+        html += `
+          <a class="bandeja__cambio" role="listitem" href="${escaparHtml(cambio.url || '#')}">
+            <span class="bandeja__cambio-avatar" aria-hidden="true">${escaparHtml(iniciales(cambio.nombre))}</span>
+            <span class="bandeja__textos">
+              <span class="bandeja__item-titulo">${escaparHtml(descripcion)}</span>
+              ${cambio.detalle ? `<span class="bandeja__item-texto">${escaparHtml(cambio.detalle)}</span>` : ''}
+            </span>
+            ${fechaValida ? `<time class="bandeja__hora" datetime="${escaparHtml(cambio.fecha)}" title="${escaparHtml(formatoDiaAnio.format(f) + ', ' + formatoHora.format(f))}">${horaRelativa(f)}</time>` : ''}
+          </a>`;
+      });
+      html += '</div>';
+    }
+    if (datos?.error) {
+      html += '<button type="button" class="bandeja__mas" data-reintentar-actividad>Reintentar</button>';
+    } else if (datos?.hay_mas) {
+      html += `<button type="button" class="bandeja__mas" data-mas-actividad${datos.cargando ? ' disabled' : ''}>${datos.cargando ? 'Cargando…' : 'Cargar más'}</button>`;
+    }
+    cuerpo.innerHTML = html;
+    const persona = restaurarFoco && cuerpo.querySelector('[data-actividad-persona]');
+    if (persona) {
+      persona.focus({ preventScroll: true });
+      persona.setSelectionRange(posicionCursor, posicionCursor);
+    }
+  }
+
+  function alCambiarFiltroActividad(ev) {
+    if (ev.target.matches('[data-actividad-persona]')) {
+      estado.actividadPersona = ev.target.value;
+      clearTimeout(estado.actividadTemporizador);
+      estado.actividadTemporizador = setTimeout(() => cargarActividad(true), 300);
+    } else if (ev.target.matches('[data-actividad-periodo]')) {
+      estado.actividadPeriodo = ev.target.value;
+      cargarActividad(true);
     }
   }
 
@@ -222,6 +354,9 @@
       if (pestana.dataset.filtro === estado.filtro) return;
       estado.filtro = pestana.dataset.filtro;
       estado.panel.querySelectorAll('[data-filtro]').forEach((b) => b.setAttribute('aria-selected', String(b === pestana)));
+      estado.panel.querySelector('[data-todas]').hidden = estado.noLeidas === 0 || estado.filtro === 'equipo';
+      clearTimeout(estado.actividadTemporizador);
+      estado.actividadRevision++;
       estado.lista = [];
       estado.panel.querySelector('[data-cuerpo]').innerHTML = '';
       cargar(true);
@@ -262,6 +397,14 @@
       } catch (e) {
         mostrarNotificacion('error', e.message);
       }
+      return;
+    }
+    if (ev.target.closest('[data-mas-actividad]')) {
+      cargarActividad(false);
+      return;
+    }
+    if (ev.target.closest('[data-reintentar-actividad]')) {
+      cargarActividad(true);
       return;
     }
     if (ev.target.closest('[data-mas]')) {

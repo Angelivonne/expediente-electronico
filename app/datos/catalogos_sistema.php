@@ -242,7 +242,7 @@ function catalogosSistema(): array
         'catalogo_categorias_farmaco' => 'Grupo terapéutico al que pertenece el medicamento.',
         'catalogo_unidades_medida' => 'Unidades para dosificar y surtir.',
         'catalogo_concentraciones' => 'Concentración del principio activo.',
-        'catalogo_entidades' => 'Entidades federativas de México (clave INEGI).',
+        'catalogo_entidades' => 'Entidades federativas de México (clave CURP).',
         'catalogo_municipios' => 'Municipios por entidad federativa.',
         'catalogo_localidades' => 'Localidades por municipio.',
         'catalogo_codigos_postales' => 'Códigos postales por localidad.',
@@ -277,7 +277,7 @@ function catalogosSistema(): array
     $fuentes = [
         'cie10' => ['SSA · CIE-10', 'CIE-10', 'NOM-004-SSA3-2012'],
         'medicamentos' => ['CSG · Cuadro Básico de Medicamentos', 'CBCM', 'NOM-004-SSA3-2012'],
-        'catalogo_entidades' => ['INEGI', 'INEGI', 'NOM-024-SSA3-2012'],
+        'catalogo_entidades' => ['RENAPO · claves de entidad CURP', 'CURP', 'NOM-024-SSA3-2012'],
         'catalogo_municipios' => ['INEGI', 'INEGI', 'NOM-024-SSA3-2012'],
         'catalogo_localidades' => ['INEGI', 'INEGI', 'NOM-024-SSA3-2012'],
         'catalogo_codigos_postales' => ['SEPOMEX', 'SEPOMEX', 'NOM-024-SSA3-2012'],

@@ -1,7 +1,7 @@
 -- CIE-10 DGIS/SSA México, DIAGNOSTICOS_20240416.xlsx (abril 2024).
 -- 14,497 claves válidas, UTF-8; excluye la fila resumen 9999.
 -- Ejecuta después de database/migracion_medicamentos_cie10_incapacidad.sql.
-USE expediente_expediente;
+USE clinica;
 SET NAMES utf8mb4;
 SET @INST := 1;
 

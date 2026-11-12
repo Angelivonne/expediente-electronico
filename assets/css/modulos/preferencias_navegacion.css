@@ -1,0 +1,41 @@
+.lateral-preferencias {
+  width: min(520px, calc(100vw - 32px));
+  max-width: 520px;
+  max-height: min(680px, calc(100dvh - 32px));
+  margin: auto;
+  padding: 22px;
+  overflow: auto;
+  border: 1px solid var(--borde-fuerte, #333);
+  border-radius: 12px;
+  background: #111;
+  color: var(--texto, #dedede);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+}
+.lateral-preferencias::backdrop { background: rgb(0 0 0 / 62%); }
+.lateral-seccion[data-seccion-personalizable][hidden] { display: none !important; }
+.lateral-preferencias__cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.lateral-preferencias__cabecera h2 { margin: 0; color: var(--texto-fuerte, #f5f5f5); font-size: 1.125rem; font-weight: 600; }
+.lateral-preferencias__cabecera p { margin: 7px 0 0; color: var(--texto-tenue, #929292); font-size: var(--fs-sm, .875rem); line-height: 1.5; }
+.lateral-preferencias__lista { margin: 18px 0 0; padding: 0; list-style: none; }
+.lateral-preferencias__fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  border-top: 1px solid var(--borde, #292929);
+}
+.lateral-preferencias__nombre { min-width: 0; color: var(--texto, #dedede); font-size: var(--fs-sm, .875rem); overflow-wrap: anywhere; }
+.lateral-preferencias__mostrar { display: inline-flex; align-items: center; gap: 7px; color: var(--texto-suave, #aaa); font-size: var(--fs-xs, .75rem); cursor: pointer; white-space: nowrap; }
+.lateral-preferencias__mostrar input { accent-color: var(--primario, #60a5fa); }
+.lateral-preferencias__mover { display: flex; gap: 5px; }
+.lateral-preferencias__mover .boton { min-height: 30px; padding: 0 8px; font-size: var(--fs-xs, .75rem); }
+.lateral-preferencias__mover .boton:disabled { opacity: .35; cursor: default; }
+.lateral-preferencias__estado { min-height: 18px; margin: 10px 0 0; color: var(--texto-tenue, #929292); font-size: var(--fs-xs, .75rem); }
+.lateral-preferencias__acciones { display: flex; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid var(--borde, #292929); }
+.lateral-preferencias__acciones .boton { min-height: 34px; }
+@media (max-width: 480px) {
+  .lateral-preferencias { padding: 18px 14px; }
+  .lateral-preferencias__fila { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 8px 0; }
+  .lateral-preferencias__mover { grid-column: 1 / -1; justify-content: flex-end; }
+}

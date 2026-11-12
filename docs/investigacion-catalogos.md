@@ -1,7 +1,7 @@
-# Expediente Expediente — Informe de Investigación de Bases de Datos Gubernamentales
+# Expediente clínico — Informe de investigación de bases de datos gubernamentales
 
 Fecha: 01/11/2026
-Sistema: Expediente Expediente (C:\xampp\htdocs\ExpedienteExpediente\)
+Sistema: Expediente Clínico (C:\xampp\htdocs\clinica\)
 Normativa aplicable: NOM-024-SSA3-2012, NOM-004-SSA3-2012, LFPDPPP
 
 ---

@@ -174,11 +174,14 @@
     const conTexto = !!respuesta.trim();
     a.caja.querySelector('[data-ia-insertar]').hidden = !conTexto;
     a.caja.querySelector('[data-ia-reemplazar]').hidden = !conTexto || !a.editor.texto(a.bloque).trim();
+    a.caja.querySelector('[data-ia-reintentar]').hidden = conTexto || !a.modoSeleccion;
+    a.caja.querySelector('[data-ia-revision]').closest('label').hidden = a.modoSeleccion && !conTexto;
     a.caja.querySelector('[data-ia-turnos]').textContent = a.historial.length > 2 ? `${a.historial.length / 2} intercambios` : '';
     const entrada = a.caja.querySelector('[data-ia-entrada]');
     entrada.value = '';
     entrada.placeholder = 'Pide un cambio o haz otra pregunta…';
-    if (conTexto) a.caja.querySelector('[data-ia-revision]')?.focus({ preventScroll: true }); else entrada.focus();
+    if (conTexto) a.caja.querySelector('[data-ia-revision]')?.focus({ preventScroll: true });
+    else if (!a.modoSeleccion) entrada.focus();
   }
 
   function insertar(reemplazar) {
@@ -196,6 +199,10 @@
       return;
     }
     if (reemplazar && a.rango) {
+      if (a.rango.toString() !== a.fragmento) {
+        mostrarNotificacion('error', 'La selección cambió durante la consulta. Selecciona de nuevo el texto para evitar reemplazar contenido distinto.');
+        return;
+      }
       a.rango.deleteContents();
       // La selección es texto en línea: inserta la respuesta sin marcadores de markdown.
       const nodo = document.createTextNode(bloquesDesde(a.respuesta).map((b) => b.x).join(' '));
@@ -237,6 +244,7 @@
         </div>
         <div class="ia-linea__resultado" data-ia-resultado hidden>
           <p class="ia-linea__pregunta" data-ia-pregunta></p>
+          <p class="ia-linea__fragmento" data-ia-fragmento hidden></p>
           <div class="ia-linea__pasos" data-ia-pasos></div>
           <div class="ia-linea__respuesta md" data-ia-respuesta></div>
         </div>
@@ -252,6 +260,7 @@
             <button type="button" class="ia-linea__boton" data-ia-insertar>${ico('agregar')}<span>Insertar debajo</span></button>
             <button type="button" class="ia-linea__boton" data-ia-otra>${ico('reabrir') || ''}<span>Otra versión</span></button>
             <button type="button" class="ia-linea__boton" data-ia-copiar>${ico('documento')}<span>Copiar</span></button>
+            <button type="button" class="ia-linea__boton" data-ia-reintentar hidden>${ico('reabrir') || ''}<span>Intentar de nuevo</span></button>
             <button type="button" class="ia-linea__boton ia-linea__boton--tenue" data-ia-descartar>${ico('cerrar')}<span>Descartar</span></button>
           </div>
           <div class="ia-linea__refinar">${REFINAR.map(([t], i) => `<button type="button" data-ia-refinar="${i}">${t}</button>`).join('')}</div>
@@ -271,7 +280,15 @@
     };
     colocar();
     window.addEventListener('resize', colocar);
-    abierto = { caja, bloque, editor: this, historial: [], colocar, rango: opciones.rango || null, fragmento: opciones.texto || '', revision: this.serializar() };
+    const seleccionDirecta = !!(opciones.rango && opciones.texto?.trim() && opciones.instruccion);
+    abierto = { caja, bloque, editor: this, historial: [], colocar, rango: opciones.rango || null, fragmento: opciones.texto || '', revision: this.serializar(), modoSeleccion: seleccionDirecta };
+    if (seleccionDirecta) {
+      caja.classList.add('ia-linea--seleccion');
+      const fragmento = caja.querySelector('[data-ia-fragmento]');
+      fragmento.textContent = `Texto seleccionado: “${opciones.texto.trim().slice(0, 360)}${opciones.texto.trim().length > 360 ? '…' : ''}”`;
+      fragmento.hidden = false;
+      caja.querySelector('[data-ia-reemplazar] span').textContent = 'Aceptar cambios';
+    }
     if (opciones.instruccion) caja.querySelector('[data-ia-entrada]').value = opciones.instruccion;
     bloque.classList.add('bloque--con-ia');
     const entrada = caja.querySelector('[data-ia-entrada]');
@@ -284,7 +301,10 @@
       if (ev.key === 'Escape') { ev.preventDefault(); cerrar(); bloque.classList.remove('bloque--con-ia'); this.enfocar(bloque); }
     });
     caja.querySelector('[data-ia-enviar]').addEventListener('click', () => preguntar(entrada.value));
-    caja.querySelector('[data-ia-compartir]').addEventListener('change', (ev) => ev.target.closest('label')?.classList.remove('ia-linea__confirmar--atencion'));
+    caja.querySelector('[data-ia-compartir]').addEventListener('change', (ev) => {
+      ev.target.closest('label')?.classList.remove('ia-linea__confirmar--atencion');
+      if (ev.target.checked && abierto?.modoSeleccion && caja.dataset.estado === 'inicio') preguntar(entrada.value);
+    });
     caja.querySelector('[data-ia-revision]').addEventListener('change', (ev) => ev.target.closest('label')?.classList.remove('ia-linea__confirmar--atencion'));
     caja.addEventListener('click', (ev) => {
       const s = ev.target.closest('[data-ia-sugerencia]');
@@ -299,6 +319,7 @@
         abierto.historial.pop();
         preguntar(abierto.ultimaPeticion, { repetir: true });
       }
+      if (ev.target.closest('[data-ia-reintentar]')) preguntar(abierto.ultimaPeticion, { repetir: true });
       if (ev.target.closest('[data-ia-descartar]')) { bloque.classList.remove('bloque--con-ia'); cerrar(); this.enfocar(bloque); }
       if (ev.target.closest('[data-ia-copiar]')) navigator.clipboard?.writeText(abierto.respuesta || '').then(() => window.mostrarNotificacion?.('exito', 'Respuesta copiada.'));
       if (ev.target.closest('[data-ia-insertar]')) { bloque.classList.remove('bloque--con-ia'); insertar(false); }

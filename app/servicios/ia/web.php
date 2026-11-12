@@ -165,7 +165,7 @@ function iaBuscarInternet(string $consulta, string $tipo): array
     $xp = new DOMXPath($dom);
     foreach ($xp->query("//div[contains(concat(' ', normalize-space(@class), ' '), ' result ')]") as $nodo) {
         $enlace = $xp->query(".//a[contains(@class, 'result__a')]", $nodo)->item(0);
-        if (!$enlace) {
+        if (!($enlace instanceof DOMElement)) {
             continue;
         }
         $href = $enlace->getAttribute('href');
@@ -276,7 +276,10 @@ function iaLeerSitio(string $url): array
     if ($imagenPrincipal) {
         $imagenes[] = urlAbsoluta($imagenPrincipal, $r['url']);
     }
-    foreach ($raiz ? $xp->query('.//img', $raiz) : [] as $img) {
+    foreach ($raiz ? ($xp->query('.//img', $raiz) ?: []) : [] as $img) {
+        if (!($img instanceof DOMElement)) {
+            continue;
+        }
         $src = $img->getAttribute('src') ?: $img->getAttribute('data-src');
         if ($src && !str_starts_with($src, 'data:') && (int) ($img->getAttribute('width') ?: 200) >= 120) {
             $imagenes[] = urlAbsoluta($src, $r['url']);

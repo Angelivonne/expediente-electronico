@@ -1,0 +1,284 @@
+main.pagina:has(> .morbilidad-pagina) {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.morbilidad-pagina { width: 100%; max-width: none; }
+.morbilidad-pagina .pagina__cabecera {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.morbilidad__resumen {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 24px 0 8px;
+}
+.morbilidad__resumen > div { min-width: 0; padding-top: 13px; padding-bottom: 13px; }
+.morbilidad__resumen dt { line-height: 1.35; }
+.morbilidad__resumen dd { overflow-wrap: anywhere; white-space: normal; }
+.morbilidad__resumen .morbilidad__patologia { font-size: var(--fs-sm); }
+.morbilidad__variacion { display: block; margin-top: 5px; color: var(--texto-tenue); font-size: var(--fs-xs); line-height: 1.4; }
+.morbilidad__distribucion {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, .9fr);
+  align-items: start;
+  gap: 30px;
+  margin-top: 20px;
+}
+.morbilidad__distribucion > *,
+.morbilidad__lateral { min-width: 0; }
+.morbilidad__graficas { min-width: 0; padding-top: 20px; border-top: 1px solid var(--borde-fuerte); }
+.morbilidad__graficas .ficha__titulo-fila { margin: 0 0 10px; }
+.morbilidad__graficas .ficha__titulo { margin: 0; }
+.morbilidad__periodos {
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--borde-fuerte);
+  scrollbar-width: thin;
+}
+.morbilidad__periodos a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 38px;
+  border-bottom: 2px solid transparent;
+  color: var(--texto-tenue);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.morbilidad__periodos a:hover { color: var(--texto); }
+.morbilidad__periodos a[aria-current="page"] {
+  border-bottom-color: var(--primario, #60a5fa);
+  color: var(--texto-fuerte);
+}
+.morbilidad__figuras {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px 0 8px;
+}
+.morbilidad__figura { min-width: 0; margin: 0; }
+.morbilidad__figura img { display: block; width: 100%; height: auto; }
+.morbilidad__grafica-vacia { display: grid; min-height: 120px; place-items: center; margin: 0; color: var(--texto-tenue); font-size: var(--fs-sm); }
+.morbilidad__figura figcaption {
+  margin-top: 7px;
+  color: var(--texto-tenue);
+  font-size: var(--fs-xs);
+}
+.morbilidad__tabla { min-width: 0; margin: 0; }
+.morbilidad__tabla .bd__cabecera { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.morbilidad__tabla-titulo { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.morbilidad__alcance { flex: 1 0 100%; margin: -2px 0 0; color: var(--texto-tenue); font-size: var(--fs-xs); }
+.morbilidad__tabla .bd__herramientas { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.morbilidad__acciones { position: relative; }
+.morbilidad__acciones > summary {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  color: var(--texto-suave);
+  cursor: pointer;
+  list-style: none;
+}
+.morbilidad__acciones > summary::-webkit-details-marker { display: none; }
+.morbilidad__acciones > summary::marker { content: ''; }
+.morbilidad__acciones > summary:hover,
+.morbilidad__acciones[open] > summary { background: var(--bg-hover, #222); color: var(--texto-fuerte); }
+.morbilidad__acciones-lista {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--borde-fuerte, #333);
+  border-radius: 8px;
+  background: var(--bg, #181818);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+}
+.morbilidad__acciones-lista a,
+.morbilidad__acciones-lista button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.morbilidad__acciones-lista a:hover,
+.morbilidad__acciones-lista button:hover,
+.morbilidad__acciones-lista a:focus-visible,
+.morbilidad__acciones-lista button:focus-visible { background: var(--bg-hover, #252525); outline: 0; }
+.morbilidad__compartir-form {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border-bottom: 1px solid var(--borde, #333);
+}
+.morbilidad__compartir-form label,
+.morbilidad__sin-autorizaciones {
+  color: var(--texto-tenue);
+  font-size: var(--fs-xs);
+}
+.morbilidad__compartir-form select {
+  max-width: 260px;
+  min-height: 34px;
+  padding: 5px 8px;
+  border: 1px solid var(--borde-fuerte, #333);
+  border-radius: 6px;
+  background: var(--bg, #181818);
+  color: var(--texto);
+  font: inherit;
+}
+.morbilidad__sin-autorizaciones { padding: 8px; }
+.morbilidad__acciones-lista svg.icono { width: 16px; height: 16px; flex: 0 0 16px; color: var(--texto-tenue); }
+.morbilidad__tabla .morbilidad__tabla-marco {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  overscroll-behavior-x: contain;
+  scrollbar-color: #666 #1c1c1c;
+  scrollbar-width: auto;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.morbilidad__tabla-marco::-webkit-scrollbar { height: 9px; }
+.morbilidad__tabla-marco::-webkit-scrollbar-track { background: #1c1c1c; }
+.morbilidad__tabla-marco::-webkit-scrollbar-thumb { border-radius: 6px; background: #666; }
+.morbilidad__tabla-marco::-webkit-scrollbar-thumb:hover { background: #888; }
+.morbilidad__tabla caption.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.morbilidad__tabla .bd-tabla { width: 100%; min-width: 980px; table-layout: fixed; }
+.morbilidad__tabla .bd-tabla th,
+.morbilidad__tabla .bd-tabla td {
+  height: auto;
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  vertical-align: middle;
+}
+.morbilidad__tabla .bd-tabla th:nth-child(1) { width: 10%; }
+.morbilidad__tabla .bd-tabla th:nth-child(2) { width: 26%; }
+.morbilidad__tabla .bd-tabla th:nth-child(3) { width: 21%; }
+.morbilidad__tabla .bd-tabla th:nth-child(4) { width: 9%; }
+.morbilidad__tabla .bd-tabla th:nth-child(5) { width: 12%; }
+.morbilidad__tabla .bd-tabla th:nth-child(6) { width: 9%; }
+.morbilidad__tabla .bd-tabla th:nth-child(7) { width: 7%; }
+.morbilidad__tabla .bd-tabla th:nth-child(8) { width: 6%; }
+.morbilidad__tabla .bd-tabla th button { min-height: 34px; white-space: normal; }
+.morbilidad__codigo { color: #93c5fd; font-family: monospace; font-weight: 600; }
+.morbilidad__casos { color: var(--texto-fuerte); font-weight: 600; }
+.morbilidad__prevalencia { color: #93c5fd; font-weight: 600; }
+.morbilidad__tabla .bd__vacio { padding: 18px 0; }
+.morbilidad__impresion,
+.morbilidad__impresion-firmas { display: none; }
+
+@media (max-width: 1000px) {
+  .morbilidad__distribucion { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .morbilidad__lateral { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); align-items: start; gap: 22px; }
+  .morbilidad__graficas { padding-top: 0; border-top: 0; }
+}
+@media (max-width: 640px) {
+  .morbilidad-pagina .morbilidad__resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .morbilidad-pagina .morbilidad__resumen > div:nth-child(3n + 1) { padding-left: 12px; border-left: 1px solid var(--borde-fuerte); }
+  .morbilidad-pagina .morbilidad__resumen > div:nth-child(2n + 1) { padding-left: 0; border-left: 0; }
+  .morbilidad-pagina .morbilidad__resumen > div:nth-child(n + 3) { border-top: 1px solid var(--borde-fuerte); }
+  .morbilidad__lateral { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .morbilidad__resumen { margin-top: 0; }
+  .morbilidad__tabla .bd-tabla { min-width: 850px; }
+  .morbilidad__tabla .bd__cabecera { align-items: flex-start; }
+  .morbilidad__tabla .bd__herramientas { margin-left: auto; }
+}
+@media print {
+  @page { size: letter landscape; margin: 10mm 12mm; }
+  html, body, .app, .contenido, main.pagina, .morbilidad-pagina {
+    display: block !important;
+    visibility: visible !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .contenido__cuerpo, .contenido__pagina {
+    display: block !important;
+    visibility: visible !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  .barra-lateral, .barra-superior, .pestanas, .banner, .velo,
+  .no-imprimir, .bd__herramientas, .morbilidad__periodos { display: none !important; }
+  .morbilidad__impresion { display: block; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid #222; }
+  .morbilidad__impresion-institucion { margin: 0 0 3px; color: #444; font-size: 9pt; font-weight: 700; text-transform: uppercase; }
+  .morbilidad__impresion h1 { margin: 0; font-size: 17pt; }
+  .morbilidad__impresion-periodo { margin: 5px 0 0; color: #444; font-size: 9pt; }
+  .morbilidad__impresion-resumen { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0 0; }
+  .morbilidad__impresion-resumen > div { padding: 6px 8px; border: 1px solid #bbb; }
+  .morbilidad__impresion-resumen dt { color: #444; font-size: 8pt; }
+  .morbilidad__impresion-resumen dd { margin: 2px 0 0; font-size: 11pt; font-weight: 700; }
+  .morbilidad__impresion-alcance { margin: 8px 0 0; color: #444; font-size: 8pt; line-height: 1.4; }
+  .morbilidad__distribucion { display: block; margin: 0; }
+  .morbilidad__tabla { border: 0; break-inside: auto; }
+  .morbilidad__tabla .bd__cabecera { display: block; padding: 0; border: 0; }
+  .morbilidad__tabla .bd-tabla { width: 100% !important; min-width: 0 !important; table-layout: fixed; border-collapse: collapse; }
+  .morbilidad__tabla .bd-tabla th:nth-child(1) { width: 8%; }
+  .morbilidad__tabla .bd-tabla th:nth-child(2) { width: 23%; }
+  .morbilidad__tabla .bd-tabla th:nth-child(3) { width: 22%; }
+  .morbilidad__tabla .bd-tabla th:nth-child(4) { width: 8%; }
+  .morbilidad__tabla .bd-tabla th:nth-child(5) { width: 10%; }
+  .morbilidad__tabla .bd-tabla th:nth-child(6) { width: 9%; }
+  .morbilidad__tabla .bd-tabla th:nth-child(7) { width: 10%; }
+  .morbilidad__tabla .bd-tabla th:nth-child(8) { width: 10%; }
+  .morbilidad__tabla .morbilidad__tabla-marco { overflow: visible !important; border: 0 !important; }
+  .morbilidad__tabla .bd-tabla thead { display: table-header-group; }
+  .morbilidad__tabla .bd-tabla tr { break-inside: avoid; page-break-inside: avoid; }
+  .morbilidad__tabla .bd-tabla th,
+  .morbilidad__tabla .bd-tabla td { padding: 4px 5px; border: 1px solid #aaa; color: #000 !important; font-size: 8pt; overflow-wrap: anywhere; }
+  .morbilidad__tabla .bd-tabla th { background: #eee !important; }
+  .morbilidad__alcance { margin: 4px 0; color: #444; }
+  .morbilidad__lateral { display: block; margin-top: 16px; }
+  .morbilidad__resumen { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; margin: 8px 0 14px !important; }
+  .morbilidad__resumen > div { padding: 6px !important; border-color: #bbb !important; }
+  .morbilidad__resumen dt { color: #444 !important; font-size: 8pt !important; }
+  .morbilidad__resumen dd { color: #000 !important; font-size: 10pt !important; }
+  .morbilidad__graficas { break-inside: auto; border-top: 1px solid #aaa; }
+  .morbilidad__figuras { grid-template-columns: 1fr; }
+  .morbilidad__figura { break-inside: avoid; page-break-inside: avoid; }
+  .morbilidad__figura img { max-width: 100% !important; max-height: 100mm; object-fit: contain; }
+  .morbilidad__impresion-firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 25mm; margin: 14mm 10mm 0; break-inside: avoid; }
+  .morbilidad__impresion-firmas div { padding-top: 6px; border-top: 1px solid #555; text-align: center; }
+  .morbilidad__impresion-firmas span { color: #444; font-size: 8pt; }
+  * { color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

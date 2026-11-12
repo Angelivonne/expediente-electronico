@@ -1,5 +1,5 @@
 -- Plantillas propias: cualquier nota se puede guardar como plantilla del equipo y reutilizarse.
--- Ejecutar como root una sola vez:  mysql -u root -p expediente_expediente < database/migracion_plantillas.sql
+-- Ejecutar como root una sola vez:  mysql -u root -p clinica < database/migracion_plantillas.sql
 
 CREATE TABLE IF NOT EXISTS plantillas (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -13,5 +13,5 @@ CREATE TABLE IF NOT EXISTS plantillas (
   KEY idx_plantillas_institucion (institucion_id, activo, creado_en)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON expediente_expediente.plantillas TO 'expediente_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON clinica.plantillas TO 'clinica_app'@'localhost';
 FLUSH PRIVILEGES;

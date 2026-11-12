@@ -153,11 +153,3 @@ $presupuestosGasto   = array_filter($presupuestos, fn ($p) => $p['tipo'] === 'ga
 </div>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
-
-
-
-
-
-
-
-

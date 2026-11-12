@@ -7,7 +7,7 @@ El expediente clínico se conserva **mínimo 5 años** contados a partir del **�
 - El sistema **no tiene borrado físico** de pacientes ni de entradas del historial:
   - Las bajas de pacientes son lógicas (`pacientes.eliminado_en`).
   - El historial clínico solo se inserta; la aplicación no tiene ruta de `DELETE`/`UPDATE` sobre él.
-  - El usuario de base de datos `expediente_app` solo tiene `SELECT` e `INSERT` sobre `bitacora`.
+  - El usuario de base de datos `clinica_app` solo tiene `SELECT` e `INSERT` sobre `bitacora`.
 - Los respaldos diarios permiten recuperar información; se conservan los 14 más recientes.
 - Al cumplirse el plazo, el expediente debe **archivarse** (no borrarse) según la política de la institución.
 

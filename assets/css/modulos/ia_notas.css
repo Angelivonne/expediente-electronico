@@ -164,6 +164,28 @@
   .ia-linea[data-estado="pensando"] .ia-linea__tarjeta::before { animation: none; }
 }
 
+/* La mejora de una selección usa el flujo breve: autorizar, revisar y aceptar. */
+.ia-linea--seleccion .ia-linea__sugerencias,
+.ia-linea--seleccion .ia-linea__barra,
+.ia-linea--seleccion [data-ia-insertar],
+.ia-linea--seleccion [data-ia-otra],
+.ia-linea--seleccion [data-ia-copiar],
+.ia-linea--seleccion .ia-linea__refinar { display: none !important; }
+.ia-linea--seleccion .ia-linea__fragmento {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-left: 2px solid #3b82f6;
+  border-radius: 0 6px 6px 0;
+  background: #17191d;
+  color: var(--texto-tenue);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.ia-linea--seleccion .ia-linea__acciones { gap: 8px; }
+.ia-linea--seleccion .ia-linea__principales { gap: 6px; }
+.ia-linea--seleccion .ia-linea__boton--primario { min-width: 128px; }
+
 /* Confirmaciones y estados (Paso 1/2) */
 .ia-linea__confirmar { display: flex; align-items: flex-start; gap: 8px; margin: 8px 14px 0; padding: 8px 10px; border: 1px solid #2f2f34; border-radius: 10px; background: #202024; color: var(--texto-suave); font-size: var(--fs-sm); line-height: 1.35; cursor: pointer; }
 .ia-linea__confirmar input { margin-top: 2px; accent-color: #2383e2; }

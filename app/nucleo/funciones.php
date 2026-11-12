@@ -187,7 +187,7 @@ function usuarioActual(): ?array
  */
 function registrarBitacora(string $tabla, int $registroId, string $accion,
                            ?string $campo = null, ?string $anterior = null, ?string $nuevo = null,
-                           ?int $institucionId = null): void
+                           ?int $institucionId = null): bool
 {
     try {
         db()->prepare(
@@ -199,8 +199,19 @@ function registrarBitacora(string $tabla, int $registroId, string $accion,
             $institucionId ?? (function_exists('institucionId') ? institucionId() : null),
             $_SERVER['REMOTE_ADDR'] ?? null,
         ]);
+        return true;
     } catch (Throwable $e) {
-        error_log('[registrarBitacora] Fallo no critico al escribir bitacora: ' . $e->getMessage());
+        error_log('[registrarBitacora] Fallo al escribir bitacora: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/** Registra solo metadatos de una fila; nunca copia su contenido sensible a la bitácora. */
+function registrarAuditoriaFilaPagina(int $paginaId, int $filaId, string $accion, ?string $campo = null): void
+{
+    $referencia = 'pagina:' . $paginaId . ':' . ($campo ?: 'fila');
+    if (!registrarBitacora('pagina_filas', $filaId, $accion, $referencia)) {
+        throw new RuntimeException('No se pudo registrar la evidencia del cambio. La operación no se completó.');
     }
 }
 
@@ -284,18 +295,29 @@ function patronContiene(string $texto): string
 }
 
 /** Separa cada palabra de una consulta sin depender de mayusculas ni puntuacion. */
-function terminosBusqueda(string $texto): array
+function terminosBusqueda(string $texto, bool $flexible = false): array
 {
     $texto = mb_strtolower(mb_substr($texto, 0, 200), 'UTF-8');
     $texto = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $texto) ?? '';
     $terminos = preg_split('/\s+/u', trim($texto), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    if ($flexible) {
+        $palabrasVacias = ['a', 'al', 'busca', 'buscar', 'buscame', 'busco', 'busque', 'con', 'de', 'del', 'dame',
+            'donde', 'el', 'en', 'encuentra', 'encontrar', 'es', 'esta', 'está', 'existe', 'existen', 'favor',
+            'hay', 'la', 'las', 'lo', 'los', 'me', 'mi', 'muestra', 'mostrar', 'necesito', 'para', 'por', 'que',
+            'quien', 'quién', 'quiero', 'quisiera', 'tiene', 'tienen', 'un', 'una', 'unas', 'uno', 'unos',
+            'alguien', 'aparece', 'aparecen', 'busqueda', 'búsqueda', 'cual', 'cuál', 'dime', 'expediente',
+            'expedientes', 'existe', 'identifica', 'llama', 'llamado', 'llamada', 'paciente', 'pacientes',
+            'persona', 'personas', 'registrada', 'registradas', 'registrado', 'registrados', 'registro', 'registros',
+            'tengo', 'puedes'];
+        $terminos = array_values(array_filter($terminos, fn ($termino) => !in_array($termino, $palabrasVacias, true)));
+    }
     return array_slice(array_values(array_unique($terminos)), 0, 12);
 }
 
 /** Condicion SQL segura: cada termino debe aparecer en alguno de los campos. */
-function condicionBusqueda(array $campos, string $texto): array
+function condicionBusqueda(array $campos, string $texto, bool $flexible = false): array
 {
-    $terminos = terminosBusqueda($texto);
+    $terminos = terminosBusqueda($texto, $flexible);
     if (!$campos || !$terminos) {
         return ['1 = 0', []];
     }
@@ -303,14 +325,29 @@ function condicionBusqueda(array $campos, string $texto): array
     $grupos = [];
     $parametros = [];
     foreach ($terminos as $termino) {
-        $alternativas = [];
-        foreach ($campos as $campo) {
-            $campo = (string) $campo;
-            if (!preg_match('/^[A-Za-z0-9_`().,\' ]{1,160}$/', $campo)) {
-                continue;
+        $variantes = [$termino];
+        if ($flexible && mb_strlen($termino, 'UTF-8') >= 4) {
+            if (str_ends_with($termino, 's')) {
+                $variantes[] = mb_substr($termino, 0, -1, 'UTF-8');
             }
-            $alternativas[] = '(' . $campo . ') LIKE ?';
-            $parametros[] = patronContiene($termino);
+            if (str_ends_with($termino, 'es')) {
+                $variantes[] = mb_substr($termino, 0, -2, 'UTF-8');
+            }
+            if (preg_match('/[aeiouáéíóú]$/u', $termino)) {
+                $variantes[] = $termino . 's';
+            }
+            $variantes = array_values(array_unique($variantes));
+        }
+        $alternativas = [];
+        foreach ($variantes as $variante) {
+            foreach ($campos as $campo) {
+                $campo = (string) $campo;
+                if (!preg_match('/^[A-Za-z0-9_`().,\' ]{1,160}$/', $campo)) {
+                    continue;
+                }
+                $alternativas[] = '(' . $campo . ') LIKE ?';
+                $parametros[] = patronContiene($variante);
+            }
         }
         if ($alternativas) {
             $grupos[] = '(' . implode(' OR ', $alternativas) . ')';
@@ -420,5 +457,3 @@ function recaptchaVerificar(string $token): bool
     }
     return true;
 }
-
-

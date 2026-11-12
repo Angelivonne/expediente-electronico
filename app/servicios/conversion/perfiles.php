@@ -167,10 +167,11 @@ function validarPerfil(string|array $entrada): array
         }
     }
     $errores = [];
-    $err = function (string $ruta, string $texto) use (&$errores): void {
+    $err = function (string $ruta, string $texto) use (&$errores): ?string {
         if (count($errores) < 40) {
             $errores[] = "$ruta: $texto";
         }
+        return null;
     };
 
     // Nada que parezca código, en ningún valor

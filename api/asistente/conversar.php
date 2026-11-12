@@ -186,5 +186,10 @@ $ejecutar = function (string $nombre, array $entrada) use ($acceso, &$llamadas):
 };
 // El chip de contexto ($herramienta) solo añade contexto extra; las herramientas del agente
 // están disponibles siempre que el administrador las haya activado, sin depender del chip.
-transmitirAsistente($cfg, $sistema, $mensajes, $esfuerzo, 'evento', opcionAsistente('herramientas') ? herramientasIa($acceso) : [], $ejecutar);
+$herramientasHabilitadas = (bool) opcionAsistente('herramientas');
+if (!$herramientasHabilitadas) {
+    $sistema .= "\n\nESTADO DE LAS HERRAMIENTAS: el administrador las desactivó para esta instalación. No afirmes que buscaste, leíste, creaste o modificaste información. Explica que no puedes ejecutar esa acción hasta que las habiliten.";
+    evento('aviso', 'Las herramientas del asistente están desactivadas. Un administrador puede habilitarlas en la configuración.');
+}
+transmitirAsistente($cfg, $sistema, $mensajes, $esfuerzo, 'evento', $herramientasHabilitadas ? herramientasIa($acceso) : [], $ejecutar);
 evento('fin');

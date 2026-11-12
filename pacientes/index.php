@@ -26,6 +26,30 @@ $lista          = motorListar('pacientes', ['q' => $busqueda, 'limite' => $limit
 $pacientes      = $lista['filas'];
 $totalPacientes = $lista['total'];
 $hayMas         = count($pacientes) < $totalPacientes;
+$idsPacientes   = array_values(array_filter(array_map(static fn ($fila): int => (int) $fila['id'], $pacientes)));
+$registradores  = [];
+if ($idsPacientes) {
+    $marcas = implode(',', array_fill(0, count($idsPacientes), '?'));
+    $consultaRegistradores = db()->prepare(
+        "SELECT b.registro_id, u.id AS usuario_id, u.nombre, u.foto
+           FROM bitacora b
+           INNER JOIN (
+             SELECT registro_id, MAX(id) AS id
+               FROM bitacora
+              WHERE tabla = 'pacientes' AND accion = 'crear' AND registro_id IN ($marcas)
+              GROUP BY registro_id
+           ) recientes ON recientes.id = b.id
+           INNER JOIN usuarios u ON u.id = b.usuario_id"
+    );
+    $consultaRegistradores->execute($idsPacientes);
+    foreach ($consultaRegistradores->fetchAll(PDO::FETCH_ASSOC) as $registrador) {
+        $registradores[(int) $registrador['registro_id']] = $registrador;
+    }
+}
+foreach ($pacientes as &$paciente) {
+    $paciente['_registrador'] = $registradores[(int) $paciente['id']] ?? null;
+}
+unset($paciente);
 
 $propiedadesExtra = json_decode((string) config('pacientes_propiedades'), true) ?: [];
 $ajustesColumnas  = json_decode((string) config('pacientes_columnas'), true) ?: [];
@@ -87,6 +111,20 @@ foreach ($propiedadesExtra as $prop) {
 
 $todasColumnas = $columnas;
 $columnas = array_values(array_filter($columnas, fn ($c) => empty($c['oculta'])));
+$grupoRegistrador = (string) ($columnas[0]['grupo'] ?? 'Registro');
+$columnas = array_merge([[
+    'clave' => 'registrador',
+    'campo' => null,
+    'editable' => false,
+    'calculo' => null,
+    'titulo' => 'Registró',
+    'tipo' => 'texto',
+    'icono' => 'usuario',
+    'ancho' => 190,
+    'orden' => 'texto',
+    'editor' => '',
+    'grupo' => $grupoRegistrador,
+]], $columnas);
 
 $grupos = [];
 foreach ($columnas as $columna) {
@@ -142,11 +180,30 @@ $tabla = [
         return $atributos;
     },
     'celdas' => [
+        'registrador' => function (array $columna, array $fila): string {
+            $registrador = $fila['_registrador'] ?? null;
+            if (!$registrador) {
+                return '<td><span class="pacientes__registrador-vacio">No disponible</span></td>';
+            }
+            return '<td><span class="pacientes__registrador">'
+                . avatar((int) $registrador['usuario_id'], (string) $registrador['nombre'], $registrador['foto'] ?: null, 'pacientes__registrador-avatar')
+                . '<span>' . e($registrador['nombre']) . '</span></span></td>';
+        },
         'nombre_completo' => function (array $columna, array $fila): string {
             $nombre = trim("{$fila['nombre']} {$fila['primer_apellido']} {$fila['segundo_apellido']}");
             return '<td class="bd-tabla__celda-titulo" title="' . e($nombre) . '">'
                 . '<a class="bd-tabla__titulo" href="' . URL_BASE . '/pacientes/ver.php?id=' . (int) $fila['id'] . '">'
                 . icono('pagina') . '<span>' . e($nombre) . '</span></a></td>';
+        },
+        'sexo' => function (array $columna, array $fila): string {
+            $sexo = (string) ($fila['sexo'] ?? '');
+            $texto = SEXOS[$sexo] ?? $sexo;
+            return '<td data-campo="sexo" data-valor="' . e($sexo) . '" title="' . e($texto) . '">' . e($texto) . '</td>';
+        },
+        'confirmacion' => function (array $columna, array $fila): string {
+            $confirmado = !empty($fila['confirmacion_datos']);
+            return '<td title="' . ($confirmado ? 'Datos confirmados' : 'Pendiente de confirmación') . '"><span class="pacientes__etiqueta ' . ($confirmado ? 'pacientes__etiqueta--confirmada' : 'pacientes__etiqueta--pendiente') . '">'
+                . ($confirmado ? 'Confirmado' : 'Pendiente') . '</span></td>';
         },
     ],
     'grupos' => $grupos,
@@ -164,7 +221,7 @@ $tabla = [
 
     <div class="bd__herramientas">
       <?php if (puede('configurar')): ?><button type="button" class="boton-icono" data-propiedades title="Propiedades" aria-label="Propiedades"><?= icono('lista') ?></button><?php endif; ?>
-      <button type="button" class="boton-icono" data-abrir-busqueda title="Buscar paciente (nombre, CURP o folio)" aria-label="Buscar paciente"><?= icono('buscar') ?></button>
+      <button type="button" class="boton-icono" data-abrir-busqueda title="Buscar en el expediente" aria-label="Buscar en el expediente"><?= icono('buscar') ?></button>
       <?php if (puede('importar_exportar')): ?><button type="button" class="boton-icono" data-herramientas-datos-pacientes aria-haspopup="menu" title="Herramientas de datos" aria-label="Herramientas de datos"><?= icono('tabla') ?></button><?php endif; ?>
       <button type="button" class="boton boton--primario bd__nuevo" data-pagina-paciente-menu data-registrar="<?= puede('editar_paciente') ? '1' : '0' ?>" aria-haspopup="menu" title="Registrar o crear"><?= icono('agregar') ?> Nuevo</button>
     </div>

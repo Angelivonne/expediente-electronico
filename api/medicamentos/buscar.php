@@ -5,7 +5,11 @@
  */
 define('RESPUESTA_JSON', true);
 require_once __DIR__ . '/../../app/nucleo/inicio.php';
-exigirPermiso('ver_expediente');
+if (!puede('ver_expediente') && !puede('farmacia')) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Tu rol no puede consultar el catálogo de medicamentos.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');

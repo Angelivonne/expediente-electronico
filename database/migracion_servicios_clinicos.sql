@@ -19,5 +19,5 @@ ALTER TABLE finanzas_movimientos
   ADD COLUMN servicio_id INT NULL AFTER concepto,
   ADD KEY idx_fin_mov_servicio (servicio_id);
 
-GRANT SELECT, INSERT, UPDATE ON expediente_expediente.servicios_clinicos
-  TO 'expediente_app'@'localhost', 'expediente_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE ON clinica.servicios_clinicos
+  TO 'clinica_app'@'localhost', 'clinica_app'@'127.0.0.1';

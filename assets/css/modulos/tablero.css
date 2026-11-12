@@ -20,6 +20,34 @@
 .tablero__resumen > div { min-width: 0; padding-top: 13px; padding-bottom: 13px; }
 .tablero__resumen dt { line-height: 1.35; }
 .tablero__resumen dd { white-space: normal; overflow-wrap: anywhere; }
+.tablero__grafica-panel {
+  margin: 22px 0 0;
+  padding: 18px 0 4px;
+  border-top: 1px solid var(--borde-fuerte);
+}
+.tablero__grafica-panel .ficha__titulo-fila { align-items: flex-start; margin: 0 0 16px; }
+.tablero__grafica-panel .ficha__titulo-fila p { margin: 5px 0 0; color: var(--texto-tenue); font-size: var(--fs-xs); }
+.tablero__grafica-panel .ficha__fuente { flex: 0 0 auto; color: var(--texto-tenue); font-size: var(--fs-xs); }
+.tablero__grafica {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  min-height: 150px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--borde-fuerte);
+}
+.tablero__grafica-mes { display: grid; grid-template-rows: 1fr auto; gap: 8px; height: 150px; min-width: 0; text-align: center; }
+.tablero__grafica-barras { display: flex; align-items: flex-end; justify-content: center; gap: 5px; height: 100%; padding: 0 0 1px; }
+.tablero__grafica-barra { width: min(22px, 42%); height: var(--altura); min-height: 0; border-radius: 4px 4px 0 0; }
+.tablero__grafica-barra--registros { background: #7aa9dc; }
+.tablero__grafica-barra--pacientes { background: #8dbaa4; }
+.tablero__grafica-mes > span { color: var(--texto-tenue); font-size: var(--fs-xs); white-space: nowrap; }
+.tablero__grafica-leyenda { display: flex; flex-wrap: wrap; gap: 8px 18px; padding-top: 10px; color: var(--texto-suave); font-size: var(--fs-xs); }
+.tablero__grafica-leyenda span { display: inline-flex; align-items: center; gap: 7px; }
+.tablero__grafica-muestra { width: 9px; height: 9px; border-radius: 2px; }
+.tablero__grafica-muestra--registros { background: #7aa9dc; }
+.tablero__grafica-muestra--pacientes { background: #8dbaa4; }
 .tablero__cuerpo { grid-template-columns: minmax(0, 1fr) minmax(250px, 300px); gap: 0 44px; }
 .tablero__principal,
 .tablero__lado { min-width: 0; }
@@ -82,4 +110,8 @@
   .tablero__resumen > div:nth-child(n + 3) { border-top: 1px solid var(--borde-fuerte); }
   .tablero__lista li { grid-template-columns: 76px minmax(0, 1fr); gap: 8px; }
   .tablero__lista > li > a { grid-column: 2; }
+  .tablero__grafica { gap: 5px; }
+  .tablero__grafica-barras { gap: 3px; }
+  .tablero__grafica-barra { width: 35%; }
+  .tablero__grafica-panel .ficha__titulo-fila { flex-direction: row; }
 }

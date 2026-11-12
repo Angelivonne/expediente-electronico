@@ -1,0 +1,137 @@
+.cirugia-pagina .pagina__subtitulo {
+  max-width: 860px;
+}
+
+.cirugia__programar {
+  margin: 0 0 28px;
+  padding: 18px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: var(--bg-elevado);
+}
+
+.cirugia__programar > summary {
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.cirugia__buscar,
+.cirugia__formulario,
+.cirugia__cambio {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.cirugia__buscar > div {
+  display: flex;
+  gap: 8px;
+}
+
+.cirugia__buscar input,
+.cirugia__formulario input,
+.cirugia__formulario select,
+.cirugia__cambio input,
+.cirugia__cambio select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  color: var(--texto);
+  background: var(--bg);
+}
+
+.cirugia__formulario {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  align-items: end;
+}
+
+.cirugia__formulario label,
+.cirugia__cambio label,
+.cirugia__buscar label {
+  display: grid;
+  gap: 6px;
+  font-size: .9rem;
+}
+
+.cirugia__formulario button {
+  justify-self: start;
+}
+
+.cirugia__resultados {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.cirugia__resultados li,
+.cirugia__paciente-seleccionado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.cirugia__agenda > h2 {
+  margin-bottom: 14px;
+}
+
+.cirugia__tarjeta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 24px;
+  margin-bottom: 12px;
+  padding: 18px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: var(--bg-elevado);
+}
+
+.cirugia__detalle h3 {
+  margin: 9px 0;
+}
+
+.cirugia__detalle p {
+  margin: 7px 0;
+  color: var(--texto-suave);
+}
+
+.cirugia__estado {
+  display: inline-block;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: var(--primario);
+  background: var(--bg-hover);
+  font-size: .8rem;
+  font-weight: 650;
+}
+
+.cirugia__historial {
+  display: grid;
+  gap: 0;
+  margin: 24px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cirugia__historial li {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-left: 2px solid var(--borde);
+}
+
+.cirugia__historial time,
+.cirugia__historial span,
+.cirugia__historial p {
+  color: var(--texto-suave);
+}
+
+@media (max-width: 720px) {
+  .cirugia__tarjeta {
+    grid-template-columns: 1fr;
+  }
+}

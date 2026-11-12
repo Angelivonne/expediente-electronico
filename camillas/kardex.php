@@ -10,6 +10,36 @@ exigirPermiso('ver_expediente');
 $pdo = db();
 $institucionId = institucionId() ?: 1;
 $usuario = usuarioActual() ?: ['id' => 1, 'nombre' => 'Personal de Enfermería'];
+$leerTexto = static fn (string $campo): string => is_string($_POST[$campo] ?? null) ? $_POST[$campo] : '';
+$leerId = static function (string $campo): int {
+    $valor = $_POST[$campo] ?? null;
+    if (!is_string($valor) && !is_int($valor)) {
+        return 0;
+    }
+    $id = filter_var($valor, FILTER_VALIDATE_INT);
+    return $id !== false && $id > 0 ? $id : 0;
+};
+$transaccion = function (callable $operacion, string $error) use ($pdo): bool {
+    try {
+        $pdo->beginTransaction();
+        $operacion();
+        $pdo->commit();
+        return true;
+    } catch (DomainException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        mensajeFlash('error', $e->getMessage());
+        return false;
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('[kardex] ' . $e->getMessage());
+        mensajeFlash('error', $error);
+        return false;
+    }
+};
 
 // Procesar formularios POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -18,69 +48,130 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirigir($_SERVER['REQUEST_URI']);
     }
 
-    $accion = $_POST['accion'] ?? '';
+    $accion = is_string($_POST['accion'] ?? null) ? $_POST['accion'] : '';
 
     // 1. Agregar nueva indicación / medicación al Kardex
     if ($accion === 'agregar_medicacion') {
-        $pacienteId = (int) ($_POST['paciente_id'] ?? 0);
-        $camillaId = (int) ($_POST['camilla_id'] ?? 0) ?: null;
-        $medicamento = mb_substr(trim((string) ($_POST['medicamento'] ?? '')), 0, 150);
-        $dosis = mb_substr(trim((string) ($_POST['dosis'] ?? '')), 0, 80);
-        $via = mb_substr(trim((string) ($_POST['via'] ?? '')), 0, 50);
-        $frecuencia = mb_substr(trim((string) ($_POST['frecuencia'] ?? '')), 0, 80);
-        $horario = mb_substr(trim((string) ($_POST['horario'] ?? '')), 0, 100);
-        $fechaInicio = !empty($_POST['fecha_inicio']) ? $_POST['fecha_inicio'] : date('Y-m-d');
-        $indicaciones = trim((string) ($_POST['indicaciones'] ?? ''));
-        $medicoPrescribe = mb_substr(trim((string) ($_POST['medico_prescribe'] ?? $usuario['nombre'])), 0, 120);
-
-        if ($pacienteId && $medicamento && $dosis && $via) {
-            $stmt = $pdo->prepare("INSERT INTO kardex_medicaciones 
-                (institucion_id, paciente_id, camilla_id, medicamento, dosis, via, frecuencia, horario, fecha_inicio, indicaciones, estado, medico_prescribe)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?)");
-            $stmt->execute([$institucionId, $pacienteId, $camillaId, $medicamento, $dosis, $via, $frecuencia, $horario, $fechaInicio, $indicaciones, $medicoPrescribe]);
-
-            registrarBitacora('kardex_medicaciones', (int)$pdo->lastInsertId(), 'crear', 'medicamento', null, $medicamento);
-            mensajeFlash('exito', 'Medicamento prescrito y agregado al Kardex.');
+        exigirPermiso('historial');
+        $pacienteId = $leerId('paciente_id');
+        $camillaId = $leerId('camilla_id') ?: null;
+        $medicamento = mb_substr(trim($leerTexto('medicamento')), 0, 150);
+        $medicamentoCatalogoId = $leerId('medicamento_id');
+        $dosis = mb_substr(trim($leerTexto('dosis')), 0, 80);
+        $via = mb_substr(trim($leerTexto('via')), 0, 50);
+        $frecuencia = mb_substr(trim($leerTexto('frecuencia')), 0, 80);
+        $horario = mb_substr(trim($leerTexto('horario')), 0, 100);
+        $fechaSolicitada = $_POST['fecha_inicio'] ?? null;
+        $fechaInicio = is_string($fechaSolicitada) ? (trim($fechaSolicitada) ?: date('Y-m-d')) : '';
+        $indicaciones = trim($leerTexto('indicaciones'));
+        $fechaValida = DateTimeImmutable::createFromFormat('!Y-m-d', $fechaInicio);
+        if (!$pacienteId || $medicamento === '' || $dosis === '' || $via === '' || $frecuencia === ''
+            || !$fechaValida || $fechaValida->format('Y-m-d') !== $fechaInicio) {
+            mensajeFlash('error', 'Completa paciente, medicamento, dosis, vía, frecuencia y una fecha válida.');
         } else {
-            mensajeFlash('error', 'Faltan campos obligatorios para registrar la medicación.');
+            $guardado = $transaccion(function () use ($pdo, $pacienteId, $camillaId, $medicamento, $medicamentoCatalogoId, $dosis, $via, $frecuencia, $horario, $fechaInicio, $indicaciones, $institucionId, $usuario): void {
+                $paciente = $pdo->prepare('SELECT id FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL FOR UPDATE');
+                $paciente->execute([$pacienteId, $institucionId]);
+                if (!$paciente->fetchColumn()) {
+                    throw new DomainException('El paciente no existe en esta institución o fue dado de baja.');
+                }
+                if ($medicamentoCatalogoId) {
+                    $catalogo = $pdo->prepare('SELECT nombre, concentracion FROM medicamentos WHERE id = ? AND institucion_id = ? AND activo = 1 FOR UPDATE');
+                    $catalogo->execute([$medicamentoCatalogoId, $institucionId]);
+                    $medicamentoSeleccionado = $catalogo->fetch(PDO::FETCH_ASSOC);
+                    if (!$medicamentoSeleccionado) {
+                        throw new DomainException('El medicamento seleccionado ya no está activo en el catálogo.');
+                    }
+                    $medicamento = mb_substr(trim((string) $medicamentoSeleccionado['nombre'] . ' ' . (string) ($medicamentoSeleccionado['concentracion'] ?? '')), 0, 150);
+                }
+                $cama = $pdo->prepare("SELECT id FROM camillas WHERE paciente_id = ? AND institucion_id = ? AND estado = 'ocupada' LIMIT 1 FOR UPDATE");
+                $cama->execute([$pacienteId, $institucionId]);
+                $camillaActualId = (int) ($cama->fetchColumn() ?: 0);
+                if (!$camillaActualId || ($camillaId && $camillaId !== $camillaActualId)) {
+                    throw new DomainException('El paciente ya no ocupa esta cama. Actualiza el censo antes de registrar la indicación.');
+                }
+                $stmt = $pdo->prepare("INSERT INTO kardex_medicaciones
+                    (institucion_id, paciente_id, camilla_id, medicamento, dosis, via, frecuencia, horario, fecha_inicio, indicaciones, estado, medico_prescribe)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?)");
+                $stmt->execute([$institucionId, $pacienteId, $camillaActualId, $medicamento, $dosis, $via, $frecuencia, $horario, $fechaInicio, $indicaciones, mb_substr((string) $usuario['nombre'], 0, 120)]);
+                registrarBitacora('kardex_medicaciones', (int) $pdo->lastInsertId(), 'crear', 'medicamento', null, $medicamento);
+            }, 'No se pudo guardar la indicación. Intenta de nuevo.');
+            if ($guardado) {
+                mensajeFlash('exito', 'Indicación agregada al Kardex por el usuario autenticado.');
+            }
         }
         redirigir("/camillas/kardex.php?paciente_id={$pacienteId}");
     }
 
     // 2. Registrar administración de una dosis
     if ($accion === 'registrar_administracion') {
-        $medicacionId = (int) ($_POST['medicacion_id'] ?? 0);
-        $pacienteId = (int) ($_POST['paciente_id'] ?? 0);
-        $turno = in_array($_POST['turno'] ?? '', ['matutino', 'vespertino', 'nocturno'], true) ? $_POST['turno'] : 'matutino';
-        $fecha = !empty($_POST['fecha']) ? $_POST['fecha'] : date('Y-m-d');
-        $horaProg = mb_substr(trim((string) ($_POST['hora_programada'] ?? date('H:i'))), 0, 10);
-        $estado = in_array($_POST['estado'] ?? '', ['aplicado', 'pendiente', 'omitido', 'rechazado'], true) ? $_POST['estado'] : 'aplicado';
-        $enfermero = mb_substr(trim((string) ($_POST['enfermero_nombre'] ?? $usuario['nombre'])), 0, 120);
-        $obs = trim((string) ($_POST['observaciones'] ?? ''));
+        exigirPermiso('kardex');
+        $medicacionId = $leerId('medicacion_id');
+        $pacienteId = $leerId('paciente_id');
+        $turno = $leerTexto('turno');
+        $fechaSolicitada = $_POST['fecha'] ?? null;
+        $fecha = is_string($fechaSolicitada) ? (trim($fechaSolicitada) ?: date('Y-m-d')) : '';
+        $horaProg = trim($leerTexto('hora_programada'));
+        $estado = $leerTexto('estado');
+        $obs = mb_substr(trim($leerTexto('observaciones')), 0, 255);
+        $fechaValida = DateTimeImmutable::createFromFormat('!Y-m-d', $fecha);
 
-        if ($medicacionId && $pacienteId) {
-            $horaApl = ($estado === 'aplicado') ? date('Y-m-d H:i:s') : null;
-
-            $stmt = $pdo->prepare("INSERT INTO kardex_administraciones 
-                (institucion_id, medicacion_id, paciente_id, turno, fecha, hora_programada, hora_aplicacion, estado, enfermero_nombre, observaciones)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$institucionId, $medicacionId, $pacienteId, $turno, $fecha, $horaProg, $horaApl, $estado, $enfermero, $obs]);
-
-            registrarBitacora('kardex_administraciones', (int)$pdo->lastInsertId(), 'crear', 'estado', null, $estado);
-            mensajeFlash('exito', 'Dosis registrada en la Hoja de Enfermería.');
+        if (!$medicacionId || !$pacienteId || !in_array($turno, ['matutino', 'vespertino', 'nocturno'], true)
+            || !in_array($estado, ['aplicado', 'pendiente', 'omitido', 'rechazado'], true)
+            || !$fechaValida || $fechaValida->format('Y-m-d') !== $fecha
+            || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $horaProg)) {
+            mensajeFlash('error', 'Revisa medicamento, turno, fecha, hora programada y resultado de la dosis.');
+        } else {
+            $guardado = $transaccion(function () use ($pdo, $medicacionId, $pacienteId, $turno, $fecha, $horaProg, $estado, $obs, $institucionId, $usuario): void {
+                $paciente = $pdo->prepare('SELECT id FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL FOR UPDATE');
+                $paciente->execute([$pacienteId, $institucionId]);
+                if (!$paciente->fetchColumn()) {
+                    throw new DomainException('El paciente no existe en esta institución o fue dado de baja.');
+                }
+                $cama = $pdo->prepare("SELECT id FROM camillas WHERE paciente_id = ? AND institucion_id = ? AND estado = 'ocupada' LIMIT 1 FOR UPDATE");
+                $cama->execute([$pacienteId, $institucionId]);
+                if (!$cama->fetchColumn()) {
+                    throw new DomainException('El paciente ya no está hospitalizado en una cama ocupada.');
+                }
+                $medicacion = $pdo->prepare("SELECT id FROM kardex_medicaciones WHERE id = ? AND paciente_id = ? AND institucion_id = ? AND estado = 'activo' FOR UPDATE");
+                $medicacion->execute([$medicacionId, $pacienteId, $institucionId]);
+                if (!$medicacion->fetchColumn()) {
+                    throw new DomainException('La indicación no pertenece a este paciente o ya no está activa.');
+                }
+                $duplicada = $pdo->prepare('SELECT id FROM kardex_administraciones WHERE medicacion_id = ? AND paciente_id = ? AND institucion_id = ? AND fecha = ? AND hora_programada = ? LIMIT 1 FOR UPDATE');
+                $duplicada->execute([$medicacionId, $pacienteId, $institucionId, $fecha, $horaProg]);
+                if ($duplicada->fetchColumn()) {
+                    throw new DomainException('Ya existe un registro de esta dosis para esa fecha y hora.');
+                }
+                $horaAplicacion = $estado === 'aplicado' ? date('Y-m-d H:i:s') : null;
+                $stmt = $pdo->prepare("INSERT INTO kardex_administraciones
+                    (institucion_id, medicacion_id, paciente_id, turno, fecha, hora_programada, hora_aplicacion, estado, enfermero_nombre, observaciones)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$institucionId, $medicacionId, $pacienteId, $turno, $fecha, $horaProg, $horaAplicacion, $estado, mb_substr((string) $usuario['nombre'], 0, 120), $obs]);
+                registrarBitacora('kardex_administraciones', (int) $pdo->lastInsertId(), 'crear', 'estado', null, $estado);
+            }, 'No se pudo registrar la dosis. Intenta de nuevo.');
+            if ($guardado) {
+                mensajeFlash('exito', 'Dosis registrada en la Hoja de Enfermería.');
+            }
         }
         redirigir("/camillas/kardex.php?paciente_id={$pacienteId}&fecha={$fecha}");
     }
 
     // 3. Suspender medicación
     if ($accion === 'suspender_medicacion') {
-        $medId = (int) ($_POST['medicacion_id'] ?? 0);
-        $pacienteId = (int) ($_POST['paciente_id'] ?? 0);
-        if ($medId) {
-            $stmt = $pdo->prepare("UPDATE kardex_medicaciones SET estado = 'suspendido' WHERE id = ? AND institucion_id = ?");
-            $stmt->execute([$medId, $institucionId]);
+        exigirPermiso('historial');
+        $medId = $leerId('medicacion_id');
+        $pacienteId = $leerId('paciente_id');
+        $guardado = $transaccion(function () use ($pdo, $medId, $pacienteId, $institucionId): void {
+            $stmt = $pdo->prepare("UPDATE kardex_medicaciones SET estado = 'suspendido' WHERE id = ? AND paciente_id = ? AND institucion_id = ? AND estado = 'activo'");
+            $stmt->execute([$medId, $pacienteId, $institucionId]);
+            if ($stmt->rowCount() !== 1) {
+                throw new DomainException('La indicación no pertenece a este paciente o ya no está activa.');
+            }
             registrarBitacora('kardex_medicaciones', $medId, 'actualizar', 'estado', 'activo', 'suspendido');
-            mensajeFlash('exito', 'Medicamento marcado como SUSPENDIDO.');
+        }, 'No se pudo suspender la indicación. Intenta de nuevo.');
+        if ($guardado) {
+            mensajeFlash('exito', 'Indicación marcada como suspendida.');
         }
         redirigir("/camillas/kardex.php?paciente_id={$pacienteId}");
     }
@@ -113,7 +204,9 @@ $paciente = null;
 $camillaActual = null;
 $medicacionesActivas = [];
 $administraciones = [];
-$fechaFiltro = $_GET['fecha'] ?? date('Y-m-d');
+$fechaSolicitada = is_string($_GET['fecha'] ?? null) ? $_GET['fecha'] : '';
+$fechaValida = DateTimeImmutable::createFromFormat('!Y-m-d', $fechaSolicitada);
+$fechaFiltro = $fechaValida && $fechaValida->format('Y-m-d') === $fechaSolicitada ? $fechaSolicitada : date('Y-m-d');
 
 if ($pacienteId) {
     $stmtP = $pdo->prepare("SELECT * FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL");
@@ -139,25 +232,12 @@ if ($pacienteId) {
     }
 }
 
-$adminPorTurno = [
-    'matutino' => [],
-    'vespertino' => [],
-    'nocturno' => []
-];
-foreach ($administraciones as $adm) {
-    $t = $adm['turno'] ?? 'matutino';
-    if (isset($adminPorTurno[$t])) {
-        $adminPorTurno[$t][] = $adm;
-    }
-}
-
 $edadPaciente = null;
 if ($paciente && !empty($paciente['fecha_nacimiento'])) {
     $edadPaciente = (new DateTime($paciente['fecha_nacimiento']))->diff(new DateTime('today'))->y;
 }
 
 $nombreCompleto = $paciente ? trim("{$paciente['nombre']} {$paciente['primer_apellido']} {$paciente['segundo_apellido']}") : '';
-$iniciales = $paciente ? mb_strtoupper(mb_substr($paciente['nombre'], 0, 1) . mb_substr($paciente['primer_apellido'], 0, 1)) : '';
 $sinAlergias = empty($paciente['alergias']) || mb_strtolower($paciente['alergias']) === 'negadas';
 
 $tituloPagina = $paciente ? "Kardex — {$nombreCompleto}" : 'Kardex de Medicación';
@@ -175,47 +255,24 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     <p class="bd__vacio"><a href="<?= URL_BASE ?>/camillas/">Ir al Censo de Camas</a> para asignar pacientes.</p>
   <?php else: ?>
 
-    <!-- Encabezado Idéntico a pacientes/ver.php (hoja-paciente) -->
-    <header class="hoja-paciente" id="perfil">
-      <div class="hoja-paciente__foto">
-        <span class="hoja-paciente__iniciales" aria-hidden="true"><?= e($iniciales) ?></span>
-      </div>
-      <div class="hoja-paciente__identidad">
-        <h1 class="hoja-paciente__nombre"><?= e($nombreCompleto) ?></h1>
-        <p class="hoja-paciente__linea">
-          <span><?= e($paciente['folio']) ?></span>
-          <span><?= $edadPaciente !== null ? "{$edadPaciente} años" : '—' ?></span>
-          <span><?= e($paciente['sexo'] === 'M' ? 'Femenino' : 'Masculino') ?></span>
-          <span>Nació el <?= e(fechaCorta($paciente['fecha_nacimiento'])) ?></span>
-        </p>
-        <ul class="hoja-paciente__alertas">
-          <?php if (!$sinAlergias): ?>
-            <li class="hoja-paciente__alerta hoja-paciente__alerta--alergia">
-              <?= icono('alerta') ?><span><b>Alergias</b> <?= e($paciente['alergias']) ?></span>
-            </li>
-          <?php endif; ?>
-          <?php if ($camillaActual): ?>
-            <li class="hoja-paciente__alerta hoja-paciente__alerta--hospital">
-              <?= icono('clinico') ?><span><b>Cama:</b> <?= e($camillaActual['codigo']) ?> (<?= e(ucfirst($camillaActual['area'])) ?>)</span>
-            </li>
-          <?php endif; ?>
-          <li class="hoja-paciente__alerta">
-            <?= icono('documento') ?><span><b>Diagnóstico de ingreso:</b> <?= e($camillaActual['diagnostico_ingreso'] ?? $paciente['motivo_consulta'] ?? 'No documentado') ?></span>
-          </li>
-        </ul>
-      </div>
+    <header class="pagina__cabecera">
+      <h1 class="pagina__titulo">Kardex de medicación</h1>
+      <p class="pagina__subtitulo">
+        <a href="<?= URL_BASE ?>/pacientes/ver.php?id=<?= (int) $paciente['id'] ?>"><?= e($nombreCompleto) ?></a>
+        · Folio <?= e($paciente['folio']) ?>
+        · <?= $edadPaciente !== null ? "{$edadPaciente} años" : 'Edad no registrada' ?>
+        · <?= e(SEXOS[$paciente['sexo']] ?? 'Sexo no registrado') ?>
+        · Cama <?= e($camillaActual['codigo'] ?? 'no asignada') ?>
+      </p>
+      <p class="pagina__descripcion">
+        <?php if (!$sinAlergias): ?><strong><?= icono('alerta') ?> Alergias:</strong> <?= e($paciente['alergias']) ?> · <?php endif; ?>
+        <strong>Diagnóstico de ingreso:</strong>
+        <?= e($camillaActual['diagnostico_ingreso'] ?? $paciente['motivo_consulta'] ?? 'No documentado') ?>
+        <a class="boton boton--sutil" href="<?= URL_BASE ?>/pacientes/ver.php?id=<?= (int) $paciente['id'] ?>" style="margin-left: 10px;">
+          <?= icono('usuarios') ?> Abrir expediente general
+        </a>
+      </p>
     </header>
-
-    <!-- Resumen Métrico (Idéntico a pacientes/ver.php hoja-paciente__resumen) -->
-    <dl class="hoja-paciente__resumen">
-      <div><dt>Grupo sanguíneo</dt><dd><?= e($paciente['grupo_sanguineo'] ?: '—') ?></dd></div>
-      <div><dt>Cama asignada</dt><dd><?= e($camillaActual['codigo'] ?? 'Sin cama') ?></dd></div>
-      <div><dt>Ingreso</dt><dd><?= $camillaActual['ingreso_en'] ? e(fechaCorta($camillaActual['ingreso_en'])) : '—' ?></dd></div>
-      <div><dt>Fármacos activos</dt><dd><?= count($medicacionesActivas) ?></dd></div>
-      <div><dt>Dosis matutino</dt><dd><?= count($adminPorTurno['matutino']) ?></dd></div>
-      <div><dt>Dosis vespertino</dt><dd><?= count($adminPorTurno['vespertino']) ?></dd></div>
-      <div><dt>Dosis nocturno</dt><dd><?= count($adminPorTurno['nocturno']) ?></dd></div>
-    </dl>
 
     <!-- Cuerpo en dos columnas (hoja-paciente__cuerpo) -->
     <div class="hoja-paciente__cuerpo">
@@ -236,7 +293,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             <ul class="lista-clinica">
               <?php foreach ($medicacionesActivas as $med): ?>
                 <li>
-                  <a href="javascript:void(0)" onclick="prepararAdminDosis(<?= (int)$med['id'] ?>, '<?= e($med['medicamento']) ?>', '<?= e($med['dosis']) ?>', '<?= e($med['horario'] ?: '08:00') ?>');">
+                  <a href="<?= URL_BASE ?>/pacientes/ver.php?id=<?= (int) $paciente['id'] ?>">
                     <span class="lista-clinica__icono"><?= icono('pildora') ?></span>
                     <span class="lista-clinica__texto">
                       <b><?= e($med['medicamento']) ?></b> · <?= e($med['dosis']) ?> · <?= e($med['via']) ?>
@@ -244,10 +301,10 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
                     </span>
                   </a>
                   <div style="display: flex; gap: 4px; align-items: center; margin-left: auto;">
-                    <button type="button" class="boton boton--sutil" style="padding: 2px 7px; font-size: var(--fs-xs);" onclick="prepararAdminDosis(<?= (int)$med['id'] ?>, '<?= e($med['medicamento']) ?>', '<?= e($med['dosis']) ?>', '<?= e($med['horario'] ?: '08:00') ?>');">
+                    <?php if (puede('kardex')): ?><button type="button" class="boton boton--sutil" style="padding: 2px 7px; font-size: var(--fs-xs);" onclick="prepararAdminDosis(<?= (int) $med['id'] ?>, <?= e(json_encode($med['horario'] ?: '08:00', JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP)) ?>);">
                       <?= icono('agregar') ?> Dosis
-                    </button>
-                    <form method="post" action="" style="display: inline;" onsubmit="return confirm('¿Suspender este medicamento del Kardex?');">
+                    </button><?php endif; ?>
+                    <?php if (puede('historial')): ?><form method="post" action="" style="display: inline;" onsubmit="return confirm('¿Suspender este medicamento del Kardex?');">
                       <?= campoCsrf() ?>
                       <input type="hidden" name="accion" value="suspender_medicacion">
                       <input type="hidden" name="medicacion_id" value="<?= (int)$med['id'] ?>">
@@ -255,16 +312,16 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
                       <button type="submit" class="boton boton--sutil" style="padding: 2px 7px; font-size: var(--fs-xs); color: #f87171;">
                         Suspender
                       </button>
-                    </form>
+                    </form><?php endif; ?>
                   </div>
                 </li>
               <?php endforeach; ?>
             </ul>
           <?php endif; ?>
 
-          <button type="button" class="hoja-paciente__agendar" onclick="document.getElementById('modalNuevaMed').showModal();" style="margin-top: 10px;">
+          <?php if (puede('historial') && $camillaActual): ?><button type="button" class="hoja-paciente__agendar" onclick="document.getElementById('modalNuevaMed').showModal();" style="margin-top: 10px;">
             <?= icono('agregar') ?> Prescribir medicamento al Kardex
-          </button>
+          </button><?php endif; ?>
         </section>
 
         <!-- Sección: Tabla Nativa de Aplicación de Dosis (bd-tabla) -->
@@ -319,9 +376,11 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             </div>
           <?php endif; ?>
 
-          <button type="button" class="hoja-paciente__agendar" onclick="document.getElementById('modalRegistrarAdmin').showModal();" style="margin-top: 10px;">
+          <?php if (puede('kardex') && $camillaActual && !empty($medicacionesActivas)): ?><button type="button" class="hoja-paciente__agendar" onclick="document.getElementById('modalRegistrarAdmin').showModal();" style="margin-top: 10px;">
             <?= icono('agregar') ?> Asentar aplicación de dosis
-          </button>
+          </button><?php elseif (puede('kardex') && $camillaActual): ?>
+            <p class="ficha__vacio">Agrega primero una indicación activa para poder registrar dosis.</p>
+          <?php endif; ?>
         </section>
 
       </div>
@@ -358,9 +417,6 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             <button type="button" class="boton boton--secundario" onclick="window.print();" style="width: 100%; justify-content: flex-start;">
               <?= icono('documento') ?> <span>Imprimir Kardex oficial</span>
             </button>
-            <a href="<?= URL_BASE ?>/pacientes/ver.php?id=<?= (int)$paciente['id'] ?>" class="boton boton--sutil" style="width: 100%; justify-content: flex-start;">
-              <?= icono('usuarios') ?> <span>Ver expediente completo</span>
-            </a>
             <a href="<?= URL_BASE ?>/camillas/" class="boton boton--sutil" style="width: 100%; justify-content: flex-start;">
               <?= icono('clinico') ?> <span>Censo de camillas</span>
             </a>
@@ -372,7 +428,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     </div>
 
     <!-- Modal: Prescribir Medicación -->
-    <dialog id="modalNuevaMed" class="modal" style="background: #181818; color: #fff; border: 1px solid #333; border-radius: 10px; padding: 22px; max-width: 520px; width: 95%;">
+    <?php if (puede('historial') && $camillaActual): ?><dialog id="modalNuevaMed" class="modal" style="background: #181818; color: #fff; border: 1px solid #333; border-radius: 10px; padding: 22px; max-width: 520px; width: 95%;">
       <form method="post" action="">
         <?= campoCsrf() ?>
         <input type="hidden" name="accion" value="agregar_medicacion">
@@ -386,7 +442,10 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
         <div style="display: flex; flex-direction: column; gap: 11px;">
           <div>
             <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Medicamento y Presentación *</label>
-            <input type="text" name="medicamento" required placeholder="Ej. Ceftriaxona 1g Fco. Ámpula" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
+            <div data-kardex-medicamento>
+              <input type="hidden" name="medicamento_id" data-medicamento-id>
+              <input type="text" name="medicamento" required placeholder="Buscar medicamento en el catálogo" data-catalogo="medicamentos" role="combobox" aria-expanded="false" aria-autocomplete="list" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
+            </div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -396,14 +455,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             </div>
             <div>
               <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Vía *</label>
-              <select name="via" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
-                <option value="Intravenosa (IV)">Intravenosa (IV)</option>
-                <option value="Oral (VO)">Oral (VO)</option>
-                <option value="Subcutánea (SC)">Subcutánea (SC)</option>
-                <option value="Intramuscular (IM)">Intramuscular (IM)</option>
-                <option value="Inhalatoria">Inhalatoria</option>
-                <option value="Tópica">Tópica</option>
-              </select>
+              <input type="text" name="via" required placeholder="Se completa desde el catálogo" style="width: 100%; background: #222; color: #fff; border: 1px solid #333; padding: 6px 8px; border-radius: 6px;">
             </div>
           </div>
 
@@ -423,10 +475,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             <input type="text" name="indicaciones" placeholder="Ej. Diluir en 100ml Sol. Fisiológica..." style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
           </div>
 
-          <div>
-            <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Médico Prescribe</label>
-            <input type="text" name="medico_prescribe" value="<?= e($usuario['nombre']) ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
-          </div>
+          <p style="margin: 0; color: var(--texto-suave); font-size: var(--fs-xs);">El usuario autenticado quedará registrado como prescriptor.</p>
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
@@ -435,9 +484,10 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
         </div>
       </form>
     </dialog>
+    <?php endif; ?>
 
     <!-- Modal: Asentar Dosis -->
-    <dialog id="modalRegistrarAdmin" class="modal" style="background: #181818; color: #fff; border: 1px solid #333; border-radius: 10px; padding: 22px; max-width: 500px; width: 95%;">
+    <?php if (puede('kardex') && !empty($medicacionesActivas)): ?><dialog id="modalRegistrarAdmin" class="modal" style="background: #181818; color: #fff; border: 1px solid #333; border-radius: 10px; padding: 22px; max-width: 500px; width: 95%;">
       <form method="post" action="">
         <?= campoCsrf() ?>
         <input type="hidden" name="accion" value="registrar_administracion">
@@ -451,6 +501,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
           <div>
             <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Medicamento Prescrito *</label>
             <select id="admin_medicacion_id" name="medicacion_id" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
+              <option value="" selected disabled>Selecciona una indicación activa</option>
               <?php foreach ($medicacionesActivas as $mAct): ?>
                 <option value="<?= (int)$mAct['id'] ?>">
                   <?= e($mAct['medicamento']) ?> — <?= e($mAct['dosis']) ?> (<?= e($mAct['via']) ?>)
@@ -470,7 +521,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             </div>
             <div>
               <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Hora Programada</label>
-              <input type="text" id="admin_hora_prog" name="hora_programada" value="<?= date('H:i') ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
+              <input type="time" id="admin_hora_prog" name="hora_programada" value="<?= date('H:i') ?>" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
             </div>
           </div>
 
@@ -478,6 +529,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             <div>
               <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Estado</label>
               <select name="estado" required style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
+                <option value="" selected disabled>Selecciona el resultado</option>
                 <option value="aplicado">Aplicado</option>
                 <option value="pendiente">Pendiente</option>
                 <option value="omitido">Omitido</option>
@@ -490,10 +542,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
             </div>
           </div>
 
-          <div>
-            <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Enfermero/a Responsable *</label>
-            <input type="text" name="enfermero_nombre" required value="<?= e($usuario['nombre']) ?>" style="width: 100%; background: #222; border: 1px solid #3a3a3a; padding: 7px 10px; border-radius: 6px; color: #fff;">
-          </div>
+          <p style="margin: 0; color: var(--texto-suave); font-size: var(--fs-xs);">El usuario autenticado quedará registrado como responsable de la administración.</p>
 
           <div>
             <label style="font-size: var(--fs-xs); color: var(--texto-suave); display: block; margin-bottom: 3px;">Observaciones / Notas de Turno</label>
@@ -507,19 +556,20 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
         </div>
       </form>
     </dialog>
+    <?php endif; ?>
 
   <?php endif; ?>
 
 </div>
 
 <script>
-function prepararAdminDosis(medId, medNombre, medDosis, medHorario) {
+function prepararAdminDosis(medId, medHorario) {
   const sel = document.getElementById('admin_medicacion_id');
   if (sel) sel.value = medId;
   const hp = document.getElementById('admin_hora_prog');
   if (hp) {
-    const hrs = medHorario.split(',');
-    hp.value = hrs[0].trim();
+    const hora = medHorario.split(',').map(valor => valor.trim()).find(valor => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(valor));
+    if (hora) hp.value = hora;
   }
   document.getElementById('modalRegistrarAdmin').showModal();
 }

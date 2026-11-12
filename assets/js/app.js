@@ -375,6 +375,7 @@ document.addEventListener('scroll', (ev) => {
 /* ---------- Paleta de búsqueda (lupa, botón Buscar o Ctrl K) ---------- */
 const ICONOS_PALETA = {
   buscar: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+  tabla: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>',
   pagina: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
   usuarioMas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M19 8v6M16 11h6"/>',
   filtro: '<path d="M4 5h16l-6 8v6l-4-2v-4z"/>',
@@ -396,10 +397,10 @@ function abrirPaleta() {
   caja.className = 'paleta';
   caja.setAttribute('role', 'dialog');
   caja.setAttribute('aria-modal', 'true');
-  caja.setAttribute('aria-label', 'Buscar pacientes');
+  caja.setAttribute('aria-label', 'Buscar en el expediente');
   caja.innerHTML = `
     <div class="paleta__entrada">
-      <input type="text" placeholder="Buscar por nombre, CURP o folio…" aria-label="Buscar" autocomplete="off" spellcheck="false"
+      <input type="text" placeholder="Buscar pacientes, camas, medicamentos…" aria-label="Buscar en el expediente" autocomplete="off" spellcheck="false"
              role="combobox" aria-expanded="true" aria-controls="paleta-lista">
       <span class="paleta__circulo">${svgPaleta('buscar')}</span>
     </div>
@@ -465,19 +466,34 @@ async function buscarEnPaleta() {
   const control = new AbortController();
   paleta.peticion = control;
 
-  let datosPacientes, datosMedicamentos, datosDiagnosticos;
+  let datosPacientes, datosNotas, datosCamillas, datosMedicamentos, datosDiagnosticos, errorBusquedaNotas = '';
+  let datosCatalogos = { total: 0, catalogos: [] };
   try {
-    const [r1, r2, r3] = await Promise.all([
+    const [r1, r2, r3, r4, r5] = await Promise.all([
       fetch(`${BASE}/api/pacientes/buscar.php?q=${encodeURIComponent(termino)}&orden=${paleta.chip.dataset.orden}`, { signal: control.signal }),
+      fetch(`${BASE}/api/camillas/buscar.php?q=${encodeURIComponent(termino)}`, { signal: control.signal }),
       fetch(`${BASE}/api/medicamentos/buscar.php?q=${encodeURIComponent(termino)}`, { signal: control.signal }),
       fetch(`${BASE}/api/cie10/buscar.php?q=${encodeURIComponent(termino)}`, { signal: control.signal }),
+      fetch(`${BASE}/api/pacientes/buscar_notas.php?q=${encodeURIComponent(termino)}`, { signal: control.signal }),
     ]);
     datosPacientes = await r1.json();
-    datosMedicamentos = await r2.json();
-    datosDiagnosticos = await r3.json();
+    datosCamillas = await r2.json();
+    datosMedicamentos = await r3.json();
+    datosDiagnosticos = await r4.json();
+    datosNotas = await r5.json();
     if (!r1.ok) throw new Error(datosPacientes.error || 'No se pudo buscar pacientes.');
-    if (!r2.ok) throw new Error(datosMedicamentos.error || 'No se pudo buscar medicamentos.');
-    if (!r3.ok) throw new Error(datosDiagnosticos.error || 'No se pudo buscar diagnósticos.');
+    if (!r2.ok) throw new Error(datosCamillas.error || 'No se pudo buscar camas y camillas.');
+    if (!r3.ok) throw new Error(datosMedicamentos.error || 'No se pudo buscar medicamentos.');
+    if (!r4.ok) throw new Error(datosDiagnosticos.error || 'No se pudo buscar diagnósticos.');
+    if (!r5.ok) {
+      errorBusquedaNotas = datosNotas.error || 'No se pudo buscar en las notas clínicas.';
+      datosNotas = { total: 0, notas: [] };
+    }
+    if (document.body.dataset.catalogosBusqueda === '1' && termino.length >= 2) {
+      const rCatalogos = await fetch(`${BASE}/api/catalogos/buscar.php?q=${encodeURIComponent(termino)}`, { signal: control.signal });
+      datosCatalogos = await rCatalogos.json();
+      if (!rCatalogos.ok) throw new Error(datosCatalogos.error || 'No se pudo buscar en catálogos.');
+    }
   } catch (error) {
     if (error.name === 'AbortError' || !paleta) return;
     paleta.total.textContent = '';
@@ -486,25 +502,37 @@ async function buscarEnPaleta() {
   }
   if (!paleta) return;
 
-  const total = (datosPacientes.total || 0) + (datosMedicamentos.total || 0) + (datosDiagnosticos.total || 0);
+  const total = (datosPacientes.total || 0) + (datosNotas.total || 0) + (datosCamillas.total || 0) + (datosMedicamentos.total || 0) + (datosDiagnosticos.total || 0) + (datosCatalogos.total || 0);
 
   // Acciones y resultados reales, en el orden en que se muestran
   const acciones = [{ tipo: 'accion', icono: 'usuarioMas', titulo: 'Registrar paciente…', url: `${BASE}/pacientes/registro.php` }];
   if (termino) {
-    acciones.push({ tipo: 'accion', icono: 'filtro', titulo: `Filtrar la tabla por «${termino}»`, url: `${BASE}/pacientes/?q=${encodeURIComponent(termino)}` });
+    acciones.push({ tipo: 'accion', icono: 'filtro', titulo: `Filtrar pacientes por «${termino}»`, url: `${BASE}/pacientes/?q=${encodeURIComponent(termino)}` });
   }
   const pacientesLocales = (datosPacientes.pacientes || []).map((p) => ({ tipo: 'paciente', ...p, url: `${BASE}/pacientes/ver.php?id=${p.id}` }));
   const pacientesCompartidos = (datosPacientes.compartidos || []).map((p) => ({
     tipo: 'paciente', compartido: true, ...p,
     hace: 'Compartido',
-    url: `${BASE}/conexiones/paciente.php?autorizacion=${encodeURIComponent(p.autorizacion)}`,
+    url: p.demo
+      ? `${BASE}/conexiones/paciente.php?demo_paciente=${encodeURIComponent(p.paciente_demo_id)}`
+      : `${BASE}/conexiones/paciente.php?autorizacion=${encodeURIComponent(p.autorizacion)}`,
   }));
   const pacientes = [...pacientesLocales, ...pacientesCompartidos];
+  const notas = (datosNotas.notas || []).map((n) => ({
+    tipo: 'nota',
+    ...n,
+    url: `${BASE}/pacientes/evento.php?id=${encodeURIComponent(n.id)}`,
+  }));
+  const camillas = (datosCamillas.camillas || []).map((c) => ({
+    tipo: 'camilla', ...c,
+    url: `${BASE}/camillas/?q=${encodeURIComponent(termino)}`,
+  }));
   const paginas = (datosPacientes.paginas || []).map((p) => ({ tipo: 'pagina', ...p, url: `${BASE}/paginas/ver.php?id=${p.id}` }));
   const medicamentos = (datosMedicamentos.medicamentos || []).map((m) => ({ tipo: 'medicamento', ...m }));
   const diagnosticos = (datosDiagnosticos.diagnosticos || []).map((d) => ({ tipo: 'diagnostico', ...d }));
+  const catalogos = (datosCatalogos.catalogos || []).map((c) => ({ tipo: 'catalogo', ...c }));
 
-  paleta.elementos = [...acciones, ...pacientes, ...medicamentos, ...diagnosticos, ...paginas];
+  paleta.elementos = [...acciones, ...pacientes, ...notas, ...camillas, ...medicamentos, ...diagnosticos, ...catalogos, ...paginas];
   paleta.activo = 0;
 
   paleta.total.textContent = total === 1 ? '1 resultado' : `${total} resultados`;
@@ -524,7 +552,33 @@ async function buscarEnPaleta() {
         <span class="paleta__detalle">${escaparHtml(p.detalle)}</span>
       </a>`).join('')
     : `<p class="paleta__vacio">${termino ? `Ningún paciente coincide con «${escaparHtml(termino)}».` : 'Aún no hay pacientes registrados.'}</p>`;
-  const idxMedicamentos = acciones.length + pacientes.length;
+  const idxNotas = acciones.length + pacientes.length;
+  if (termino.length >= 3) {
+    html += '<div class="paleta__grupo">Notas clínicas</div>';
+    html += errorBusquedaNotas
+      ? `<p class="paleta__vacio">${escaparHtml(errorBusquedaNotas)}</p>`
+      : notas.length
+      ? notas.map((n, k) => `
+        <a class="paleta__item" role="option" data-indice="${idxNotas + k}" href="${n.url}">
+          ${svgPaleta('documento')}
+          <span class="paleta__titulo">${escaparHtml(n.titulo)}</span>
+          <span class="paleta__detalle">${escaparHtml(n.paciente)} · ${escaparHtml(n.tipo)} · ${escaparHtml(n.fecha)}</span>
+        </a>`).join('')
+      : '<p class="paleta__vacio">Ninguna nota clínica coincide con la búsqueda.</p>';
+  }
+  const idxCamillas = idxNotas + notas.length;
+  if (termino) {
+      html += '<div class="paleta__grupo">Camas y camillas</div>';
+      html += camillas.length
+        ? camillas.map((c, k) => `
+          <a class="paleta__item" role="option" data-indice="${idxCamillas + k}" href="${c.url}">
+            ${svgPaleta('pagina')}
+            <span class="paleta__titulo">${escaparHtml(c.nombre)}</span>
+            <span class="paleta__detalle">${escaparHtml(c.detalle)}</span>
+          </a>`).join('')
+        : `<p class="paleta__vacio">Ninguna cama o camilla coincide con «${escaparHtml(termino)}».</p>`;
+  }
+  const idxMedicamentos = idxCamillas + camillas.length;
   html += '<div class="paleta__grupo">Medicamentos</div>';
   html += medicamentos.length
     ? medicamentos.map((m, k) => `
@@ -544,10 +598,21 @@ async function buscarEnPaleta() {
         <span class="paleta__detalle">${escaparHtml(d.detalle)}</span>
       </a>`).join('')
     : `<p class="paleta__vacio">${termino ? `Ningún diagnóstico coincide con «${escaparHtml(termino)}».` : 'No hay diagnósticos registrados.'}</p>`;
+  const idxCatalogos = idxDiagnosticos + diagnosticos.length;
+  if (catalogos.length) {
+    html += '<div class="paleta__grupo">Otros catálogos</div>';
+    html += catalogos.map((c, k) => `
+      <a class="paleta__item" role="option" data-indice="${idxCatalogos + k}" href="${c.url}">
+        ${svgPaleta('tabla')}
+        <span class="paleta__titulo">${escaparHtml(c.nombre)}</span>
+        <span class="paleta__lado">${escaparHtml(c.catalogo)}</span>
+        <span class="paleta__detalle">${escaparHtml(c.detalle)}</span>
+      </a>`).join('');
+  }
   if (paginas.length) {
     html += '<div class="paleta__grupo">Páginas</div>';
     html += paginas.map((p, k) => `
-      <a class="paleta__item" role="option" data-indice="${acciones.length + pacientes.length + medicamentos.length + diagnosticos.length + k}" href="${p.url}">
+      <a class="paleta__item" role="option" data-indice="${idxCatalogos + catalogos.length + k}" href="${p.url}">
         ${typeof ico === 'function' ? ico(p.icono) : svgPaleta('pagina')}
         <span class="paleta__titulo">${escaparHtml(p.titulo)}</span>
         <span class="paleta__lado">${escaparHtml(p.hace)}</span>
@@ -1167,6 +1232,11 @@ function iniciarMapa(seccion) {
 function iniciarDictado(raiz) {
   const form = document.getElementById('form-paciente') || document.querySelector('[data-registro-clinico]');
   if (!form) return;
+  const confirmacion = form.querySelector('[data-dictado-confirmacion]');
+  const confirmarTranscripcion = form.querySelector('[data-confirmar-transcripcion]');
+  const transcripcionOriginal = form.querySelector('[data-transcripcion-original]');
+  const transcripcionVisible = form.querySelector('[data-transcripcion-visible]');
+  const transcriptorMotor = form.querySelector('[data-transcriptor-motor]');
   const panel = raiz.querySelector('[data-dictado-panel]');
   const texto = raiz.querySelector('[data-dictado-texto]');
   const estadoTexto = raiz.querySelector('[data-dictado-estado]');
@@ -1189,8 +1259,8 @@ function iniciarDictado(raiz) {
   const CLAVE_ORBITA = 'expediente-dictado-orbita';
 
   let reconocedor = null, paroManual = false, reintentosVoz = 0, reinicioVoz = null;
-  let textoFinal = '', textoParcial = '', temporizadorEnvio = null;
-  let inicio = 0, reloj = null, enVuelo = false, finalPendiente = false;
+  let textoFinal = '', textoFuente = '', textoParcial = '', temporizadorEnvio = null;
+  let inicio = 0, reloj = null, enVuelo = false, finalPendiente = false, procesamientoFallido = false;
   let descartar = false, duracion = 0;
   let modoVoz = null;                        // 'web' o 'local'
   let flujoLocal = null, ctxLocal = null, analizadorLocal = null;
@@ -1198,10 +1268,44 @@ function iniciarDictado(raiz) {
   let colaVivo = [], enviandoVivo = false, paroLocal = false, localActivo = false, vivoEnviando = false;
   let bolita = null, orbitaLista = false, clicArrastrado = false;
   const llenados = new Set();
+  const actualizarConfirmacion = (visible) => {
+    if (!confirmacion || !confirmarTranscripcion || !transcripcionOriginal) return;
+    confirmacion.hidden = !visible;
+    confirmarTranscripcion.checked = false;
+    if (transcripcionVisible) transcripcionVisible.textContent = transcripcionOriginal.value;
+  };
+  if (transcripcionOriginal?.value.trim()) actualizarConfirmacion(true);
+  if (form.matches('[data-registro-clinico]') && confirmarTranscripcion) {
+    form.addEventListener('input', (evento) => {
+      if (evento.target === confirmarTranscripcion || !confirmarTranscripcion.checked) return;
+      confirmarTranscripcion.checked = false;
+    });
+    form.addEventListener('change', (evento) => {
+      if (evento.target === confirmarTranscripcion || !confirmarTranscripcion.checked) return;
+      confirmarTranscripcion.checked = false;
+    });
+    form.addEventListener('submit', (evento) => {
+      if (raiz.dataset.estado !== 'inactivo') {
+        evento.preventDefault();
+        mostrarNotificacion('error', 'Termina el dictado y espera a que se procesen todas las palabras antes de guardar.');
+        return;
+      }
+      if (procesamientoFallido) {
+        evento.preventDefault();
+        mostrarNotificacion('error', 'No se procesó el dictado completo. Vuelve a dictar y revisar la nota antes de guardarla.');
+        return;
+      }
+      if (!transcripcionOriginal?.value.trim() || confirmarTranscripcion.checked) return;
+      evento.preventDefault();
+      actualizarConfirmacion(true);
+      confirmarTranscripcion.focus();
+      mostrarNotificacion('error', 'Confirma que revisaste la transcripción antes de guardar la nota.');
+    });
+  }
 
   const ponerEstado = (estado) => {
     raiz.dataset.estado = estado;
-    const etiqueta = { inactivo: 'Traductor Cl�nico', grabando: 'Terminar', procesando: 'Procesando…' }[estado];
+    const etiqueta = { inactivo: 'Transcriptor clínico', grabando: 'Terminar', procesando: 'Procesando…' }[estado];
     globo.textContent = etiqueta;
     boton.setAttribute('aria-label', etiqueta);
     boton.disabled = estado === 'procesando';
@@ -1321,7 +1425,7 @@ function iniciarDictado(raiz) {
     if (!orbitaBurbuja || !orbitaTexto) return;
     let t = String(valor || '').replace(/\s+/g, ' ').trim();
     if (t.length > 300) t = '…' + t.slice(-300);
-    orbitaTexto.textContent = t || (raiz.dataset.estado === 'grabando' ? 'Escuchando…' : 'Traductor Cl�nico listo');
+    orbitaTexto.textContent = t || (raiz.dataset.estado === 'grabando' ? 'Escuchando…' : 'Transcriptor clínico listo');
     orbitaBurbuja.hidden = false;
   };
 
@@ -1491,6 +1595,7 @@ function iniciarDictado(raiz) {
     dosis_incompleta: 'Dosis', dosis_fuera_de_rango: 'Dosis',
     frecuencia_incompleta: 'Frecuencia', frecuencia_fuera_de_rango: 'Frecuencia',
     medicamento_no_reconocido: 'Medicamento', contradiccion: 'Contradicción',
+    campo_no_asignado: 'Dato sin casilla',
     signo_fuera_de_rango: 'Signo vital', telefono_incompleto: 'Teléfono',
     nombre_dudoso: 'Nombre', curp_invalida: 'CURP', falta_motivo: 'Falta motivo',
     falta_diagnostico: 'Falta diagnóstico', texto_repetido: 'Transcripción',
@@ -1498,7 +1603,7 @@ function iniciarDictado(raiz) {
   };
   const pintarAvisos = (avisos) => {
     if (!avisosCaja) return;
-    const lista = Array.isArray(avisos) ? avisos.slice(0, 5) : [];
+    const lista = Array.isArray(avisos) ? avisos.slice(0, 8) : [];
     if (!lista.length) {
       avisosCaja.hidden = true;
       avisosCaja.replaceChildren();
@@ -1604,18 +1709,48 @@ function iniciarDictado(raiz) {
 
   const aplicar = (datos) => {
     texto.textContent = datos.texto || '';
+    if (transcripcionOriginal && datos.texto_original) {
+      transcripcionOriginal.value = String(datos.texto_original);
+      if (transcripcionVisible) transcripcionVisible.textContent = transcripcionOriginal.value;
+      if (transcriptorMotor) transcriptorMotor.value = modoVoz === 'local' ? 'stt_local' : 'web_speech';
+      if (confirmarTranscripcion) confirmarTranscripcion.checked = false;
+    }
     texto.scrollTop = texto.scrollHeight;
     const usados = new Set();
+    const camposSinCasilla = [];
+    const camposContexto = new Set([
+      'seccion', 'seccion_confianza', 'secciones_sub', 'hablante_rol', 'hablante_genero',
+      'hablante_confianza', 'hablante_se_autoidentifica', 'hablante_mencionado_por_tercero',
+      'contexto_tipo', 'contexto_direccion', 'contexto_tiempo_verbal', 'contexto_es_pregunta',
+      'contexto_es_respuesta', 'contexto_es_instruccion', 'contexto_es_diagnostico',
+      'contexto_es_prescripcion', 'contexto_urgencia',
+    ]);
+    const etiquetasCampo = {
+      primer_apellido: 'apellido paterno', segundo_apellido: 'apellido materno',
+      fecha_nacimiento: 'fecha de nacimiento', entidad_nacimiento: 'entidad de nacimiento',
+      nacionalidad: 'nacionalidad', estado_civil: 'estado civil', ocupacion: 'ocupación',
+      escolaridad: 'escolaridad', afiliacion_institucional: 'afiliación institucional',
+      tutor_representante: 'tutor o representante', contacto_emergencia: 'contacto de emergencia',
+      telefono_emergencia: 'teléfono de emergencia', padecimiento_actual: 'padecimiento actual',
+      exploracion_fisica: 'exploración física', plan_tratamiento: 'plan de tratamiento',
+      diagnostico: 'diagnóstico', nota_libre: 'nota clínica',
+    };
     let ultimoCampoModificado = null;
     Object.entries(datos.campos || {}).forEach(([nombre, valor]) => {
       if (nombre === 'diagnostico' && !form.elements['diagnostico']) {
         if (llenarDiagnostico(String(valor || ''))) {
           const ultimoDiag = [...form.querySelectorAll('[name="diagnostico[]"]')].pop();
           if (ultimoDiag) ultimoCampoModificado = ultimoDiag;
+        } else if (valor) {
+          camposSinCasilla.push(etiquetasCampo[nombre] || nombre);
         }
         return;
       }
       const campo = campoDe(nombre);
+      if (!campo && valor && !camposContexto.has(nombre)) {
+        camposSinCasilla.push(etiquetasCampo[nombre] || nombre.replaceAll('_', ' '));
+        return;
+      }
       if (!campo || usados.has(campo)) return;                          // una casilla, un dato
       if (campo.value && !campo.dataset.dictado) return;                // respeta lo escrito a mano
       if (!ponerEnCampo(campo, String(valor ?? ''))) return;
@@ -1646,9 +1781,15 @@ function iniciarDictado(raiz) {
     const hayCasilla = claves.some((nombre) => nombre === 'diagnostico'
       ? !!form.querySelector('[name="diagnostico[]"]')
       : !!campoDe(nombre));
-    pintarAvisos(datos.avisos);
+    const avisos = Array.isArray(datos.avisos) ? [...datos.avisos] : [];
+    camposSinCasilla.forEach((nombre) => avisos.push({
+      tipo: 'campo_no_asignado',
+      gravedad: 'media',
+      mensaje: `No hay una casilla «${nombre}» en este formulario. Revisa la transcripción y captura ese dato en el expediente correspondiente.`,
+    }));
+    pintarAvisos(avisos);
     if (claves.length && !hayCasilla) {
-      mostrarErrorDictado('Se transcribi� el audio, pero este formulario no tiene una casilla compatible. Revisa el texto.', false);
+      mostrarErrorDictado('Se transcribió el audio, pero este formulario no tiene una casilla compatible. Revisa el texto.', false);
     }
     actualizarBurbuja(texto.textContent);
   };
@@ -1661,12 +1802,26 @@ function iniciarDictado(raiz) {
       const respuesta = await fetch(`${BASE}/api/pacientes/dictado.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': TOKEN_CSRF },
-        body: JSON.stringify({ modo: 'texto', texto: textoFinal }),
+        body: JSON.stringify({
+          modo: 'texto',
+          texto: textoFinal,
+          texto_original: textoFuente || textoFinal,
+          ...(form.matches('[data-registro-clinico]') ? {
+            contexto_registro: {
+              paciente_id: Number(form.elements.paciente_id?.value || 0),
+              tipo: String(form.elements.tipo?.value || ''),
+              token: String(form.elements.dictado_contexto?.value || ''),
+              motor: modoVoz === 'local' ? 'stt_local' : 'web_speech',
+            },
+          } : {}),
+        }),
       });
       const resultado = await respuesta.json();
       if (!resultado.ok) throw new Error(resultado.error);
       if (!descartar) aplicar(resultado);
+      if (final) procesamientoFallido = false;
     } catch (error) {
+      if (final) procesamientoFallido = true;
       if (final || !texto.textContent) mostrarErrorDictado(error.message || 'No se pudo procesar el dictado.');
     } finally {
       enVuelo = false;
@@ -1700,7 +1855,11 @@ function iniciarDictado(raiz) {
       let parcial = '';
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
         const resultado = ev.results[i];
-        if (resultado.isFinal) textoFinal += resultado[0].transcript.trim() + ' ';
+        if (resultado.isFinal) {
+          const frase = resultado[0].transcript.trim();
+          textoFinal += frase + ' ';
+          textoFuente += frase + ' ';
+        }
         else parcial += resultado[0].transcript;
       }
       textoParcial = parcial;
@@ -1828,6 +1987,7 @@ function iniciarDictado(raiz) {
         const frase = (resultado.texto || '').trim();
         if (frase && !descartar) {
           textoFinal += frase + ' ';
+          textoFuente += `${(resultado.texto_original || frase).trim()} `;
           texto.textContent = textoFinal.trim() + (colaVivo.length ? ' …' : '');
           texto.scrollTop = texto.scrollHeight;
           actualizarBurbuja(texto.textContent);
@@ -1951,9 +2111,12 @@ function iniciarDictado(raiz) {
       return;
     }
     estadoTexto.textContent = `Dictado terminado ${Math.round(duracion || segundos())} s`;
+    if (transcripcionOriginal && textoFuente.trim()) {
+      actualizarConfirmacion(true);
+    }
     calificar.hidden = false;
     calificar.querySelectorAll('button').forEach((b) => { b.disabled = false; b.setAttribute('aria-pressed', 'false'); });
-    actualizarBurbuja(texto.textContent || 'Traductor Cl�nico listo');
+    actualizarBurbuja(texto.textContent || 'Transcriptor clínico listo');
     if (raiz.dataset.minimizado == '1') { try { bolita?.apagar(); } catch (e) { /* sin motor */ } }
     if (llenados.size) mostrarNotificacion('exito', `Se llenaron ${llenados.size} campos. Revísalos antes de guardar.`);
   };
@@ -1961,8 +2124,11 @@ function iniciarDictado(raiz) {
   const iniciar = async () => {
     descartar = false;
     duracion = 0;
+    procesamientoFallido = false;
     llenados.clear();
     textoFinal = '';
+    textoFuente = '';
+    if (transcripcionOriginal?.value.trim()) actualizarConfirmacion(true);
     textoParcial = '';
     paroManual = false;
     modoVoz = null;
@@ -2930,6 +3096,67 @@ function iniciarAsistente() {
       }
     };
     crearRazonamiento();
+    let eventosRecibidos = 0;
+    const procesarLinea = (linea) => {
+      if (!linea.trim()) return;
+      let evento;
+      try {
+        evento = JSON.parse(linea);
+      } catch {
+        throw new Error('El servidor devolvió una respuesta inválida.');
+      }
+      eventosRecibidos++;
+      if (evento.t === 'pensamiento') {
+        crearRazonamiento();
+        razonamiento?.agregar(evento.d);
+      } else if (evento.t === 'texto') {
+        razonamiento?.terminar();
+        esperaPensamiento.remove();
+        respuesta += evento.d;
+        segmento += evento.d;
+        md.innerHTML = markdownSeguro(segmento);
+        montarGraficas(md);
+        if (conversacion.scrollHeight - conversacion.scrollTop - conversacion.clientHeight < 140) alFinal();
+      } else if (evento.t === 'herramienta_inicio') {
+        razonamiento?.terminar();
+        esperaPensamiento.remove();
+        enCurso?.remove();
+        enCurso = document.createElement('div');
+        enCurso.className = 'msj__accion msj__accion--curso';
+        enCurso.innerHTML = `<span class="msj__accion-icono" aria-hidden="true">${iconoAccion(evento.nombre)}</span><span class="msj__accion-texto trShimmer"></span>`;
+        enCurso.querySelector('.msj__accion-texto').textContent = evento.d;
+        md.classList.remove('msj__escribiendo');
+        contenedor.insertBefore(enCurso, md);
+        alFinal();
+      } else if (evento.t === 'herramienta') {
+        razonamiento?.terminar();
+        esperaPensamiento.remove();
+        enCurso?.remove();
+        enCurso = null;
+        const accion = { d: evento.d, ok: evento.ok, url: evento.url, nombre: evento.nombre, vista: evento.vista };
+        acciones.push(accion);
+        md.classList.remove('msj__escribiendo');
+        if (!segmento) md.remove();
+        const nodo = nodoAccion(accion);
+        contenedor.appendChild(nodo);
+        if (nodo._vista) contenedor.appendChild(nodo._vista);
+        md = document.createElement('div');
+        md.className = 'md msj__escribiendo';
+        contenedor.appendChild(md);
+        if (segmento) respuesta += '\n\n';
+        segmento = '';
+        if (evento.cambio) {
+          cambioEspacio = true;
+          if (evento.url && paginaId && evento.url.endsWith(`?id=${paginaId}`)) cambioPaginaActual = true;
+        }
+        alFinal();
+      } else if (evento.t === 'aviso' || evento.t === 'error') {
+        const n = document.createElement('div');
+        n.className = evento.t === 'error' ? 'msj__error' : 'msj__aviso';
+        n.textContent = evento.d;
+        contenedor.appendChild(n);
+      }
+    };
     let enCurso = null;
     peticion = new AbortController();
     enviar.disabled = false;
@@ -2949,6 +3176,7 @@ function iniciarAsistente() {
         }),
         signal: peticion.signal,
       });
+      if (!r.body) throw new Error(`El servidor no inició la transmisión (HTTP ${r.status}).`);
       const lector = r.body.getReader();
       const decodificador = new TextDecoder();
       let pendiente = '';
@@ -2958,69 +3186,19 @@ function iniciarAsistente() {
         pendiente += decodificador.decode(value, { stream: true });
         let fin;
         while ((fin = pendiente.indexOf('\n')) >= 0) {
-          const linea = pendiente.slice(0, fin).trim();
+          const linea = pendiente.slice(0, fin);
           pendiente = pendiente.slice(fin + 1);
-          if (!linea) continue;
-          const evento = JSON.parse(linea);
-          if (evento.t === 'pensamiento') {
-            crearRazonamiento();
-            razonamiento?.agregar(evento.d);
-          } else if (evento.t === 'texto') {
-            razonamiento?.terminar();
-            esperaPensamiento.remove();
-            respuesta += evento.d;
-            segmento += evento.d;
-            md.innerHTML = markdownSeguro(segmento);
-            montarGraficas(md);
-            if (conversacion.scrollHeight - conversacion.scrollTop - conversacion.clientHeight < 140) alFinal();
-          } else if (evento.t === 'herramienta_inicio') {
-            // Paso en curso: brillo sobre el texto hasta que llega el resultado
-            razonamiento?.terminar();
-            esperaPensamiento.remove();
-            enCurso?.remove();
-            enCurso = document.createElement('div');
-            enCurso.className = 'msj__accion msj__accion--curso';
-            enCurso.innerHTML = `<span class="msj__accion-icono" aria-hidden="true">${iconoAccion(evento.nombre)}</span><span class="msj__accion-texto trShimmer"></span>`;
-            enCurso.querySelector('.msj__accion-texto').textContent = evento.d;
-            md.classList.remove('msj__escribiendo');
-            contenedor.insertBefore(enCurso, md);
-            alFinal();
-          } else if (evento.t === 'herramienta') {
-            // La IA hizo algo en el espacio de trabajo: se muestra la acción y el texto siguiente va debajo
-            razonamiento?.terminar();
-            esperaPensamiento.remove();
-            enCurso?.remove();
-            enCurso = null;
-            const accion = { d: evento.d, ok: evento.ok, url: evento.url, nombre: evento.nombre, vista: evento.vista };
-            acciones.push(accion);
-            md.classList.remove('msj__escribiendo');
-            if (!segmento) md.remove();
-            const nodo = nodoAccion(accion);
-            contenedor.appendChild(nodo);
-            if (nodo._vista) contenedor.appendChild(nodo._vista);
-            md = document.createElement('div');
-            md.className = 'md msj__escribiendo';
-            contenedor.appendChild(md);
-            if (segmento) respuesta += '\n\n';
-            segmento = '';
-            if (evento.cambio) {
-              cambioEspacio = true;
-              if (evento.url && paginaId && evento.url.endsWith(`?id=${paginaId}`)) cambioPaginaActual = true;
-            }
-            alFinal();
-          } else if (evento.t === 'aviso' || evento.t === 'error') {
-            const n = document.createElement('div');
-            n.className = evento.t === 'error' ? 'msj__error' : 'msj__aviso';
-            n.textContent = evento.d;
-            contenedor.appendChild(n);
-          }
+          procesarLinea(linea);
         }
       }
+      pendiente += decodificador.decode();
+      procesarLinea(pendiente);
+      if (!r.ok && !eventosRecibidos) throw new Error(`El servidor respondió con HTTP ${r.status}.`);
     } catch (error) {
       if (error.name !== 'AbortError') {
         const n = document.createElement('div');
         n.className = 'msj__error';
-        n.textContent = 'Se perdió la conexión con el servidor.';
+        n.textContent = error.message || 'Se perdió la conexión con el servidor.';
         contenedor.appendChild(n);
       }
     } finally {
@@ -4051,6 +4229,122 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+/* ---------- Preferencias personales de navegación ---------- */
+function iniciarPersonalizacionLateral() {
+  const lateral = document.querySelector('.barra-lateral__desplazable');
+  const dialogo = document.querySelector('[data-lateral-preferencias]');
+  const lista = dialogo?.querySelector('[data-lateral-preferencias-lista]');
+  if (!lateral || !dialogo || !lista) return;
+
+  const secciones = Array.from(lateral.querySelectorAll('[data-seccion-personalizable]'));
+  if (!secciones.length) return;
+  const porClave = new Map(secciones.map((seccion) => [
+    seccion.dataset.seccionPersonalizable,
+    seccion,
+  ]));
+  const nombres = new Map(secciones.map((seccion) => [
+    seccion.dataset.seccionPersonalizable,
+    seccion.querySelector('.lateral-seccion__alternar')?.textContent.trim() || seccion.dataset.seccionPersonalizable,
+  ]));
+  const predeterminado = secciones.map((seccion) => seccion.dataset.seccionPersonalizable);
+  const clave = `expediente-lateral-secciones-${document.body.dataset.usuario ?? ''}`;
+  let guardado = null;
+  try { guardado = JSON.parse(localStorage.getItem(clave) || 'null'); } catch (e) { /* opcional */ }
+
+  const ordenGuardado = Array.isArray(guardado?.orden) ? guardado.orden : [];
+  const ordenValido = ordenGuardado.filter((nombre, indice) => porClave.has(nombre) && ordenGuardado.indexOf(nombre) === indice);
+  const orden = [...ordenValido, ...predeterminado.filter((nombre) => !ordenValido.includes(nombre))];
+  const ocultas = new Set(Array.isArray(guardado?.ocultas)
+    ? guardado.ocultas.filter((nombre) => porClave.has(nombre))
+    : []);
+  const estado = dialogo.querySelector('[data-lateral-preferencias-estado]');
+
+  const aplicar = () => {
+    const marcadores = secciones.map(() => document.createComment('seccion'));
+    secciones.forEach((seccion, indice) => seccion.replaceWith(marcadores[indice]));
+    orden.forEach((nombre, indice) => marcadores[indice].replaceWith(porClave.get(nombre)));
+    porClave.forEach((seccion, nombre) => { seccion.hidden = ocultas.has(nombre); });
+  };
+  const guardar = () => {
+    try {
+      localStorage.setItem(clave, JSON.stringify({ orden, ocultas: [...ocultas] }));
+      if (estado) estado.textContent = 'Cambios guardados en este navegador.';
+    } catch (e) {
+      if (estado) estado.textContent = 'No se pudieron guardar los cambios en este navegador.';
+    }
+  };
+  const renderizar = (enfocar = null) => {
+    lista.replaceChildren();
+    orden.forEach((nombre, indice) => {
+      const elemento = document.createElement('li');
+      elemento.className = 'lateral-preferencias__fila';
+      elemento.dataset.seccion = nombre;
+
+      const texto = document.createElement('span');
+      texto.className = 'lateral-preferencias__nombre';
+      texto.textContent = nombres.get(nombre);
+
+      const etiqueta = document.createElement('label');
+      etiqueta.className = 'lateral-preferencias__mostrar';
+      const casilla = document.createElement('input');
+      casilla.type = 'checkbox';
+      casilla.checked = !ocultas.has(nombre);
+      casilla.setAttribute('aria-label', `Mostrar ${nombres.get(nombre)}`);
+      casilla.addEventListener('change', () => {
+        if (casilla.checked) ocultas.delete(nombre);
+        else ocultas.add(nombre);
+        aplicar();
+        guardar();
+        renderizar(nombre);
+      });
+      etiqueta.append(casilla, document.createTextNode('Mostrar'));
+
+      const mover = document.createElement('div');
+      mover.className = 'lateral-preferencias__mover';
+      [
+        { texto: 'Subir', destino: indice - 1 },
+        { texto: 'Bajar', destino: indice + 1 },
+      ].forEach(({ texto: etiquetaBoton, destino }) => {
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = 'boton boton--sutil';
+        boton.textContent = etiquetaBoton;
+        boton.disabled = destino < 0 || destino >= orden.length;
+        boton.setAttribute('aria-label', `${etiquetaBoton} ${nombres.get(nombre)}`);
+        boton.addEventListener('click', () => {
+          if (destino < 0 || destino >= orden.length) return;
+          [orden[indice], orden[destino]] = [orden[destino], orden[indice]];
+          aplicar();
+          guardar();
+          renderizar(nombre);
+        });
+        mover.appendChild(boton);
+      });
+
+      elemento.append(texto, etiqueta, mover);
+      lista.appendChild(elemento);
+    });
+    if (enfocar) lista.querySelector(`[data-seccion="${CSS.escape(enfocar)}"] input`)?.focus();
+  };
+
+  aplicar();
+  renderizar();
+  document.querySelector('[data-lateral-personalizar]')?.addEventListener('click', () => {
+    if (!dialogo.open) dialogo.showModal();
+  });
+  dialogo.querySelectorAll('[data-lateral-preferencias-cerrar]').forEach((boton) => {
+    boton.addEventListener('click', () => dialogo.close());
+  });
+  dialogo.querySelector('[data-lateral-restablecer]')?.addEventListener('click', () => {
+    orden.splice(0, orden.length, ...predeterminado);
+    ocultas.clear();
+    aplicar();
+    guardar();
+    renderizar();
+  });
+}
+document.addEventListener('DOMContentLoaded', iniciarPersonalizacionLateral);
+
 /* ---------- Secciones de la barra lateral que se pliegan (se recuerda en este navegador) ---------- */
 function iniciarSeccionesPlegables() {
   const clave = `expediente-lateral-plegadas-${document.body.dataset.usuario ?? ''}`;
@@ -4108,4 +4402,3 @@ function iniciarAvisoDatos() {
   });
 }
 document.addEventListener('DOMContentLoaded', iniciarAvisoDatos);
-

@@ -108,11 +108,3 @@ $pintarTabla = function (array $filas) use ($situacion, $dinero): void {
 </div>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
-
-
-
-
-
-
-
-

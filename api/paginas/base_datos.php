@@ -179,6 +179,7 @@ switch ($entrada['accion'] ?? '') {
         }
         $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)')->execute([$pagina['id'], $valoresPF, $ordenPF]);
         $filaPF = (int) $pdo->lastInsertId();
+        registrarAuditoriaFilaPagina((int) $pagina['id'], $filaPF, 'crear', 'fila');
         $pdo->prepare('UPDATE paginas SET actualizado_en = NOW(), actualizado_por = ? WHERE id = ?')->execute([$usuarioId, $pagina['id']]);
         registrarBitacora('paginas', (int) $pagina['id'], 'actualizar', 'plantilla_fila', null, (string) $filaPF);
         responder(200, ['ok' => true, 'fila' => $filaPF]);
@@ -206,13 +207,20 @@ switch ($entrada['accion'] ?? '') {
                 responder(404, ['ok' => false, 'error' => 'La fila no existe.']);
             }
             $orden = (int) $ref['orden'] + (isset($entrada['antes_de']) ? 0 : 1);
+            $movidas = $pdo->prepare('SELECT id FROM pagina_filas WHERE pagina_id = ? AND orden >= ? ORDER BY id');
+            $movidas->execute([$pagina['id'], $orden]);
+            $idsMovidos = array_map('intval', $movidas->fetchAll(PDO::FETCH_COLUMN));
             $pdo->prepare('UPDATE pagina_filas SET orden = orden + 1 WHERE pagina_id = ? AND orden >= ?')->execute([$pagina['id'], $orden]);
+            foreach ($idsMovidos as $idMovido) {
+                registrarAuditoriaFilaPagina((int) $pagina['id'], $idMovido, 'actualizar', 'orden');
+            }
             if (isset($entrada['duplicar'])) {
                 $valoresNuevos = $ref['valores'];
             }
         }
         $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)')->execute([$pagina['id'], $valoresNuevos, $orden]);
         $filaId = (int) $pdo->lastInsertId();
+        registrarAuditoriaFilaPagina((int) $pagina['id'], $filaId, 'crear', 'fila');
         $pdo->prepare('UPDATE paginas SET actualizado_en = NOW(), actualizado_por = ? WHERE id = ?')->execute([$usuarioId, $pagina['id']]);
         registrarBitacora('paginas', (int) $pagina['id'], 'actualizar', 'fila_nueva', null, (string) $filaId);
         responder(200, ['ok' => true, 'fila' => $filaId, 'valores' => json_decode($valoresNuevos, true) ?: new stdClass()]);
@@ -224,7 +232,9 @@ switch ($entrada['accion'] ?? '') {
         }
         $valores = json_decode($fila['valores'], true) ?: [];
         $valor   = valorDeCelda($columnas[$indice]['tipo'], $entrada['valor'] ?? null);
-        $valores[$columnas[$indice]['id']] = $valor;
+        $columnaId = $columnas[$indice]['id'];
+        $valorAnterior = $valores[$columnaId] ?? null;
+        $valores[$columnaId] = $valor;
         // Selección: un valor nuevo se agrega como opción con el siguiente color
         $columna = $columnas[$indice];
         if ($columna['tipo'] === 'seleccion' && $valor !== null
@@ -235,6 +245,9 @@ switch ($entrada['accion'] ?? '') {
         $pdo->prepare('UPDATE pagina_filas SET valores = ?, actualizado_en = NOW() WHERE id = ?')
             ->execute([json_encode($valores, JSON_UNESCAPED_UNICODE), $fila['id']]);
         $pdo->prepare('UPDATE paginas SET actualizado_en = NOW(), actualizado_por = ? WHERE id = ?')->execute([$usuarioId, $pagina['id']]);
+        if ($valorAnterior !== $valor) {
+            registrarAuditoriaFilaPagina((int) $pagina['id'], (int) $fila['id'], 'actualizar', 'celda:' . $columnaId);
+        }
         // Bitácora: una entrada por persona, página y columna cada 5 minutos de edición
         $reciente = $pdo->prepare(
             "SELECT 1 FROM bitacora WHERE tabla = 'paginas' AND registro_id = ? AND usuario_id = ? AND campo = 'celda'
@@ -258,7 +271,12 @@ switch ($entrada['accion'] ?? '') {
     case 'fila_notas':
         $fila = $filaOError();
         $notas = mb_substr((string) ($entrada['notas'] ?? ''), 0, 20000);
-        $pdo->prepare('UPDATE pagina_filas SET notas = ?, actualizado_en = NOW() WHERE id = ?')->execute([$notas !== '' ? $notas : null, $fila['id']]);
+        $notas = $notas !== '' ? $notas : null;
+        if (($fila['notas'] ?? null) !== $notas) {
+            $pdo->prepare('UPDATE pagina_filas SET notas = ?, actualizado_en = NOW() WHERE id = ?')->execute([$notas, $fila['id']]);
+            registrarAuditoriaFilaPagina((int) $pagina['id'], (int) $fila['id'], 'actualizar', 'notas');
+            $pdo->prepare('UPDATE paginas SET actualizado_en = NOW(), actualizado_por = ? WHERE id = ?')->execute([$usuarioId, $pagina['id']]);
+        }
         responder(200, ['ok' => true]);
 
     case 'plantilla':
@@ -290,6 +308,7 @@ switch ($entrada['accion'] ?? '') {
             $insertar = $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)');
             foreach ($p->fetchAll() as $k => $x) {
                 $insertar->execute([$pagina['id'], json_encode(['c1' => $x['folio'], 'c2' => (int) $x['id'], 'c3' => 'Activo'], JSON_UNESCAPED_UNICODE), $k + 1]);
+                registrarAuditoriaFilaPagina((int) $pagina['id'], (int) $pdo->lastInsertId(), 'crear', 'fila');
                 $filasNuevas++;
             }
         }
@@ -297,8 +316,8 @@ switch ($entrada['accion'] ?? '') {
 
     case 'fila_eliminar':
         $fila = $filaOError();
+        registrarAuditoriaFilaPagina((int) $pagina['id'], (int) $fila['id'], 'eliminar', 'fila');
         $pdo->prepare('DELETE FROM pagina_filas WHERE id = ?')->execute([$fila['id']]);
-        registrarBitacora('paginas', (int) $pagina['id'], 'eliminar', 'fila', $fila['valores']);
         responder(200, ['ok' => true]);
 }
 

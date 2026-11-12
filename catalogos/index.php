@@ -60,41 +60,70 @@ foreach ($catalogos as $clave => $catalogo) {
     $conteos[$clave] = (int) $consultaConteo->fetchColumn();
 }
 $secciones = seccionesCatalogo();
+$seccionInicial = (string) array_key_first($secciones);
 
 require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 ?>
 <div class="pagina__cabecera">
-  <h1 class="pagina__titulo">Catálogos del Sistema</h1>
-  <p class="pagina__subtitulo">Catálogos clínicos y normativos maestros (NOM-004, NOM-024 y compendios oficiales)</p>
+  <h1 class="pagina__titulo">Catálogos</h1>
 </div>
 
 <?php if (!$metaCatalogoDisponible): ?>
   <p class="pagina__descripcion" role="status">Metadatos editables no disponibles. Falta aplicar <code>database/migracion_catalogos_meta.sql</code>.</p>
 <?php endif; ?>
 
+<div class="catalogos-pagina" data-catalogos>
+  <div class="catalogos__barra">
+    <nav class="catalogos__tabs" role="tablist" aria-label="Secciones de catálogos">
+      <?php
+        $iconosSeccion = ['A' => 'usuarios', 'B' => 'clinico', 'C' => 'pildora', 'D' => 'casa', 'E' => 'tabla', 'F' => 'documento'];
+        foreach ($secciones as $clave => $seccion):
+      ?>
+        <button type="button" class="catalogos__tab" role="tab"
+          id="tab-catalogos-<?= e($clave) ?>"
+          aria-controls="panel-catalogos-<?= e($clave) ?>"
+          aria-selected="<?= $clave === $seccionInicial ? 'true' : 'false' ?>"
+          tabindex="<?= $clave === $seccionInicial ? '0' : '-1' ?>"
+          data-catalogos-tab="<?= e($clave) ?>">
+          <?= icono($iconosSeccion[$clave] ?? 'tabla') ?>
+          <span><?= e(preg_replace('/^[A-F]\.\s*/', '', $seccion['titulo'])) ?></span>
+          <small data-catalogos-conteo><?= count($seccion['catalogos']) ?></small>
+        </button>
+      <?php endforeach; ?>
+    </nav>
+    <div class="catalogos__busqueda">
+      <label class="sr-only" for="catalogos-filtro">Filtrar catálogos</label>
+      <input id="catalogos-filtro" type="search" placeholder="Filtrar catálogos…" autocomplete="off" data-catalogos-filtro>
+      <button type="button" class="boton-icono" data-abrir-busqueda title="Buscar en todo el expediente" aria-label="Buscar en todo el expediente"><?= icono('buscar') ?></button>
+    </div>
+  </div>
+  <p class="catalogos__estado" role="status" aria-live="polite" data-catalogos-estado></p>
+
 <?php foreach ($secciones as $clave => $seccion): ?>
   <?php $llaves = $seccion['catalogos']; ?>
-  <section class="bd" aria-labelledby="cat-<?= e($clave) ?>" style="margin-bottom:28px;">
-    <div class="bd__cabecera">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <h2 class="bd__titulo" id="cat-<?= e($clave) ?>"><?= e($seccion['titulo']) ?></h2>
-        <span class="bd__contador"><?= count($llaves) ?></span>
+  <section class="catalogos__seccion" id="panel-catalogos-<?= e($clave) ?>"
+    role="tabpanel" aria-labelledby="tab-catalogos-<?= e($clave) ?>"
+    data-catalogos-panel="<?= e($clave) ?>"<?= $clave !== $seccionInicial ? ' hidden' : '' ?>>
+    <header class="catalogos__seccion-cabecera">
+      <div>
+        <h2><?= e(preg_replace('/^[A-F]\.\s*/', '', $seccion['titulo'])) ?></h2>
+        <p><?= e($seccion['descripcion']) ?></p>
       </div>
-      <div class="bd__herramientas">
-        <span class="datos-tenue" style="font-size:var(--fs-xs);">Herramientas de datos</span>
-      </div>
-    </div>
-    <p class="pagina__descripcion" style="margin-bottom:12px;"><?= e($seccion['descripcion']) ?></p>
-
-    <div class="bd-tabla-contenedor">
+      <span><?= count($llaves) ?> catálogos</span>
+      <?php if ($clave === 'A'): ?>
+        <a class="boton boton--sutil catalogos__ver-entidades" href="<?= URL_BASE ?>/catalogos/editar_tabla.php?tabla=catalogo_entidades">
+          <?= icono('ubicacion') ?><span>Ver entidades federativas</span>
+        </a>
+      <?php endif; ?>
+    </header>
+    <div class="bd-tabla-contenedor catalogos__tabla-contenedor">
       <table class="bd-tabla">
         <thead>
           <tr>
-            <th style="min-width:210px;">Catálogo</th>
-            <th>Descripción</th>
-            <th class="num" style="width:110px;">Registros</th>
+            <th>Catálogo</th>
+            <th class="num">Registros</th>
             <th>Fuente / Norma</th>
-            <th style="width:170px;text-align:right;">Acciones</th>
+            <th class="catalogos__acciones-columna">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -106,18 +135,32 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
               $urlTabla = !empty($catalogo['editor'])
                 ? URL_BASE . '/' . trim($catalogo['editor'], '/') . '/'
                 : URL_BASE . '/catalogos/editar_tabla.php?tabla=' . urlencode($llave);
+              $textoBusqueda = implode(' ', array_filter([
+                $seccion['titulo'] ?? '',
+                $catalogo['titulo'] ?? '',
+                $catalogo['descripcion'] ?? '',
+                $catalogo['fuente'] ?? '',
+                $catalogo['version'] ?? '',
+                $catalogo['norma'] ?? '',
+                $metaCatalogoDb[$llave]['fuente'] ?? '',
+                $metaCatalogoDb[$llave]['version'] ?? '',
+              ]));
+              if (!empty($metaCatalogoDb[$llave]['norma'])) {
+                  $textoBusqueda .= ' ' . (string) $metaCatalogoDb[$llave]['norma'];
+              }
               $urlNuevo = !empty($catalogo['editor'])
                 ? URL_BASE . '/' . trim($catalogo['editor'], '/') . '/nuevo.php'
                 : URL_BASE . '/catalogos/nuevo.php?tabla=' . urlencode($llave);
             ?>
-            <tr>
+            <tr data-catalogos-fila data-busqueda="<?= e($textoBusqueda) ?>">
               <td class="bd-tabla__celda-titulo">
-                <a class="bd-tabla__titulo" href="<?= e($urlTabla) ?>" title="Abrir tabla independiente de <?= e($catalogo['titulo']) ?>">
-                  <?= icono('tabla') ?> <span><?= e($catalogo['titulo']) ?></span>
+                <a class="catalogos__enlace" href="<?= e($urlTabla) ?>" title="Abrir tabla independiente de <?= e($catalogo['titulo']) ?>">
+                  <?= icono('tabla') ?>
+                  <span class="catalogos__enlace-nombre"><?= e($catalogo['titulo']) ?></span>
+                  <span class="catalogos__enlace-accion">Ver registros <?= icono('flecha_derecha') ?></span>
                 </a>
               </td>
-              <td style="color:var(--texto);"><?= e($catalogo['descripcion'] ?? ('Catálogo del sistema · tabla ' . $catalogo['tabla'])) ?></td>
-              <td class="num font-mono"><?= $total === null ? '<span class="datos-tenue">0</span>' : number_format((int) $total) ?></td>
+              <td class="num font-mono"><?= $total === null ? '<span class="datos-tenue">—</span>' : number_format((int) $total) ?></td>
               <?php
                 $metaFila = $metaCatalogoDb[$llave] ?? [];
                 $fuenteMostrar = $metaFila['fuente'] ?? ($catalogo['fuente'] ?? '—');
@@ -128,18 +171,21 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
                 <?= $versionMostrar !== '' && $versionMostrar !== '—' && $versionMostrar !== $fuenteMostrar ? ' · ' . e($versionMostrar) : '' ?>
                 <br><small class="datos-tenue"><?= e($catalogo['norma'] ?? '') ?><?= !empty($metaFila['vigencia']) ? ' · hasta ' . e((string) $metaFila['vigencia']) : '' ?><?= !empty($metaFila['responsable']) ? ' · ' . e((string) $metaFila['responsable']) : '' ?></small>
               </td>
-              <td style="text-align:right;">
-                <div style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;">
-                  <a class="boton boton--primario boton--pequeno" href="<?= e($urlNuevo) ?>" title="Ingresar nuevo dato"><?= icono('agregar') ?> Nuevo</a>
-                  <a class="boton boton--secundario boton--pequeno" href="<?= e($urlTabla) ?>" title="Abrir tabla independiente">Abrir</a>
-                  <a class="boton-icono" href="<?= URL_BASE ?>/api/motor/exportar.php?<?= e(http_build_query(['entidad' => $llave])) ?>" title="Exportar catálogo" aria-label="Exportar"><?= icono('descargar') ?></a>
-                  <?php if (puede('configurar')): ?>
-                    <a class="boton-icono" href="<?= URL_BASE ?>/catalogos/importar.php?tabla=<?= e(urlencode($llave)) ?>" title="Importar datos" aria-label="Importar"><?= icono('subir') ?></a>
-                    <?php if ($metaCatalogoDisponible): ?>
-                      <a class="boton-icono" href="<?= URL_BASE ?>/catalogos/meta.php?tabla=<?= e(urlencode($llave)) ?>" title="Metadatos" aria-label="Metadatos"><?= icono('ajustes') ?></a>
+              <td class="catalogos__acciones-celda">
+                <details class="catalogos__acciones-menu">
+                  <summary class="boton-icono" title="Acciones de <?= e($catalogo['titulo']) ?>" aria-label="Acciones de <?= e($catalogo['titulo']) ?>" aria-haspopup="menu"><?= icono('mas') ?></summary>
+                  <div class="catalogos__acciones-lista" role="menu" aria-label="Acciones de <?= e($catalogo['titulo']) ?>">
+                    <a href="<?= e($urlNuevo) ?>" role="menuitem"><?= icono('agregar') ?><span>Nuevo registro</span></a>
+                    <a href="<?= e($urlTabla) ?>" role="menuitem"><?= icono('tabla') ?><span>Abrir catálogo</span></a>
+                    <a href="<?= URL_BASE ?>/catalogos/exportar.php?tabla=<?= e(urlencode($llave)) ?>" role="menuitem"><?= icono('descargar') ?><span>Exportar</span></a>
+                    <?php if (puede('configurar')): ?>
+                      <a href="<?= URL_BASE ?>/catalogos/importar.php?tabla=<?= e(urlencode($llave)) ?>" role="menuitem"><?= icono('subir') ?><span>Importar</span></a>
+                      <?php if ($metaCatalogoDisponible): ?>
+                        <a href="<?= URL_BASE ?>/catalogos/meta.php?tabla=<?= e(urlencode($llave)) ?>" role="menuitem"><?= icono('ajustes') ?><span>Metadatos</span></a>
+                      <?php endif; ?>
                     <?php endif; ?>
-                  <?php endif; ?>
-                </div>
+                  </div>
+                </details>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -148,5 +194,6 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     </div>
   </section>
 <?php endforeach; ?>
+</div>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>

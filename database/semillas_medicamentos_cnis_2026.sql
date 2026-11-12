@@ -2,7 +2,7 @@
 -- Fuente COMPENDIO_MEDICAMENTOS_V23092026.xlsm; OpenXML leído sin ejecutar macros.
 -- 1,983 claves. Ejecuta después de database/migracion_medicamentos_cie10_incapacidad.sql.
 -- En filas ya cargadas, repone resúmenes genéricos y agrega detalle oficial solo en campos vacíos.
-USE expediente_expediente;
+USE clinica;
 SET NAMES utf8mb4;
 SET @INST := 1;
 

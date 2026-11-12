@@ -34,6 +34,8 @@
   </div>
 <?php endif; ?>
 
+<?php if (usuarioActual() && !esPaciente()): require __DIR__ . '/../componentes/anuncios_dialogo.php'; endif; ?>
+
 <?php $iconosJs = ['imagen', 'grafica', 'carpeta', 'documento', 'tabla', 'chevron', 'mas', 'agregar', 'estrella', 'papelera', 'enlace', 'editar', 'reabrir', 'usuarios', 'candado', 'flecha_abajo', 'aa', 'numero', 'calendario', 'seleccion', 'casilla', 'buscar', 'agarre', 'titulo', 'vinetas', 'lista_numerada', 'comillas', 'separador', 'texto', 'cerrar', 'microfono', 'reloj', 'chispa', 'flecha_arriba', 'menos', 'clinico', 'info', 'usuario', 'flujo', 'expandir', 'doble_derecha', 'pildora', 'tarjeta', 'tendencia', 'ubicacion', 'telefono', 'mensaje', 'casa', 'gota', 'escudo', 'clinico', 'termometro', 'panel', 'lista', 'alerta', 'barras', 'escudo_ok', 'flecha_derecha', 'salir', 'pdf', 'adelante']; ?>
 <?php if (usuarioActual() && !esPaciente()): require_once __DIR__ . '/../../datos/registros_clinicos.php'; ?>
 <script type="application/json" id="tipos-registro"><?= json_encode(array_map(fn ($t) => ['corto' => $t['corto'], 'documento' => $t['documento'], 'grupo' => $t['grupo'], 'icono' => $t['icono'], 'descripcion' => $t['descripcion']], TIPOS_REGISTRO), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>

@@ -112,11 +112,3 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 </div>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
-
-
-
-
-
-
-
-

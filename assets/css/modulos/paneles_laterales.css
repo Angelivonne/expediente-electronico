@@ -55,6 +55,47 @@ a.panel-lateral__fila:hover, button.panel-lateral__fila:hover, .panel-lateral__f
 .panel-lateral__acciones .boton-icono { width: 26px; height: 26px; }
 .boton-icono--peligro:hover { color: var(--peligro); }
 .panel-lateral__vacio { padding: 24px 14px; font-size: var(--fs-sm); color: var(--texto-tenue); text-align: center; }
+.actividad-filtros {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 116px;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #222;
+  background: #111;
+}
+.actividad-filtros input,
+.actividad-filtros select {
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #292929;
+  border-radius: 4px;
+  background: #151515;
+  color: var(--texto);
+  font: inherit;
+  font-size: var(--fs-xs);
+}
+.actividad-filtros input:focus-visible,
+.actividad-filtros select:focus-visible { outline: 1px solid #555; outline-offset: 1px; }
+.actividad-filtros__mas {
+  display: block;
+  width: calc(100% - 28px);
+  min-height: 34px;
+  margin: 8px 14px 14px;
+  border: 1px solid #292929;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--texto-suave);
+  font: inherit;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+.actividad-filtros__mas:hover { background: #1b1b1b; color: var(--texto-fuerte); }
+.actividad-filtros__mas:disabled { cursor: wait; opacity: .7; }
+.actividad-filtros__error { margin: 6px 14px 12px; color: var(--peligro); font-size: var(--fs-xs); }
 .panel-lateral__pie { padding: 8px 14px 10px; border-top: 1px solid #222; font-size: 11px; line-height: 1.45; color: var(--texto-tenue); }
 .panel-lateral__esqueleto { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
 .panel-lateral__esqueleto span {

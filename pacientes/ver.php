@@ -5,6 +5,7 @@
  */
 require_once __DIR__ . '/../app/nucleo/inicio.php';
 require_once __DIR__ . '/../app/servicios/motor/almacen.php';
+require_once __DIR__ . '/../app/servicios/clinica/consentimiento_morbilidad.php';
 require_once __DIR__ . '/../app/vistas/componentes/bloques_nota.php';
 exigirPermiso('ver_expediente');
 
@@ -16,6 +17,30 @@ $p = $consulta->fetch();
 if (!$p) {
     mensajeFlash('error', 'El paciente no existe o fue dado de baja.');
     redirigir('/pacientes/');
+}
+$autorizacionEstadistica = null;
+if (puede('consentimiento_morbilidad')) {
+    $consultaAutorizacion = db()->prepare(
+        "SELECT c.version, c.destinatario, c.texto_consentimiento, c.texto_sha256,
+                ce.evidencia_archivo, ce.evidencia_sha256
+         FROM consentimientos_morbilidad c
+         INNER JOIN consentimientos_morbilidad_eventos ce
+           ON ce.consentimiento_id = c.id AND ce.institucion_id = c.institucion_id
+          AND ce.paciente_id = c.paciente_id AND ce.tipo = 'otorgado'
+         WHERE c.institucion_id = ? AND c.paciente_id = ? AND c.estado = 'vigente'
+           AND c.texto_sha256 = SHA2(c.texto_consentimiento, 256)
+           AND ce.evidencia_archivo IS NOT NULL AND ce.evidencia_sha256 IS NOT NULL
+         ORDER BY c.id DESC LIMIT 1"
+    );
+    $consultaAutorizacion->execute([institucionId(), $id]);
+    $autorizacionEstadistica = $consultaAutorizacion->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+$autorizacionEstadisticaVerificada = false;
+if ($autorizacionEstadistica && $autorizacionEstadistica['version'] === VERSION_CONSENTIMIENTO_MORBILIDAD) {
+    $rutaEvidencia = rutaEvidenciaConsentimientoMorbilidad(institucionId(), (string) $autorizacionEstadistica['evidencia_archivo']);
+    $hashArchivo = $rutaEvidencia ? hash_file('sha256', $rutaEvidencia) : false;
+    $autorizacionEstadisticaVerificada = is_string($hashArchivo)
+        && hash_equals((string) $autorizacionEstadistica['evidencia_sha256'], $hashArchivo);
 }
 $extrasPerfil = json_decode((string) ($p['extras'] ?? ''), true) ?: [];
 $estadosDiagnostico = $extrasPerfil['_diagnosticos_estado'] ?? [];
@@ -124,6 +149,22 @@ try {
     $qCam->execute([(int)$p['id'], institucionId()]);
     $camillaAsignada = $qCam->fetch(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {}
+$qKardex = db()->prepare("SELECT id, medicamento, dosis, via, frecuencia, horario, fecha_inicio, fecha_fin, indicaciones, estado, medico_prescribe
+    FROM kardex_medicaciones
+    WHERE paciente_id = ? AND institucion_id = ?
+    ORDER BY CASE estado WHEN 'activo' THEN 0 ELSE 1 END, fecha_inicio DESC, id DESC
+    LIMIT 10");
+$qKardex->execute([(int) $p['id'], institucionId()]);
+$medicacionesKardex = $qKardex->fetchAll(PDO::FETCH_ASSOC);
+
+$qAdministracionesKardex = db()->prepare("SELECT a.fecha, a.turno, a.hora_programada, a.hora_aplicacion, a.estado, a.enfermero_nombre, a.observaciones, m.medicamento, m.dosis, m.via
+    FROM kardex_administraciones a
+    INNER JOIN kardex_medicaciones m ON m.id = a.medicacion_id AND m.institucion_id = a.institucion_id
+    WHERE a.paciente_id = ? AND a.institucion_id = ?
+    ORDER BY a.fecha DESC, a.hora_programada DESC, a.id DESC
+    LIMIT 8");
+$qAdministracionesKardex->execute([(int) $p['id'], institucionId()]);
+$administracionesKardex = $qAdministracionesKardex->fetchAll(PDO::FETCH_ASSOC);
 
 // Identificación de localización: entidad reconocida en el domicilio
 require_once __DIR__ . '/../app/servicios/clinica/mapa.php';
@@ -386,6 +427,11 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
   <div class="hoja-paciente__identidad">
     <h1 class="hoja-paciente__nombre"><?= e($nombreCompleto) ?></h1>
             <?php if (puede('historial')): ?><a class="hoja-paciente__versiones" href="<?= URL_BASE ?>/pacientes/versiones.php?id=<?= (int) $p['id'] ?>"><?= icono('documento') ?> Versiones</a><?php endif; ?>
+            <?php if (puede('consentimiento_morbilidad')): ?>
+              <a class="hoja-paciente__versiones" href="<?= URL_BASE ?>/pacientes/consentimiento_morbilidad.php?id=<?= (int) $p['id'] ?>">
+                <?= icono('escudo') ?> Estadísticas · <?= $autorizacionEstadisticaVerificada ? 'autorizada' : 'sin autorización íntegra y vigente' ?>
+              </a>
+            <?php endif; ?>
     <p class="hoja-paciente__linea">
       <span><?= e($p['folio']) ?></span>
       <span><?= edad($p['fecha_nacimiento']) ?> años</span>
@@ -395,7 +441,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     <?php if (!$sinAlergias || $p['padecimientos_cronicos'] || $hospitalizado || !empty($camillaAsignada)): ?>
       <ul class="hoja-paciente__alertas">
         <?php if (!$sinAlergias): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--alergia"><?= icono('alerta') ?><span><b>Alergias</b> <?= e($p['alergias']) ?></span></li><?php endif; ?>
-        <?php if (!empty($camillaAsignada)): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--hospital"><?= icono('clinico') ?><span><b>Cama:</b> <?= e($camillaAsignada['codigo']) ?> (<?= e(ucfirst($camillaAsignada['area'])) ?>) · <a href="<?= URL_BASE ?>/camillas/kardex.php?paciente_id=<?= (int)$p['id'] ?>" style="color: #93c5fd; text-decoration: underline; font-weight: 600;">Kardex de Medicación →</a></span></li><?php elseif ($hospitalizado): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--hospital"><?= icono('clinico') ?><span><b>Hospitalizado</b> <?= e($hospitalizado['servicio'] ?: $hospitalizado['motivo']) ?> · desde <?= e(fechaCorta($hospitalizado['ingreso'])) ?></span></li><?php endif; ?>
+        <?php if (!empty($camillaAsignada)): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--hospital"><?= icono('clinico') ?><span><b>Cama:</b> <?= e($camillaAsignada['codigo']) ?> (<?= e(ucfirst($camillaAsignada['area'])) ?>)</span></li><?php elseif ($hospitalizado): ?><li class="hoja-paciente__alerta hoja-paciente__alerta--hospital"><?= icono('clinico') ?><span><b>Hospitalizado</b> <?= e($hospitalizado['servicio'] ?: $hospitalizado['motivo']) ?> · desde <?= e(fechaCorta($hospitalizado['ingreso'])) ?></span></li><?php endif; ?>
         <?php if ($p['padecimientos_cronicos']): ?><li class="hoja-paciente__alerta"><?= icono('corazon') ?><span><b>Crónicos</b> <?= e($p['padecimientos_cronicos']) ?></span></li><?php endif; ?>
       </ul>
     <?php endif; ?>
@@ -493,6 +539,93 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
   <?php endif; ?>
 </section>
 
+<section class="ficha__seccion" id="kardex">
+  <div class="ficha__titulo-fila">
+    <h2 class="ficha__titulo">Kardex hospitalario</h2>
+    <span class="ficha__fuente"><?= $camillaAsignada ? 'Hospitalización activa · cama ' . e($camillaAsignada['codigo']) : 'Historial de indicaciones hospitalarias' ?></span>
+  </div>
+  <p class="ficha__fuente">Esta sección forma parte del expediente general. Las recetas ambulatorias aparecen arriba; aquí se muestran las indicaciones y administraciones de hospitalización.</p>
+
+  <?php if ($medicacionesKardex): ?>
+    <div class="bd__marco">
+      <table class="bd-tabla">
+        <thead>
+          <tr>
+            <th scope="col">Medicamento</th>
+            <th scope="col">Dosis / vía</th>
+            <th scope="col">Frecuencia / horario</th>
+            <th scope="col">Periodo</th>
+            <th scope="col">Estado / prescriptor</th>
+            <th scope="col">Indicaciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($medicacionesKardex as $med):
+            $estadoKardex = match ($med['estado']) {
+                'activo' => $camillaAsignada ? 'Activa' : 'Activa en Kardex',
+                'suspendido' => 'Suspendida',
+                'completado' => 'Completada',
+                default => ucfirst($med['estado']),
+            };
+          ?>
+            <tr>
+              <td class="bd-tabla__celda-titulo"><span class="bd-tabla__titulo"><?= e($med['medicamento']) ?></span></td>
+              <td><?= e($med['dosis']) ?> · <?= e($med['via']) ?></td>
+              <td><?= e($med['frecuencia']) ?><?= $med['horario'] ? ' · ' . e($med['horario']) : '' ?></td>
+              <td><?= e(fechaCorta($med['fecha_inicio'])) ?><?= $med['fecha_fin'] ? ' – ' . e(fechaCorta($med['fecha_fin'])) : '' ?></td>
+              <td><?= e($estadoKardex) ?><?= $med['medico_prescribe'] ? ' · ' . e($med['medico_prescribe']) : '' ?></td>
+              <td><?= e($med['indicaciones'] ?: '—') ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php else: ?>
+    <p class="ficha__vacio">Sin indicaciones hospitalarias registradas en el Kardex.</p>
+  <?php endif; ?>
+
+  <?php if ($administracionesKardex): ?>
+    <div class="ficha__titulo-fila" style="margin-top: 18px;">
+      <h3 class="ficha__titulo">Últimas administraciones</h3>
+      <span class="ficha__fuente">Hasta 8 registros recientes</span>
+    </div>
+    <div class="bd__marco">
+      <table class="bd-tabla">
+        <thead>
+          <tr>
+            <th scope="col">Fecha</th>
+            <th scope="col">Turno</th>
+            <th scope="col">Hora programada</th>
+            <th scope="col">Aplicación</th>
+            <th scope="col">Medicamento</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Responsable</th>
+            <th scope="col">Notas</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($administracionesKardex as $administracion): ?>
+            <tr>
+              <td><?= e(fechaCorta($administracion['fecha'])) ?></td>
+              <td><?= e(ucfirst($administracion['turno'])) ?></td>
+              <td class="num"><?= e($administracion['hora_programada']) ?></td>
+              <td class="num"><?= $administracion['hora_aplicacion'] ? e((new DateTime($administracion['hora_aplicacion']))->format('H:i')) : '—' ?></td>
+              <td><?= e($administracion['medicamento']) ?> · <?= e($administracion['dosis']) ?> (<?= e($administracion['via']) ?>)</td>
+              <td><?= e(ucfirst($administracion['estado'])) ?></td>
+              <td><?= e($administracion['enfermero_nombre'] ?: '—') ?></td>
+              <td><?= e($administracion['observaciones'] ?: '—') ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($camillaAsignada && puede('kardex')): ?>
+    <a class="hoja-paciente__agendar" href="<?= URL_BASE ?>/camillas/kardex.php?paciente_id=<?= (int) $p['id'] ?>">Abrir hoja de enfermería</a>
+  <?php endif; ?>
+</section>
+
 <?php if ($hospitalizaciones): ?>
   <section class="ficha__seccion">
     <div class="ficha__titulo-fila">
@@ -513,7 +646,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 
 <!-- Imágenes médicas: estudios DICOM (TC, RM, RX, US…), fotos clínicas y reportes; se abren en el visor -->
 <?php require_once __DIR__ . '/../app/servicios/clinica/imagenes.php'; $estudiosImagen = estudiosDelPaciente((int) $p['id']); ?>
-<section class="ficha__seccion" data-imagenes-medicas="<?= (int) $p['id'] ?>" data-puede-subir="<?= puede('editar_paciente') ? '1' : '0' ?>">
+<section class="ficha__seccion" id="imagenes-medicas" data-imagenes-medicas="<?= (int) $p['id'] ?>" data-puede-subir="<?= puede('editar_paciente') ? '1' : '0' ?>">
   <div class="ficha__titulo-fila">
     <h2 class="ficha__titulo">Imágenes</h2>
     <span class="ficha__fuente">Tomografía, resonancia, radiografía, fotos y reportes</span>

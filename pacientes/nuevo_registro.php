@@ -7,7 +7,6 @@
  */
 require_once __DIR__ . '/../app/nucleo/inicio.php';
 require_once __DIR__ . '/../app/datos/registros_clinicos.php';
-require_once __DIR__ . '/../app/vistas/componentes/bloques_nota.php';
 exigirPermiso('historial');
 
 $pacienteId = (int) ($_GET['paciente'] ?? 0);
@@ -32,36 +31,20 @@ if ($borrador && $borrador['paciente'] === $pacienteId && $borrador['tipo'] === 
     $datos   = (array) $borrador['datos'];
     $errores = (array) $borrador['errores'];
 }
-
-// Cuerpo de la nota con el motor de bloques: mismas secciones que el documento de la NOM-004.
-// El editor rellena el campo oculto "cuerpo" y se guarda dentro de la entrada (solo texto).
-$seccionesCuerpo = [
-    'consulta'        => ['Padecimiento actual', 'Exploración física', 'Resultados', 'Diagnóstico', 'Evolución', 'Plan y tratamiento', 'Pronóstico'],
-    'urgencias'       => ['Interrogatorio', 'Exploración física', 'Estado mental', 'Resultados', 'Diagnóstico', 'Tratamiento', 'Pronóstico', 'Destino'],
-    'interconsulta'   => ['Motivo de la interconsulta', 'Resumen clínico', 'Criterios diagnósticos', 'Plan de estudios', 'Sugerencias', 'Pronóstico'],
-    'referencia'      => ['Motivo de envío', 'Resumen clínico', 'Impresión diagnóstica', 'Terapéutica empleada'],
-    'egreso'          => ['Diagnósticos finales', 'Resumen de la evolución', 'Manejo durante la estancia', 'Problemas pendientes', 'Plan', 'Recomendaciones', 'Pronóstico'],
-    'receta'          => ['Indicaciones'],
-    'estudio'         => ['Resultado', 'Valores fuera de rango', 'Interpretación'],
-    'hospitalizacion' => ['Diagnóstico de ingreso', 'Evolución', 'Diagnóstico de egreso', 'Resumen de la estancia'],
-    'consentimiento'  => ['Acto autorizado', 'En qué consiste', 'Riesgos', 'Beneficios', 'Alternativas'],
-    'incapacidad'     => ['Motivo', 'Observaciones'],
-    'preoperatoria'   => ['Plan quirúrgico', 'Cuidados preoperatorios'],
-    'transoperatoria' => ['Hallazgos', 'Técnica quirúrgica', 'Complicaciones', 'Estado final'],
-    'postoperatoria'  => ['Evolución postoperatoria', 'Plan', 'Complicaciones'],
-    'enfermeria'      => ['Valoración', 'Cuidados realizados', 'Medicamentos administrados', 'Observaciones'],
-    'resumen_clinico' => ['Padecimiento actual', 'Diagnóstico', 'Tratamiento', 'Evolución', 'Pronóstico', 'Estudios'],
-];
-$cuerpoBloques = [];
-foreach ($seccionesCuerpo[$tipo] ?? ['Nota'] as $tituloSeccion) {
-    $cuerpoBloques[] = ['t' => 'h2', 'x' => $tituloSeccion];
-    $cuerpoBloques[] = ['t' => 'p', 'x' => ''];
+$contextosDictado = is_array($_SESSION['dictado_contextos'] ?? null) ? $_SESSION['dictado_contextos'] : [];
+foreach ($contextosDictado as $token => $contexto) {
+    if (!is_array($contexto) || (int) ($contexto['creado_en'] ?? 0) < time() - 86400) {
+        unset($contextosDictado[$token]);
+    }
 }
-$cuerpoPrevio = sanearBloquesNota($datos['cuerpo'] ?? []);
-if ($cuerpoPrevio) {
-    $cuerpoBloques = $cuerpoPrevio;
+$dictadoToken = is_string($datos['dictado_contexto'] ?? null) ? $datos['dictado_contexto'] : '';
+$contextoPrevio = $contextosDictado[$dictadoToken] ?? null;
+if (!preg_match('/^[a-f0-9]{48}$/', $dictadoToken) || !is_array($contextoPrevio)
+    || (int) ($contextoPrevio['paciente_id'] ?? 0) !== $pacienteId || ($contextoPrevio['tipo'] ?? '') !== $tipo) {
+    $dictadoToken = bin2hex(random_bytes(24));
+    $contextosDictado[$dictadoToken] = ['paciente_id' => $pacienteId, 'tipo' => $tipo, 'creado_en' => time()];
 }
-$jsonCuerpo = json_encode($cuerpoBloques, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+$_SESSION['dictado_contextos'] = array_slice($contextosDictado, -10, null, true);
 
 // Quien firma la entrada (NOM-004 5.10)
 $autor = db()->prepare('SELECT nombre, cedula_profesional FROM usuarios WHERE id = ?');
@@ -155,7 +138,7 @@ $fechaHora = fn (string $etiqueta = 'Fecha'): string =>
   . $campo('hora', 'Hora', ['col' => 3, 'tipo' => 'time', 'icono' => 'reloj', 'defecto' => date('H:i')]);
 
 /** Signos vitales (con el IMC calculado en el navegador a partir de peso y talla). */
-$signos = function () use ($campo, $valor, $datos): string {
+$signos = function () use ($campo, $datos): string {
     $cortas = ['fc' => 'Frec. cardiaca', 'fr' => 'Frec. respiratoria', 'spo2' => 'Saturación O₂', 'glucosa' => 'Glucosa'];
     $html = '<p class="registro-clinico__subtitulo">Signos vitales</p><div class="rejilla">';
     foreach (SIGNOS_VITALES as $clave => [$etiqueta, , $unidad]) {
@@ -258,16 +241,8 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     <?= campoEnvio() ?>
     <input type="hidden" name="paciente_id" value="<?= $pacienteId ?>">
     <input type="hidden" name="tipo" value="<?= e($tipo) ?>">
+    <input type="hidden" name="dictado_contexto" value="<?= e($dictadoToken) ?>">
     <input type="hidden" name="origen" value="completo">
-
-    <!-- Cuerpo de la nota con el mismo editor por bloques de las notas (espacio.js) -->
-    <section class="notas-seccion registro-clinico__cuerpo" aria-label="Cuerpo de la nota">
-      <div class="notas-seccion__hoja" data-hoja-seccion data-editable="1" data-version="0">
-        <script type="application/json" id="editor-datos"><?= $jsonCuerpo ?></script>
-        <div class="editor" data-editor-bloques data-editor-formulario="1" aria-label="Cuerpo de la nota"></div>
-      </div>
-      <input type="hidden" name="cuerpo" id="registro-cuerpo" value="">
-    </section>
 
     <?php switch ($tipo):
       case 'consulta': ?>
@@ -686,6 +661,20 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     endswitch; ?>
 
     <div class="pie-formulario">
+      <section class="registro-clinico__confirmacion" data-dictado-confirmacion <?= empty($datos['transcripcion_original']) ? 'hidden' : '' ?>>
+        <strong>Revisión obligatoria del dictado</strong>
+        <p>El texto original del dictado se conservará junto a esta nota. Verifiqué la transcripción y cada dato clínico frente a la información proporcionada. La confirmación registra esta revisión; no sustituye el juicio profesional ni garantiza por sí sola la integridad legal del expediente.</p>
+        <label class="casilla">
+          <input type="checkbox" name="confirmar_transcripcion" value="1" data-confirmar-transcripcion>
+          <span>Confirmo que revisé la información y la corregí cuando fue necesario.</span>
+        </label>
+        <details class="registro-clinico__fuente">
+          <summary>Ver texto original reconocido</summary>
+          <pre data-transcripcion-visible></pre>
+        </details>
+        <textarea name="transcripcion_original" data-transcripcion-original hidden><?= e((string) ($datos['transcripcion_original'] ?? '')) ?></textarea>
+        <input type="hidden" name="transcriptor_motor" data-transcriptor-motor value="<?= e((string) ($datos['transcriptor_motor'] ?? '')) ?>">
+      </section>
       <div class="pie-formulario__legal">
         <?php if ($tipo === 'consentimiento'): ?>
           <?= $casilla('explicado', 'Confirmo que expliqué el procedimiento en lenguaje comprensible y resolví las dudas', true) ?>

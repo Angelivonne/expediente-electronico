@@ -7,11 +7,14 @@
   edición por API, exportación futura).
 - Pantalla `/finanzas/`:
   - Resumen del mes: ingresos, gastos, balance y por cobrar (pendiente).
+  - Tendencia mensual de cobros y gastos pagados, con la gráfica y la estructura de accesos del Tablero.
   - Tabla de movimientos con los mismos componentes del resto de la app.
+  - Acciones para registrar ingresos o gastos en el extremo superior derecho; exportación y filtros permanecen junto
+    a la tabla de movimientos.
   - Alta rápida con el formulario estándar del motor.
 - Permiso `finanzas` (administrador, médico, recepción).
 - Menú lateral: Finanzas → Ingresos y gastos.
-- Migración: `database/migracion_finanzas.sql` (idempotente) y permisos de tabla para `expediente_app`.
+- Migración: `database/migracion_finanzas.sql` (idempotente) y permisos de tabla para `clinica_app`.
 
 ## Campos de un movimiento
 
@@ -56,7 +59,7 @@ Los cálculos de pantalla (resumen, saldos) no se guardan; los datos viven en su
 - Tabla `finanzas_cierres` + entidad `finanzas_cierres` del motor (alta, tabla y edición por API).
 - `/finanzas/cierre.php`: totales del día por método de pago (efectivo, tarjeta, transferencia, cheque, otro),
   navegación de días, registro del cierre con el formulario estándar y tabla de cierres registrados.
-- Migración: `database/migracion_finanzas_cierre.sql` (idempotente) y permisos de tabla para `expediente_app`.
+- Migración: `database/migracion_finanzas_cierre.sql` (idempotente) y permisos de tabla para `clinica_app`.
 
 ## Cuentas por cobrar y por pagar (implementado)
 
@@ -71,7 +74,7 @@ Los cálculos de pantalla (resumen, saldos) no se guardan; los datos viven en su
 - `/finanzas/presupuestos.php`: presupuesto contra real del mes, por tipo y por concepto, con diferencia y navegación de meses.
 - `/finanzas/recurrentes.php`: renta, nómina, servicios… con día del mes y método; botón «Generar del mes» que crea los
   movimientos una sola vez (referencia `REC-<id>-<año-mes>`, no duplica si se vuelve a generar).
-- Migración: `database/migracion_finanzas_presupuesto.sql` y permisos de tabla para `expediente_app`.
+- Migración: `database/migracion_finanzas_presupuesto.sql` y permisos de tabla para `clinica_app`.
 
 ## Facturación (implementado)
 
@@ -80,7 +83,7 @@ Los cálculos de pantalla (resumen, saldos) no se guardan; los datos viven en su
 - Campos fiscales: folio, fecha, paciente, RFC, razón social, uso CFDI, método PUE/PPD, forma de pago,
   total, estado, UUID fiscal y notas.
 - El **timbrado** lo realiza el PAC externo; aquí se guarda el control y el UUID cuando se timbra.
-- Migración: `database/migracion_finanzas_facturacion.sql` y permisos de tabla para `expediente_app`.
+- Migración: `database/migracion_finanzas_facturacion.sql` y permisos de tabla para `clinica_app`.
 
 ## Conciliación del cierre (implementado)
 

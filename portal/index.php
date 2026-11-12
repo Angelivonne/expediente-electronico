@@ -14,6 +14,13 @@ if (!esPaciente()) {
     redirigir('/pacientes/');
 }
 $p = expedienteDelPortal();
+$fotoUrl = null;
+$nombreCompleto = $iniciales = $sexo = '';
+$hospitalizado = $ultimaConsulta = $imc = null;
+$sinAlergias = false;
+$proximas = $cambios = $diagnosticos = $medicamentos = $hospitalizaciones = [];
+$id = 0;
+$datos = $signosRecientes = $conSignos = $signosCampos = $graficaSignos = $historial = [];
 
 if ($p) {
     $id = (int) $p['id'];

@@ -19,14 +19,16 @@
  */
 require_once __DIR__ . '/../../servicios/espacio/paginas.php';
 require_once __DIR__ . '/../../servicios/clinica/agenda.php';
+require_once __DIR__ . '/../../servicios/cuenta/preferencias.php';
 
-$tituloPagina   = $tituloPagina   ?? 'Expediente clínico';
+$tituloPagina   = $tituloPagina   ?? 'Clínica';
 $seccionActiva  = $seccionActiva  ?? '';
 $migas          = $migas          ?? [['texto' => $tituloPagina]];
 $mostrarBanner  = $mostrarBanner  ?? true;
 $claseContenido = $claseContenido ?? '';
 $paginaActual   = $paginaActual   ?? null;
 $usuario        = usuarioActual();
+$preferenciasVisuales = preferenciasVisuales((int) $usuario['id']);
 $clavePresencia = $clavePresencia ?? ('ruta:' . trim(preg_replace('/[^a-z0-9]+/', '-', strtolower(
     basename(dirname($_SERVER['SCRIPT_NAME'])) . '-' . basename($_SERVER['SCRIPT_NAME'], '.php')
 )), '-'));
@@ -40,35 +42,56 @@ $arbol      = arbolPaginas((int) $usuario['id']);
 /* "Última edición" de la sección abierta (barra superior, igual que en Notas).
    En Notas lo pinta $paginaActual; aquí lo calculamos desde la bitácora. */
 $ultimaEdicionSeccion = null;
-if (!$paginaActual) {
-    $tablaUltima = match ($seccionActiva) {
-        'pacientes' => 'pacientes',
-        'agenda'    => 'citas',
-        default     => null,
+$seccionActividad = match ($seccionActiva) {
+    'anuncios' => null,
+    'pacientes' => 'pacientes',
+    'agenda' => 'agenda',
+    'camillas' => 'camillas',
+    'farmacia' => 'farmacia',
+    'finanzas' => 'finanzas',
+    'conexiones' => 'conexiones',
+    'datos' => 'datos',
+    'catalogos', 'cie10', 'medicamentos' => 'catalogos',
+    'tablero' => puede('configurar') ? 'sistema' : null,
+    default => str_starts_with($seccionActiva, 'catalogos-')
+        ? 'catalogos'
+        : (puede('configurar') ? 'sistema' : null),
+};
+if (!$paginaActual && $seccionActividad !== null) {
+    $tablasUltima = match ($seccionActividad) {
+        'pacientes' => ['pacientes', 'historial_clinico', 'imagenes_medicas'],
+        'agenda' => ['citas'],
+        'camillas' => puede('kardex') ? ['camillas', 'kardex_medicaciones', 'kardex_administraciones'] : ['camillas'],
+        'farmacia' => ['farmacia_lotes', 'farmacia_movimientos'],
+        'finanzas' => ['finanzas_movimientos', 'finanzas_facturas', 'finanzas_recurrentes', 'finanzas_presupuestos', 'finanzas_cierres', 'servicios_clinicos'],
+        'conexiones' => ['conexiones_clinicas', 'conexiones_autorizaciones'],
+        'datos' => ['historial_clinico', 'informes_morbilidad'],
+        default => null,
     };
+    if ($seccionActividad === 'catalogos') {
+        require_once __DIR__ . '/../../datos/catalogos_sistema.php';
+        $tablasUltima = array_values(array_unique(array_map(
+            static fn (array $catalogo): string => (string) $catalogo['tabla'],
+            catalogosSistema()
+        )));
+    }
     try {
-        $consulta = $tablaUltima !== null
-            ? db()->prepare("SELECT MAX(creado_en) FROM bitacora WHERE tabla = ? AND institucion_id = ? AND accion IN ('crear','actualizar')")
+        $consulta = $tablasUltima
+            ? db()->prepare("SELECT MAX(creado_en) FROM bitacora WHERE tabla IN (" . implode(',', array_fill(0, count($tablasUltima), '?')) . ") AND institucion_id = ? AND accion IN ('crear','actualizar')")
             : db()->prepare("SELECT MAX(creado_en) FROM bitacora WHERE institucion_id = ? AND accion IN ('crear','actualizar')");
-        if ($tablaUltima !== null) {
-            $consulta->execute([$tablaUltima, institucionId()]);
+        if ($tablasUltima) {
+            $consulta->execute([...$tablasUltima, institucionId()]);
         } else {
             $consulta->execute([institucionId()]);
         }
         $ultimaEdicionSeccion = $consulta->fetchColumn() ?: null;
-        if (!$ultimaEdicionSeccion && $tablaUltima !== null) {
-            // Sin movimientos en esta sección: último movimiento registrado en la institución
-            $general = db()->prepare("SELECT MAX(creado_en) FROM bitacora WHERE institucion_id = ? AND accion IN ('crear','actualizar')");
-            $general->execute([institucionId()]);
-            $ultimaEdicionSeccion = $general->fetchColumn() ?: null;
-        }
     } catch (Throwable $e) {
         $ultimaEdicionSeccion = null;
     }
 }
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-tema="<?= e($preferenciasVisuales['tema']) ?>" data-densidad="<?= e($preferenciasVisuales['densidad']) ?>" data-tamano-texto="<?= e($preferenciasVisuales['tamano_texto']) ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -83,7 +106,7 @@ if (!$paginaActual) {
     try { if (localStorage.getItem('lateral-oculta') === '1') document.documentElement.classList.add('lateral-oculta'); } catch (e) {}
   </script>
 </head>
-<body data-base="<?= URL_BASE ?>" data-usuario="<?= (int) $usuario['id'] ?>" data-usuario-nombre="<?= e($usuario['nombre']) ?>" data-usuario-foto="<?= !empty($usuario['foto']) ? e(URL_BASE . '/' . $usuario['foto']) : '' ?>" data-titulo="<?= e($tituloPagina) ?>" data-presencia="<?= e($clavePresencia) ?>"<?= !empty($pacienteActual) ? ' data-paciente="' . (int) $pacienteActual . '" data-paciente-nombre="' . e($tituloPagina) . '"' : '' ?><?= !empty($registroActual) ? ' data-registro="' . (int) $registroActual . '"' : '' ?><?= $paginaActual ? ' data-pagina="' . (int) $paginaActual['id'] . '" data-pagina-tipo="' . e($paginaActual['tipo']) . '"' : '' ?>>
+<body data-base="<?= URL_BASE ?>" data-usuario="<?= (int) $usuario['id'] ?>" data-usuario-nombre="<?= e($usuario['nombre']) ?>" data-usuario-foto="<?= !empty($usuario['foto']) ? e(URL_BASE . '/' . $usuario['foto']) : '' ?>" data-titulo="<?= e($tituloPagina) ?>" data-presencia="<?= e($clavePresencia) ?>" data-catalogos-busqueda="<?= str_starts_with((string) $seccionActiva, 'catalogos') ? '1' : '0' ?>" data-actividad-equipo="<?= puede('ver_expediente') ? '1' : '0' ?>"<?= !empty($pacienteActual) ? ' data-paciente="' . (int) $pacienteActual . '" data-paciente-nombre="' . e($tituloPagina) . '"' : '' ?><?= !empty($registroActual) ? ' data-registro="' . (int) $registroActual . '"' : '' ?><?= $paginaActual ? ' data-pagina="' . (int) $paginaActual['id'] . '" data-pagina-tipo="' . e($paginaActual['tipo']) . '"' : '' ?>>
 
 <div class="app">
 
@@ -92,6 +115,7 @@ if (!$paginaActual) {
     <div class="barra-lateral__cabecera">
       <span class="barra-lateral__nombre">Expedientes Clínicos</span>
       <button type="button" class="boton-icono" data-accion="alternar-lateral" title="Ocultar la barra lateral"><?= icono('panel') ?></button>
+      <button type="button" class="boton-icono" data-lateral-personalizar title="Personalizar secciones" aria-label="Personalizar secciones"><?= icono('ordenar') ?></button>
       <button type="button" class="boton-icono" data-pagina-nueva="nota" data-seccion="privado" title="Nueva página"><?= iconoRelleno('editar') ?></button>
     </div>
 
@@ -129,12 +153,16 @@ if (!$paginaActual) {
     </button>
 
     <div class="lateral-inicio">
-      <a class="lateral-inicio__pastilla<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/" title="Inicio" aria-label="Inicio"><?= iconoRelleno('casa') ?><span>Inicio</span></a>
-      <a class="boton-icono<?= $seccionActiva === 'asistente' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/asistente/" title="Asistente de IA"><?= iconoRelleno('mensaje') ?></a>
+      <?php if (puede('ver_expediente')): ?>
+        <a class="lateral-inicio__pastilla<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/" title="Pacientes" aria-label="Pacientes"><?= iconoRelleno('casa') ?></a>
+      <?php endif; ?>
+      <?php if (puede('asistente')): ?>
+        <a class="boton-icono<?= $seccionActiva === 'asistente' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/asistente/" title="Asistente de IA"><?= iconoRelleno('mensaje') ?></a>
+      <?php endif; ?>
       <?php if (puede('agenda')): ?>
         <a class="boton-icono<?= $seccionActiva === 'agenda' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/agenda/" title="Agenda"><?= iconoRelleno('calendario') ?></a>
       <?php endif; ?>
-      <?php if (($usuario['rol'] ?? '') !== 'paciente'): ?>
+      <?php if (($usuario['rol'] ?? '') !== 'paciente' && puede('ver_expediente')): ?>
         <button type="button" class="boton-icono<?= $seccionActiva === 'equipo' ? ' activo' : '' ?>" data-equipo-abrir aria-haspopup="dialog" aria-expanded="false" aria-controls="equipo-panel" title="Personas" aria-label="Personas"><?= iconoRelleno('usuarios') ?></button>
       <?php endif; ?>
       <!-- Notificaciones: assets/js/modulos/notificaciones.js abre la bandeja y mantiene el punto de "sin leer" -->
@@ -145,7 +173,12 @@ if (!$paginaActual) {
     <div class="barra-lateral__desplazable">
       <script type="application/json" id="arbol-paginas"><?= json_encode($arbol, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 
-      <a class="lateral-enlace<?= $seccionActiva === 'tablero' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/tablero/"<?= $seccionActiva === 'tablero' ? ' aria-current="page"' : '' ?>><?= icono('grafica') ?><span>Tablero</span></a>
+      <?php if (puede('ver_expediente')): ?>
+        <a class="lateral-enlace<?= $seccionActiva === 'tablero' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/tablero/"<?= $seccionActiva === 'tablero' ? ' aria-current="page"' : '' ?>><?= icono('grafica') ?><span>Tablero</span></a>
+      <?php endif; ?>
+      <?php if (puede('conexiones') || puede('configurar')): ?>
+        <a class="lateral-enlace<?= $seccionActiva === 'conexiones' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/conexiones/"<?= $seccionActiva === 'conexiones' ? ' aria-current="page"' : '' ?>><?= icono('clinica') ?><span>Conexiones con clínicas</span></a>
+      <?php endif; ?>
 
       <?php if (puede('agenda')): $proximas = proximasCitas((int) $usuario['id'], 4); ?>
         <div class="lateral-seccion" data-plegable="eventos">
@@ -183,45 +216,63 @@ if (!$paginaActual) {
         </div>
       </div>
 
-      <div class="lateral-seccion" data-plegable="expediente">
+      <?php if (puede('ver_expediente')): ?>
+      <div class="lateral-seccion" data-plegable="expediente" data-seccion-personalizable="expediente">
         <div class="lateral-seccion__titulo">
           <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Expediente<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
           <button type="button" class="boton-icono" data-pagina-paciente-menu data-importar="<?= puede('importar_exportar') ? '1' : '0' ?>" data-registrar="<?= puede('editar_paciente') ? '1' : '0' ?>" aria-haspopup="menu" title="Registrar paciente, crear o importar"><?= icono('agregar') ?></button>
         </div>
         <div class="lateral-seccion__contenido">
           <a class="lateral-enlace<?= $seccionActiva === 'pacientes' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/"<?= $enListado ? ' aria-current="page"' : '' ?>><?= iconoRelleno('usuarios') ?><span>Pacientes</span></a>
-          <a class="lateral-enlace<?= $seccionActiva === 'camillas' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/camillas/"<?= $seccionActiva === 'camillas' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('clinico') ?><span>Camillas y Hospitalización</span></a>
-          <a class="lateral-enlace<?= $seccionActiva === 'datos' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/datos.php"<?= $seccionActiva === 'datos' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('grafica') ?><span>Datos y Morbilidad</span></a>
-        <?php if (puede('conexiones') || puede('configurar')): ?>
-          <a class="lateral-enlace<?= $seccionActiva === 'conexiones' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/conexiones/"<?= $seccionActiva === 'conexiones' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('usuarios') ?><span>Conexiones con clínicas</span></a>
-        <?php endif; ?>
+          <a class="lateral-enlace<?= $seccionActiva === 'flujo' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/flujo/"<?= $seccionActiva === 'flujo' ? ' aria-current="page"' : '' ?>><?= icono('flujo') ?><span>Flujo de atención</span></a>
+          <a class="lateral-enlace<?= $seccionActiva === 'cirugia' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/cirugia/"<?= $seccionActiva === 'cirugia' ? ' aria-current="page"' : '' ?>><?= icono('cama') ?><span>Agenda quirúrgica</span></a>
+          <a class="lateral-enlace<?= $seccionActiva === 'camillas' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/camillas/"<?= $seccionActiva === 'camillas' ? ' aria-current="page"' : '' ?>><?= icono('cama') ?><span>Camillas y Hospitalización</span></a>
+          <a class="lateral-enlace<?= $seccionActiva === 'datos' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/pacientes/datos.php"<?= $seccionActiva === 'datos' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('grafica') ?><span>Morbilidad</span></a>
         </div>
       </div>
+      <?php endif; ?>
 
-      <div class="lateral-seccion" data-plegable="catalogos">
+      <?php if (puede('farmacia')): ?>
+        <div class="lateral-seccion" data-plegable="farmacia" data-seccion-personalizable="farmacia">
+          <div class="lateral-seccion__titulo">
+            <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Farmacia<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
+          </div>
+          <div class="lateral-seccion__contenido">
+            <a class="lateral-enlace<?= $seccionActiva === 'farmacia' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/farmacia/"<?= $seccionActiva === 'farmacia' ? ' aria-current="page"' : '' ?>><?= icono('pildora') ?><span>Inventario y dispensación</span></a>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <?php if (puede('ver_expediente')): ?>
+      <div class="lateral-seccion" data-plegable="catalogos" data-seccion-personalizable="catalogos">
         <div class="lateral-seccion__titulo">
           <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Catálogos<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
         </div>
+        <?php endif; ?>
         <div class="lateral-seccion__contenido">
           <a class="lateral-enlace<?= $seccionActiva === 'catalogos' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/catalogos/"<?= $seccionActiva === 'catalogos' ? ' aria-current="page"' : '' ?>><?= iconoRelleno('tabla') ?><span>Catálogos</span></a>
         </div>
       </div>
 
 
-      <div class="lateral-seccion" data-plegable="finanzas">
-        <div class="lateral-seccion__titulo">
-          <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Finanzas<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
+      <?php if (puede('finanzas')): ?>
+        <div class="lateral-seccion" data-plegable="finanzas" data-seccion-personalizable="finanzas">
+          <div class="lateral-seccion__titulo">
+            <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Finanzas<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
+          </div>
+          <div class="lateral-seccion__contenido">
+            <a class="lateral-enlace<?= str_starts_with($seccionActiva, 'finanzas') ? ' activo' : '' ?>" href="<?= URL_BASE ?>/finanzas/"<?= str_starts_with($seccionActiva, 'finanzas') ? ' aria-current="page"' : '' ?>><?= icono('dinero') ?><span>Ingresos y gastos</span></a>
+          </div>
         </div>
-        <div class="lateral-seccion__contenido">
-          <a class="lateral-enlace<?= str_starts_with($seccionActiva, 'finanzas') ? ' activo' : '' ?>" href="<?= URL_BASE ?>/finanzas/"<?= str_starts_with($seccionActiva, 'finanzas') ? ' aria-current="page"' : '' ?>><?= iconoRelleno('grafica') ?><span>Ingresos y gastos</span></a>
-        </div>
-      </div>
+      <?php endif; ?>
 
-      <div class="lateral-seccion" data-seccion-arbol="notas" data-plegable="notas">
+      <?php if (puede('ver_expediente')): ?>
+      <div class="lateral-seccion" data-seccion-arbol="notas" data-plegable="notas" data-seccion-personalizable="notas">
         <div class="lateral-seccion__titulo">
           <button type="button" class="lateral-seccion__alternar" aria-expanded="true">Notas<?= icono('flecha_abajo', 'lateral-seccion__chevron') ?></button>
           <button type="button" class="boton-icono" data-pagina-menu-nueva data-seccion="notas" title="Agregar una nota">+</button>
         </div>
+        <?php endif; ?>
         <div class="lateral-seccion__contenido">
           <a class="lateral-enlace lateral-enlace--tenue" href="<?= URL_BASE ?>/paginas/"><?= icono('documento') ?><span>Ver todas las notas</span></a>
           <div class="arbol" data-arbol="notas"></div>
@@ -243,6 +294,7 @@ if (!$paginaActual) {
           <div class="lateral-seccion__contenido"><div>
             <button type="button" class="lateral-enlace" data-lateral-lista="recientes" aria-haspopup="menu" aria-expanded="false"><?= iconoRelleno('reloj') ?><span>Recientes</span></button>
             <button type="button" class="lateral-enlace" data-lateral-lista="papelera" aria-haspopup="menu" aria-expanded="false"><?= iconoRelleno('papelera') ?><span>Papelera</span></button>
+            <a class="lateral-enlace<?= $seccionActiva === 'anuncios' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/anuncios/"<?= $seccionActiva === 'anuncios' ? ' aria-current="page"' : '' ?>><?= icono('chispa') ?><span>Anuncios</span></a>
             <a class="lateral-enlace<?= $seccionActiva === 'configuracion' || $seccionActiva === 'personas' ? ' activo' : '' ?>" href="<?= URL_BASE ?>/configuracion/"><?= iconoRelleno('engrane') ?><span>Configuración</span></a>
           </div></div>
         </div>
@@ -260,6 +312,22 @@ if (!$paginaActual) {
       </form>
     </div>
   </aside>
+
+  <dialog class="lateral-preferencias" data-lateral-preferencias aria-labelledby="lateral-preferencias-titulo">
+    <div class="lateral-preferencias__cabecera">
+      <div>
+        <h2 id="lateral-preferencias-titulo">Personalizar navegación</h2>
+        <p>Oculta secciones que no uses y cambia su orden. El ajuste se guarda en este navegador.</p>
+      </div>
+      <button type="button" class="boton-icono" data-lateral-preferencias-cerrar aria-label="Cerrar"><?= icono('cerrar') ?></button>
+    </div>
+    <ol class="lateral-preferencias__lista" data-lateral-preferencias-lista></ol>
+    <p class="lateral-preferencias__estado" data-lateral-preferencias-estado role="status" aria-live="polite"></p>
+    <div class="lateral-preferencias__acciones">
+      <button type="button" class="boton boton--sutil" data-lateral-restablecer>Restablecer</button>
+      <button type="button" class="boton boton--primario" data-lateral-preferencias-cerrar>Listo</button>
+    </div>
+  </dialog>
 
   <div class="velo" data-accion="cerrar-lateral" aria-hidden="true"></div>
 
@@ -302,8 +370,11 @@ if (!$paginaActual) {
       </nav>
 
       <div class="barra-superior__derecha">
-        <!-- Quién está en esta sección y quién edita (presencia real, se renueva cada 15 s) -->
+        <!-- Quién está en esta sección y quién edita (presencia real, se renueva cada 10 s) -->
         <div class="presencia" data-presencia-burbujas aria-label="Personas en esta página"></div>
+        <?php if (puede('ver_expediente')): ?>
+          <button type="button" class="boton-icono barra-superior__cursores" data-cursores-toggle aria-pressed="true" title="Ocultar cursores del equipo" aria-label="Mostrar u ocultar los cursores del equipo"><?= icono('cursor') ?></button>
+        <?php endif; ?>
 
         <?php if ($paginaActual): ?>
           <div class="ancla-popover">
@@ -311,6 +382,9 @@ if (!$paginaActual) {
               Última edición <span data-ultima-edicion data-fecha="<?= e(date('c', strtotime($paginaActual['actualizado_en']))) ?>"><?= e(str_replace('hace un momento', 'ahora mismo', hace($paginaActual['actualizado_en']))) ?></span>
             </button>
           </div>
+          <?php if (puede('asistente') && empty($asistenteEnPagina)): ?>
+            <button type="button" class="boton-icono barra-superior__asistente" data-asistente-abrir aria-expanded="false" aria-controls="asistente-panel" title="Abrir el asistente de IA" aria-label="Abrir el asistente de IA"><?= icono('mensaje') ?></button>
+          <?php endif; ?>
           <?php if ($paginaActual['tipo'] === 'nota' && !empty($firmas)): ?>
             <!-- Firma digital (NOM-024): sella la nota con cédula + hora + huella; firmada queda en solo lectura -->
             <div class="ancla-popover">
@@ -325,8 +399,11 @@ if (!$paginaActual) {
         <?php elseif (empty($ocultarCompartir)): ?>
           <?php if ($ultimaEdicionSeccion): ?>
             <div class="ancla-popover">
-              <button type="button" class="barra-superior__edicion" data-actividad-abrir data-actividad-seccion="<?= e($seccionActiva ?: 'sistema') ?>" aria-haspopup="dialog" aria-expanded="false">Última edición <span data-ultima-edicion data-fecha="<?= e(date('c', strtotime($ultimaEdicionSeccion))) ?>"><?= e(str_replace('hace un momento', 'ahora mismo', hace($ultimaEdicionSeccion))) ?></span></button>
+              <button type="button" class="barra-superior__edicion" data-actividad-abrir data-actividad-seccion="<?= e($seccionActividad) ?>" aria-haspopup="dialog" aria-expanded="false">Última edición <span data-ultima-edicion data-fecha="<?= e(date('c', strtotime($ultimaEdicionSeccion))) ?>"><?= e(str_replace('hace un momento', 'ahora mismo', hace($ultimaEdicionSeccion))) ?></span></button>
             </div>
+          <?php endif; ?>
+          <?php if (puede('asistente') && empty($asistenteEnPagina)): ?>
+            <button type="button" class="boton-icono barra-superior__asistente" data-asistente-abrir aria-expanded="false" aria-controls="asistente-panel" title="Abrir el asistente de IA" aria-label="Abrir el asistente de IA"><?= icono('mensaje') ?></button>
           <?php endif; ?>
           <button type="button" class="boton boton--compartir" data-compartir title="Copiar el enlace de esta página">
             <?= icono('candado') ?> Compartir
@@ -341,7 +418,7 @@ if (!$paginaActual) {
             <button type="button" role="menuitem" data-pestanas-nueva><?= icono('agregar') ?> Nueva pestaña</button>
             <button type="button" role="menuitem" data-imprimir><?= icono('documento') ?> Imprimir</button>
             <button type="button" role="menuitem" data-exportar><?= icono('pdf') ?> Exportar</button>
-            <a class="menu-mas__opcion" href="<?= URL_BASE ?>/pacientes/datos.php" role="menuitem" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; color: inherit; text-decoration: none; border-radius: var(--radio); font: inherit;"><?= icono('barras') ?> Datos y Morbilidad</a>
+            <a class="menu-mas__opcion" href="<?= URL_BASE ?>/pacientes/datos.php" role="menuitem" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; color: inherit; text-decoration: none; border-radius: var(--radio); font: inherit;"><?= icono('barras') ?> Morbilidad</a>
           </div>
         </div>
       </div>
@@ -388,4 +465,3 @@ if (!$paginaActual) {
     <?php endif; ?>
 
     <main class="pagina <?= e($claseContenido) ?>">
-

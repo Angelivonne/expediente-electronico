@@ -34,27 +34,67 @@ if (!dentroDelLimite('dictado:usuario:' . usuarioActual()['id'], 900, 600)) {
 /* ---------- MODO TEXTO: Web Speech API del navegador ya transcribió ----------
    El navegador reconoce la voz en tiempo real (parcial, palabra por palabra) y manda aquí
    SOLO el texto; PHP extrae los campos sin depender del servicio local de audio.
-   Petición: POST JSON {"modo":"texto","texto":"..."} → {ok, texto, campos}. */
+   Petición: POST JSON con el texto visible, su fuente original y, en notas clínicas, el contexto
+   del formulario; responde con ambos textos y los campos extraídos. */
 $entradaJson = json_decode(file_get_contents('php://input') ?: '', true);
 if (is_array($entradaJson) && ($entradaJson['modo'] ?? '') === 'texto') {
-    $textoDictado = trim((string) ($entradaJson['texto'] ?? ''));
+    $textoDictado = is_string($entradaJson['texto'] ?? null) ? trim($entradaJson['texto']) : '';
     if ($textoDictado === '') {
         responder(400, ['ok' => false, 'error' => 'No llegó el texto dictado.']);
     }
     // Una consulta larga no debe perder ni el inicio (nombre) ni el final (últimos campos).
     if (mb_strlen($textoDictado) > 60000) {
-        $textoDictado = mb_substr($textoDictado, 0, 10000) . ' ' . mb_substr($textoDictado, -50000);
+        $textoDictado = mb_substr($textoDictado, 0, 10000) . ' ' . mb_substr($textoDictado, -49999);
+    }
+    $textoOriginal = is_string($entradaJson['texto_original'] ?? null) ? trim($entradaJson['texto_original']) : $textoDictado;
+    if (mb_strlen($textoOriginal) > 60000) {
+        $textoOriginal = mb_substr($textoOriginal, 0, 10000) . ' ' . mb_substr($textoOriginal, -49999);
+    }
+    $contextoRegistro = $entradaJson['contexto_registro'] ?? null;
+    if (is_array($contextoRegistro) && puede('historial')) {
+        require_once __DIR__ . '/../../app/datos/registros_clinicos.php';
+        $pacienteIdDictado = filter_var($contextoRegistro['paciente_id'] ?? null, FILTER_VALIDATE_INT);
+        $tipoDictado = is_string($contextoRegistro['tipo'] ?? null) ? $contextoRegistro['tipo'] : '';
+        $tokenDictado = is_string($contextoRegistro['token'] ?? null) ? $contextoRegistro['token'] : '';
+        $motorDictado = is_string($contextoRegistro['motor'] ?? null) ? $contextoRegistro['motor'] : '';
+        $contextoSesion = $_SESSION['dictado_contextos'][$tokenDictado] ?? null;
+        if (!$pacienteIdDictado || !isset(TIPOS_REGISTRO[$tipoDictado])
+            || !preg_match('/^[a-f0-9]{48}$/', $tokenDictado)
+            || !is_array($contextoSesion)
+            || (int) ($contextoSesion['creado_en'] ?? 0) < time() - 86400
+            || (int) ($contextoSesion['paciente_id'] ?? 0) !== (int) $pacienteIdDictado
+            || ($contextoSesion['tipo'] ?? '') !== $tipoDictado
+            || !in_array($motorDictado, ['web_speech', 'stt_local'], true)) {
+            responder(400, ['ok' => false, 'error' => 'No se pudo identificar el registro clínico asociado al dictado.']);
+        }
+        $pacienteDictado = db()->prepare('SELECT id FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL');
+        $pacienteDictado->execute([$pacienteIdDictado, institucionId()]);
+        if (!$pacienteDictado->fetchColumn()) {
+            responder(403, ['ok' => false, 'error' => 'El paciente no pertenece a esta institución o no está disponible.']);
+        }
+        $_SESSION['dictado_clinico_pendiente'][$tokenDictado] = [
+            'token' => $tokenDictado,
+            'paciente_id' => (int) $pacienteIdDictado,
+            'tipo' => $tipoDictado,
+            'motor' => $motorDictado,
+            'texto_original' => $textoOriginal,
+            'actualizado_en' => time(),
+        ];
     }
     require_once __DIR__ . '/../../app/servicios/clinica/dictado.php';
     require_once __DIR__ . '/../../app/servicios/clinica/receta_dictado.php';
+    require_once __DIR__ . '/../../app/servicios/clinica/redaccion_dictado.php';
     // El STT escribe los fármacos como suenan: se corrigen contra el catálogo antes de
     // mostrar el texto y de extraer los campos.
     $textoDictado = recetaDictadoCorregirTexto($textoDictado);
+    // La extracción corre sobre el texto tal como se dijo (reconoce el habla directa);
+    // camposDeDictado ya devuelve los valores redactados (jerga, persona y tiempo).
     $campos = camposDeDictado($textoDictado);
     $medicamentos = medicamentosDeDictado($textoDictado);
     responder(200, [
         'ok'    => true,
-        'texto' => $textoDictado,
+        'texto' => dictadoRedactarTexto($textoDictado),
+        'texto_original' => $textoOriginal,
         'campos' => $campos,
         'medicamentos' => $medicamentos,
         'avisos' => dictadoAvisos($textoDictado, $campos, $medicamentos),
@@ -106,14 +146,16 @@ $resultado = json_decode($respuesta, true);
 if (!$resultado || !($resultado['ok'] ?? false)) {
     $error = is_array($resultado) ? (string) ($resultado['error'] ?? '') : '';
     if ($error === '') {
-        $error = 'El transcriptor local no respondió. Abre iniciar_servicio_stt.bat y deja la ventana abierta.';
+        $error = 'El transcriptor local no respondió. Inicia el servicio de voz desde el script de arranque del expediente.';
     }
     responder(500, ['ok' => false, 'error' => 'Error de transcripción: ' . $error]);
 }
 
-$textoTranscrito = (string) ($resultado['texto'] ?? '');
+$textoOriginal = trim((string) ($resultado['texto'] ?? ''));
+$textoTranscrito = $textoOriginal;
 require_once __DIR__ . '/../../app/servicios/clinica/dictado.php';
 require_once __DIR__ . '/../../app/servicios/clinica/receta_dictado.php';
+require_once __DIR__ . '/../../app/servicios/clinica/redaccion_dictado.php';
 $textoTranscrito = recetaDictadoCorregirTexto($textoTranscrito);
 // PHP es el extractor autoritativo de los campos clínicos. Del STT solo se conservan
 // metadatos de conversación; sus reglas antiguas no deben sobreescribir la extracción.
@@ -132,10 +174,10 @@ $medicamentos = medicamentosDeDictado($textoTranscrito);
 
 responder(200, [
     'ok'    => true,
-    'texto' => $textoTranscrito,
+    'texto' => dictadoRedactarTexto($textoTranscrito),
+    'texto_original' => $textoOriginal,
     'campos' => $campos,
     'medicamentos' => $medicamentos,
     'avisos' => dictadoAvisos($textoTranscrito, $campos, $medicamentos),
     'duracion' => null,
 ]);
-

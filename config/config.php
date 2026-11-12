@@ -6,17 +6,19 @@
 // Ruta pública del proyecto dentro de htdocs (sin diagonal final).
 // En Railway las variables de entorno del servicio definen estos valores; en local se usan los de siempre.
 $enRailway = getenv('RAILWAY_ENVIRONMENT') !== false;
-define('URL_BASE', $enRailway ? '' : '/ExpedienteFEMECI');
+$esListenerCompartido = (string) ($_SERVER['SERVER_PORT'] ?? '') === '8081';
+$rutaLocal = '/' . basename(dirname(__DIR__));
+define('URL_BASE', $enRailway || $esListenerCompartido ? '' : $rutaLocal);
 // Origen público para los enlaces de los correos (no se toma de la cabecera Host, que se puede falsificar)
 define('URL_ORIGEN', getenv('URL_ORIGEN') ?: 'http://localhost');
 
-// Base de datos MySQL: una sola base (expediente_femeci). La app entra con un usuario de privilegios
+// Base de datos MySQL: una sola base (clinica). La app entra con un usuario de privilegios
 // mínimos (database/usuario_aplicacion.sql) cuyas credenciales viven en privado/bd.php, nunca root.
 // En Railway la conexión viene en las variables DB_* o MYSQL* del servicio.
 $credencialesBd = is_file(__DIR__ . '/../privado/bd.php') ? require __DIR__ . '/../privado/bd.php' : ['usuario' => 'root', 'clave' => ''];
 define('DB_HOST',    getenv('DB_HOST') ?: (getenv('MYSQLHOST') ?: '127.0.0.1'));
 define('DB_PUERTO',  (int) (getenv('DB_PUERTO') ?: (getenv('MYSQLPORT') ?: 3306)));
-define('DB_NOMBRE',  getenv('DB_NOMBRE') ?: (getenv('MYSQLDATABASE') ?: 'expediente_femeci'));
+define('DB_NOMBRE',  getenv('DB_NOMBRE') ?: (getenv('MYSQLDATABASE') ?: 'clinica'));
 define('DB_USUARIO', getenv('DB_USUARIO') ?: (getenv('MYSQLUSER') ?: $credencialesBd['usuario']));
 define('DB_CLAVE',   getenv('DB_CLAVE') !== false ? getenv('DB_CLAVE') : (getenv('MYSQLPASSWORD') !== false ? getenv('MYSQLPASSWORD') : $credencialesBd['clave']));
 unset($credencialesBd);
@@ -32,16 +34,18 @@ define('ADMINISTRADORES_SERVIDOR', []);
 //   'mail':    producción; usa mail() de PHP con el SMTP configurado en php.ini / sendmail.
 define('MAIL_MODO',      'archivo');
 define('MAIL_CARPETA',   $enRailway ? __DIR__ . '/../privado/mailoutput' : 'C:/xampp/mailoutput');
-define('MAIL_REMITENTE', 'no-responder@femeci.local');
+define('MAIL_REMITENTE', 'no-responder@clinica.local');
 
 // Inicio de sesión con Google: el botón aparece solo cuando hay credenciales OAuth configuradas.
 define('GOOGLE_CLIENT_ID', getenv('GOOGLE_CLIENT_ID') ?: '');
+define('GOOGLE_CLIENT_SECRET', getenv('GOOGLE_CLIENT_SECRET') ?: '');
+define('RECAPTCHA_SECRET_KEY', getenv('RECAPTCHA_SECRET_KEY') ?: '');
 
-// Acceso directo en este equipo: true = se entra como administrador sin escribir contraseña ni código
-// (sirve en equipo propio/local). Ponlo en false para exigir el inicio de sesión normal con clave y código.
-define('ACCESO_AUTOMATICO', getenv('ACCESO_AUTOMATICO') !== false
-    ? filter_var(getenv('ACCESO_AUTOMATICO'), FILTER_VALIDATE_BOOLEAN)
-    : true);
+// El listener compartido siempre exige autenticación, incluso si el equipo usa acceso automático local.
+$accesoAutomaticoConfigurado = getenv('ACCESO_AUTOMATICO');
+define('ACCESO_AUTOMATICO', !$esListenerCompartido && ($accesoAutomaticoConfigurado !== false
+    ? filter_var($accesoAutomaticoConfigurado, FILTER_VALIDATE_BOOLEAN)
+    : false));
 
 // Verificación de cédulas en el Registro Nacional de Profesionistas (SEP). El portal oficial exige
 // reCAPTCHA y no hay un servicio público: queda vacío hasta contar con un servicio autorizado (HTTPS)

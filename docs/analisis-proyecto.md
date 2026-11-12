@@ -1,6 +1,6 @@
-﻿# Análisis del proyecto — ExpedienteExpediente
+# Análisis del proyecto — Expediente clínico
 
-> Análisis hecho el 1 de noviembre de 2026 sobre `C:\xampp\htdocs\ExpedienteExpediente`
+> Análisis hecho el 1 de noviembre de 2026 sobre `C:\xampp\htdocs\clinica`
 > (4,098 archivos, XAMPP con PHP 8.2.12 y MariaDB 10.4.32, Apache y MySQL en ejecución).
 > Punto de entrada revisado a fondo: `pacientes/registro.php`.
 
@@ -28,9 +28,9 @@ Expediente clínico electrónico para consultorios en México, alineado a **NOM-
 
 | Pieza | Elección |
 |---|---|
-| Servidor | Apache de XAMPP, `http://localhost/ExpedienteExpediente/` |
+| Servidor | Apache de XAMPP, `http://localhost/clinica/` |
 | Backend | PHP 8.2 "plano": sin framework, sin router, un archivo `.php` por pantalla |
-| Base de datos | MySQL/MariaDB, **una sola base**: `expediente_expediente` |
+| Base de datos | MySQL/MariaDB, **una sola base**: `clinica` |
 | Frontend | HTML renderizado en servidor + JavaScript vanilla (`assets/js`) |
 | Dependencias | solo `anthropic-ai/sdk` vía Composer (`vendor/`) |
 | Voz a texto | Parakeet TDT 0.6B v3 local (`models/stt/*.gguf`, 485 MB) + binario en `transcribe-cpp/` |
@@ -140,7 +140,7 @@ definen `define('RESPUESTA_JSON', true)` **antes** de incluirlo.
 | Archivo | Para qué |
 |---|---|
 | `database/esquema.sql` | 1,071 líneas: todas las tablas, migraciones idempotentes, **triggers de sincronización**, semillas |
-| `database/usuario_aplicacion.sql` | usuario MySQL `expediente_app` con privilegios mínimos y `expediente_respaldo` |
+| `database/usuario_aplicacion.sql` | usuario MySQL `clinica_app` con privilegios mínimos y `clinica_respaldo` |
 | `database/migracion_catalogos_admin.sql` | 34 tablas `catalogo_*` (nunca se importaron en esta instalación) |
 | `database/migracion_medicamentos_cie10_incapacidad.sql` | crea `medicamentos` y `cie10`, agrega el tipo `incapacidad` |
 | `database/semillas_cie10_oficial.sql` (2 MB) / `semillas_medicamentos_cnis_2026.sql` (1 MB) | carga de los 14,497 diagnósticos y 1,983 medicamentos |
@@ -196,7 +196,7 @@ Automatismos que no se ven en el archivo:
 
 ## 5. La base de datos real (no la del esquema: la que está cargada)
 
-`expediente_expediente` · usuario `expediente_app` · MariaDB 10.4.32 · **66 tablas**: 32 de la aplicación y 34
+`clinica` · usuario `clinica_app` · MariaDB 10.4.32 · **66 tablas**: 32 de la aplicación y 34
 `catalogo_*` con el diseño de `migracion_catalogos_admin.sql` (clave, nombre, descripción, activo y sus
 llaves a entidades, municipios, localidades y unidades). 23 de esas 34 tienen datos cargados.
 
@@ -403,4 +403,3 @@ natural para cargar CNIS/INEGI/OMS desde archivo.
 
 Pendientes de la auditoría (no aplicados): encabezado h2 antes del h1 en el expediente, pie de página en
 la impresión del navegador (@page margin boxes no soportadas) y el resumen duplicado al expandir una fila.
-

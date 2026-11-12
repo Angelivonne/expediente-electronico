@@ -8,8 +8,8 @@ if (!puede('configurar')) {
     return;
 }
 ?>
-<div data-sinc-ajustes>
-  <h3 class="ajustes-ia__seccion">Sincronización</h3>
+<details class="ajustes-ia__grupo" data-sinc-ajustes>
+  <summary>Sincronización</summary>
   <div class="ajustes-ia__fila ajustes-ia__fila--apilada">
     <div class="ajustes-ia__etiqueta"><b>Servidor central</b><small>Dirección de la instalación que recibe lo capturado aquí. Vacía, este equipo trabaja solo.</small></div>
     <div class="campo-ia">
@@ -32,4 +32,4 @@ if (!puede('configurar')) {
     <div class="ajustes-ia__etiqueta"><b>Sincronizar ahora</b><small data-sinc-resumen>Se envía solo cuando hay conexión; aquí puedes forzarlo.</small></div>
     <button type="button" class="boton boton--sutil" data-sinc-ahora>Sincronizar ahora</button>
   </div>
-</div>
+</details>

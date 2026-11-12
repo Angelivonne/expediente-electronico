@@ -1,6 +1,6 @@
 <?php
 /**
- * Descarga oficial de documentos del proyecto COA-SI-2135 (FEMECI)
+ * Descarga de documentos del proyecto COA-SI-2135
  * Permite descargar el Anexo 11 y el Registro Completo de 200 Prompts.
  */
 $doc = $_GET['doc'] ?? 'registro_completo';

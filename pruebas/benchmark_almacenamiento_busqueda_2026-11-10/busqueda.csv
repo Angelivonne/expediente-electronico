@@ -1,0 +1,7 @@
+caso,estrategia,mediana_ms,p95_ms,resultados,filas_estimadas,indice_usado
+Búsqueda exacta,Barrido completo,3.524,4.159,1,29449,no
+Búsqueda exacta,B-tree,0.112,0.188,1,1,idx_lookup_key
+Búsqueda exacta,B-tree en InnoDB comprimido,0.163,0.232,1,1,idx_lookup_key
+Búsqueda de palabra,LIKE con barrido,14.759,15.239,300,29512,no
+Búsqueda de palabra,Índice FULLTEXT,1.131,1.520,300,1,ft_note
+Búsqueda de palabra,FULLTEXT en InnoDB comprimido,1.023,1.777,300,1,ft_note

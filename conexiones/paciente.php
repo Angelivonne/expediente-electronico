@@ -10,18 +10,45 @@ if (!conexionesCanalProtegido()) {
     http_response_code(403);
     exit('La consulta requiere HTTPS o acceso local desde localhost en esta computadora.');
 }
-$autorizacionId = (int) ($_GET['autorizacion'] ?? 0);
-$consulta = db()->prepare('SELECT a.*, p.folio, p.nombre, p.primer_apellido, p.segundo_apellido, p.fecha_nacimiento, p.sexo,
-                                  p.curp, p.domicilio, p.municipio_estado, p.alergias, p.grupo_sanguineo, p.padecimientos_cronicos,
-                                  p.medicamentos_actuales, o.nombre AS clinica_origen, o.domicilio AS domicilio_origen,
-                                  o.entidad AS entidad_origen, o.clues AS clues_origen
-                             FROM conexiones_autorizaciones a
-                             JOIN conexiones_clinicas x ON x.id = a.conexion_id AND x.estado = \'conectada\'
-                             JOIN pacientes p ON p.id = a.paciente_id AND p.institucion_id = a.institucion_origen_id AND p.eliminado_en IS NULL
-                             JOIN instituciones o ON o.id = a.institucion_origen_id
-                            WHERE a.id = ? AND a.institucion_destino_id = ? AND a.revocado_en IS NULL AND a.vence_en >= NOW()');
-$consulta->execute([$autorizacionId, institucionId()]);
-$autorizacion = $consulta->fetch();
+$demoPacienteId = filter_var($_GET['demo_paciente'] ?? 0, FILTER_VALIDATE_INT);
+$modoDemo = $demoPacienteId !== false && $demoPacienteId > 0;
+if ($modoDemo) {
+    if (institucionId() !== 9 || !conexionesCanalProtegido()) {
+        http_response_code(403);
+        exit('La consulta DEMO requiere una sesión de la clínica destino y un canal HTTPS protegido.');
+    }
+    $consulta = db()->prepare('SELECT x.id AS conexion_id, p.id AS paciente_id, p.folio, p.nombre, p.primer_apellido,
+                                      p.segundo_apellido, p.fecha_nacimiento, p.sexo, p.curp, p.domicilio,
+                                      p.municipio_estado, p.alergias, p.grupo_sanguineo, p.padecimientos_cronicos,
+                                      p.medicamentos_actuales, o.nombre AS clinica_origen, o.domicilio AS domicilio_origen,
+                                      o.entidad AS entidad_origen, o.clues AS clues_origen, x.acuerdo_version
+                                 FROM conexiones_clinicas x
+                                 JOIN pacientes p ON p.institucion_id = x.institucion_a_id
+                                                 AND p.id = ? AND p.eliminado_en IS NULL
+                                 JOIN instituciones o ON o.id = x.institucion_a_id
+                                WHERE x.institucion_a_id = 1 AND x.institucion_b_id = 9
+                                  AND x.estado = \'conectada\' AND x.acuerdo_version = \'DEMO-prueba-no-legal-v1\'');
+    $consulta->execute([$demoPacienteId]);
+    $autorizacion = $consulta->fetch();
+    if ($autorizacion) {
+        $autorizacion['alcance'] = 'expediente';
+        $autorizacion['finalidad'] = 'Consulta de prueba local, solo lectura; datos declarados ficticios, sin consentimiento individual.';
+        $autorizacion['vence_en'] = '';
+    }
+} else {
+    $autorizacionId = (int) ($_GET['autorizacion'] ?? 0);
+    $consulta = db()->prepare('SELECT a.*, p.folio, p.nombre, p.primer_apellido, p.segundo_apellido, p.fecha_nacimiento, p.sexo,
+                                      p.curp, p.domicilio, p.municipio_estado, p.alergias, p.grupo_sanguineo, p.padecimientos_cronicos,
+                                      p.medicamentos_actuales, o.nombre AS clinica_origen, o.domicilio AS domicilio_origen,
+                                      o.entidad AS entidad_origen, o.clues AS clues_origen, x.acuerdo_version
+                                 FROM conexiones_autorizaciones a
+                                 JOIN conexiones_clinicas x ON x.id = a.conexion_id AND x.estado = \'conectada\'
+                                 JOIN pacientes p ON p.id = a.paciente_id AND p.institucion_id = a.institucion_origen_id AND p.eliminado_en IS NULL
+                                 JOIN instituciones o ON o.id = a.institucion_origen_id
+                                WHERE a.id = ? AND a.institucion_destino_id = ? AND a.revocado_en IS NULL AND a.vence_en >= NOW()');
+    $consulta->execute([$autorizacionId, institucionId()]);
+    $autorizacion = $consulta->fetch();
+}
 if (!$autorizacion) {
     http_response_code(404);
     exit('No hay una autorización vigente para consultar este expediente.');
@@ -32,7 +59,11 @@ $maxRegistros = $autorizacion['alcance'] === 'expediente' ? 2000 : 5;
 $historial = db()->prepare('SELECT id, tipo, fecha, titulo, detalle, autor_nombre, autor_cedula FROM historial_clinico WHERE paciente_id = ? ORDER BY fecha DESC, id DESC LIMIT ' . $maxRegistros);
 $historial->execute([(int) $autorizacion['paciente_id']]);
 $registros = $historial->fetchAll();
-registrarBitacora('conexiones_autorizaciones', $autorizacionId, 'acceso', 'consulta_compartida', null, $autorizacion['alcance'] . ' · expediente ' . $autorizacion['folio']);
+if ($modoDemo) {
+    registrarBitacora('conexiones_clinicas', (int) $autorizacion['conexion_id'], 'acceso', 'consulta_demo_local', null, 'Expediente ' . $autorizacion['folio']);
+} else {
+    registrarBitacora('conexiones_autorizaciones', $autorizacionId, 'acceso', 'consulta_compartida', null, $autorizacion['alcance'] . ' · expediente ' . $autorizacion['folio']);
+}
 
 $tituloPagina = 'Expediente compartido · ' . $paciente;
 $seccionActiva = 'pacientes';
@@ -43,7 +74,12 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 <div class="pagina__cabecera">
   <h1 class="pagina__titulo"><?= e($paciente) ?></h1>
   <p class="pagina__subtitulo">Expediente compartido por <?= e($autorizacion['clinica_origen']) ?> · <?= e($autorizacion['alcance'] === 'expediente' ? 'Expediente completo' : 'Resumen clínico') ?></p>
-  <p class="conexiones__nota">Finalidad autorizada: <?= e($autorizacion['finalidad']) ?> · Vigente hasta <?= e(fechaCorta($autorizacion['vence_en'])) ?></p>
+  <?php if ($modoDemo): ?>
+    <p class="conexiones__modo">DEMO · DATOS DECLARADOS FICTICIOS · SIN CONSENTIMIENTO INDIVIDUAL · SOLO LECTURA · CANAL PROTEGIDO</p>
+  <?php elseif (str_starts_with((string) $autorizacion['acuerdo_version'], 'DEMO-') || str_starts_with((string) $autorizacion['consentimiento_nombre'], 'DEMO-')): ?>
+    <p class="conexiones__modo">DEMO · DOCUMENTOS NO FIRMADOS</p>
+  <?php endif; ?>
+  <p class="conexiones__nota"><?= $modoDemo ? e($autorizacion['finalidad']) : 'Finalidad autorizada: ' . e($autorizacion['finalidad']) . ' · Vigente hasta ' . e(fechaCorta($autorizacion['vence_en'])) ?></p>
 </div>
 <section class="seccion conexiones__ficha-compartida">
   <h2 class="seccion__titulo">Identificación del paciente</h2>

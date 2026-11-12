@@ -40,6 +40,8 @@ $consultaProximas->execute([$institucion, $usuarioId]);
 $proximas = $consultaProximas->fetchAll(PDO::FETCH_ASSOC);
 
 $actividadClinica = null;
+$actividadMensual = [];
+$maximoRegistrosMensuales = 1;
 $registrosRecientes = [];
 if (puede('historial')) {
     $consultaActividad = db()->prepare(
@@ -51,6 +53,38 @@ if (puede('historial')) {
     );
     $consultaActividad->execute([$institucion, $usuarioId]);
     $actividadClinica = $consultaActividad->fetch(PDO::FETCH_ASSOC) ?: ['notas' => 0, 'pacientes' => 0];
+
+    $mesesCortos = [1 => 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    $mesActual = new DateTimeImmutable('first day of this month');
+    for ($i = 5; $i >= 0; $i--) {
+        $mes = $mesActual->modify("-$i months");
+        $claveMes = $mes->format('Y-m');
+        $actividadMensual[$claveMes] = [
+            'etiqueta' => $mesesCortos[(int) $mes->format('n')] . ' ' . $mes->format('y'),
+            'registros' => 0,
+            'pacientes' => 0,
+        ];
+    }
+    $inicioGrafica = array_key_first($actividadMensual) . '-01 00:00:00';
+    $finGrafica = $mesActual->modify('+1 month')->format('Y-m-d H:i:s');
+    $consultaActividadMensual = db()->prepare(
+        "SELECT DATE_FORMAT(h.fecha, '%Y-%m') AS mes,
+                COUNT(*) AS registros, COUNT(DISTINCT h.paciente_id) AS pacientes
+           FROM historial_clinico h
+           JOIN pacientes p ON p.id = h.paciente_id AND p.institucion_id = h.institucion_id
+          WHERE h.institucion_id = ? AND h.autor_id = ? AND p.eliminado_en IS NULL
+            AND h.fecha >= ? AND h.fecha < ?
+          GROUP BY DATE_FORMAT(h.fecha, '%Y-%m')"
+    );
+    $consultaActividadMensual->execute([$institucion, $usuarioId, $inicioGrafica, $finGrafica]);
+    foreach ($consultaActividadMensual->fetchAll(PDO::FETCH_ASSOC) as $mes) {
+        $claveMes = (string) $mes['mes'];
+        if (isset($actividadMensual[$claveMes])) {
+            $actividadMensual[$claveMes]['registros'] = (int) $mes['registros'];
+            $actividadMensual[$claveMes]['pacientes'] = (int) $mes['pacientes'];
+        }
+    }
+    $maximoRegistrosMensuales = max(1, ...array_column($actividadMensual, 'registros'));
 
     $consultaRecientes = db()->prepare(
         'SELECT h.id, h.tipo, h.fecha, h.titulo, p.id AS paciente_id, p.folio,
@@ -136,6 +170,46 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
     <div><dt>Neto personal · mes</dt><dd><?= e($dinero((float) $finanzasPersonales['neto_mes'])) ?></dd></div>
   <?php endif; ?>
 </dl>
+
+<?php if ($actividadClinica !== null): ?>
+  <section class="ficha__seccion tablero__grafica-panel" aria-labelledby="tablero-grafica-titulo">
+    <div class="ficha__titulo-fila">
+      <div>
+        <h2 class="ficha__titulo" id="tablero-grafica-titulo">Actividad clínica</h2>
+        <p>Registros y pacientes únicos por mes · solo tu actividad</p>
+      </div>
+      <span class="ficha__fuente">Últimos 6 meses</span>
+    </div>
+    <div class="tablero__grafica" aria-hidden="true">
+      <?php foreach ($actividadMensual as $mes): ?>
+        <?php
+          $altura = min(100, (int) round(($mes['registros'] / $maximoRegistrosMensuales) * 100));
+          $alturaPacientes = min(100, (int) round(($mes['pacientes'] / $maximoRegistrosMensuales) * 100));
+        ?>
+        <div class="tablero__grafica-mes">
+          <div class="tablero__grafica-barras" title="<?= (int) $mes['registros'] ?> registros, <?= (int) $mes['pacientes'] ?> pacientes">
+            <span class="tablero__grafica-barra tablero__grafica-barra--registros" style="--altura: <?= $altura ?>%"></span>
+            <span class="tablero__grafica-barra tablero__grafica-barra--pacientes" style="--altura: <?= $alturaPacientes ?>%"></span>
+          </div>
+          <span><?= e($mes['etiqueta']) ?></span>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <div class="tablero__grafica-leyenda" aria-hidden="true">
+      <span><i class="tablero__grafica-muestra tablero__grafica-muestra--registros"></i>Registros clínicos</span>
+      <span><i class="tablero__grafica-muestra tablero__grafica-muestra--pacientes"></i>Pacientes únicos</span>
+    </div>
+    <table class="sr-only">
+      <caption>Actividad clínica del usuario por mes durante los últimos seis meses</caption>
+      <thead><tr><th>Mes</th><th>Registros clínicos</th><th>Pacientes únicos</th></tr></thead>
+      <tbody>
+        <?php foreach ($actividadMensual as $mes): ?>
+          <tr><th scope="row"><?= e($mes['etiqueta']) ?></th><td><?= (int) $mes['registros'] ?></td><td><?= (int) $mes['pacientes'] ?></td></tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </section>
+<?php endif; ?>
 
 <div class="hoja-paciente__cuerpo tablero__cuerpo">
   <div class="hoja-paciente__datos tablero__principal">

@@ -895,6 +895,7 @@ switch ($accion) {
             $insertarFila = $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)');
             foreach ($plan['filas'] as $n => $valores) {
                 $insertarFila->execute([$paginaId, json_encode($valores, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION), $n + 1]);
+                registrarAuditoriaFilaPagina($paginaId, (int) $pdo->lastInsertId(), 'crear', 'fila');
             }
             $conversionId = registrarConversion([
                 'direccion' => 'importar', 'formato' => $formato, 'archivo_nombre' => $importacion['nombre'], 'archivo_sha256' => $importacion['sha256'],

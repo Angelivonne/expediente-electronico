@@ -81,7 +81,7 @@ $tabla = [
       <span class="bd__contador" data-bd-contador><?= (int) $total ?></span>
     </div>
     <div class="bd__herramientas">
-      <?php $herramientas = ['clave' => $clave, 'base' => URL_BASE . '/catalogos/editar_tabla.php', 'ocultos' => array_filter(['tabla' => $clave, 'q' => $busqueda, 'limite' => $limite]), 'orden' => $ordenTabla, 'dir' => $dirTabla, 'campo' => $campoTabla, 'valor' => $valorTabla, 'agrupar' => $agruparTabla, 'solo' => 'menu', 'exportar' => URL_BASE . '/api/motor/exportar.php?' . http_build_query(array_filter(['entidad' => $clave, 'q' => $busqueda, 'campo' => $campoTabla, 'valor' => $valorTabla, 'orden' => $ordenTabla, 'dir' => $dirTabla]))]; require __DIR__ . '/../app/vistas/componentes/herramientas_tabla.php'; ?>
+      <?php $herramientas = ['clave' => $clave, 'base' => URL_BASE . '/catalogos/editar_tabla.php', 'ocultos' => array_filter(['tabla' => $clave, 'q' => $busqueda, 'limite' => $limite]), 'orden' => $ordenTabla, 'dir' => $dirTabla, 'campo' => $campoTabla, 'valor' => $valorTabla, 'agrupar' => $agruparTabla, 'solo' => 'menu', 'exportar' => URL_BASE . '/catalogos/exportar.php?' . http_build_query(array_filter(['tabla' => $clave, 'q' => $busqueda, 'campo' => $campoTabla, 'valor' => $valorTabla, 'orden' => $ordenTabla, 'dir' => $dirTabla]))]; require __DIR__ . '/../app/vistas/componentes/herramientas_tabla.php'; ?>
       <button type="button" class="boton-icono" data-abrir-busqueda title="Buscar en catálogo"><?= icono('buscar') ?></button>
       <a class="boton boton--primario bd__nuevo" href="<?= URL_BASE ?>/catalogos/nuevo.php?tabla=<?= e(urlencode($clave)) ?>" title="Nuevo registro"><?= icono('agregar') ?> Nuevo</a>
     </div>
@@ -107,9 +107,3 @@ $tabla = [
 <script type="application/json" id="opciones-editor"><?= json_encode($opcionesEditor, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
-
-
-
-
-
-

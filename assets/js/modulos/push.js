@@ -132,11 +132,12 @@
       </header>`}
       <div class="push-ajustes__cuerpo">
         <label class="ajustes-ia__fila ajustes-ia__fila--interruptor">
-          <div class="ajustes-ia__etiqueta"><b>En este dispositivo</b><small data-push-estado>Avisos en el teléfono o la computadora aunque la app esté cerrada. Solo muestran textos generales, sin datos de pacientes.</small></div>
+          <div class="ajustes-ia__etiqueta"><b>En este dispositivo</b><small data-push-estado>Avisos generales, sin datos de pacientes, aunque la app esté cerrada.</small></div>
           <input type="checkbox" data-push-activar><i class="interruptor" aria-hidden="true"></i>
         </label>
 
-        <h3 class="ajustes-ia__seccion">Qué avisos recibir</h3>
+        <details class="ajustes-ia__grupo push-ajustes__grupo" open>
+          <summary>Qué avisos recibir</summary>
         ${filaInterruptor('cita_recordatorio', 'Recordatorio de cita', '', p.cita_recordatorio)}
         <div class="ajustes-ia__fila ajustes-ia__fila--apilada push-ajustes__sub" data-push-sub="cita_recordatorio"${p.cita_recordatorio ? '' : ' hidden'}>
           <div class="ajustes-ia__etiqueta"><small>Anticipación</small></div>
@@ -147,15 +148,18 @@
         ${d.invitacion_aceptada ? filaInterruptor('invitacion_aceptada', 'Invitación aceptada', '', p.invitacion_aceptada) : ''}
         ${d.pagina_compartida ? filaInterruptor('pagina_compartida', 'Página compartida', '', p.pagina_compartida) : ''}
         ${d.aviso ? filaInterruptor('aviso', 'Aviso del equipo', '', p.aviso) : ''}
+        </details>
 
-        ${umbrales ? '<h3 class="ajustes-ia__seccion">Avisos por umbral</h3>' : ''}
+        ${umbrales ? '<details class="ajustes-ia__grupo push-ajustes__grupo"><summary>Avisos por umbral</summary>' : ''}
         ${d.umbral_citas ? filaInterruptor('umbral_citas_activo', 'Citas pendientes hoy', 'Una vez al día, al llegar a la cantidad.', p.umbral_citas_activo)
           + filaContador('umbral_citas_n', 'Cantidad de citas', p.umbral_citas_n, e.maximos.citas, !p.umbral_citas_activo) : ''}
         ${d.umbral_pacientes ? filaInterruptor('umbral_pacientes_activo', 'Pacientes nuevos', 'Cada vez que se registren esa cantidad en el día.', p.umbral_pacientes_activo)
           + filaContador('umbral_pacientes_n', 'Cantidad de pacientes', p.umbral_pacientes_n, e.maximos.pacientes, !p.umbral_pacientes_activo) : ''}
         ${d.signos_fuera_rango ? filaInterruptor('signos_fuera_rango', 'Signo vital fuera de rango', 'TA, FC, FR, temperatura, SpO₂ o glucosa fuera del rango de referencia del adulto.', p.signos_fuera_rango) : ''}
+        ${umbrales ? '</details>' : ''}
 
-        <h3 class="ajustes-ia__seccion">Horario de silencio</h3>
+        <details class="ajustes-ia__grupo push-ajustes__grupo">
+          <summary>Horario y dispositivos</summary>
         ${filaInterruptor('silencio_activo', 'Silenciar por horario', 'En ese horario no llegan avisos push; siguen en la bandeja.', p.silencio_activo)}
         <div class="ajustes-ia__fila push-ajustes__sub" data-push-sub="silencio_activo"${p.silencio_activo ? '' : ' hidden'}>
           <div class="ajustes-ia__etiqueta"><small>De</small></div>
@@ -166,8 +170,8 @@
           </div>
         </div>
 
-        <h3 class="ajustes-ia__seccion">Dispositivos</h3>
         <div data-push-dispositivos>${dispositivosHtml(e.dispositivos)}</div>
+        </details>
 
         <div class="push-ajustes__pie">
           <span class="ajustes-ia__prueba" data-push-mensaje></span>

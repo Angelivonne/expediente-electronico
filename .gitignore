@@ -16,6 +16,7 @@ privado/bd.php
 .DS_Store
 Thumbs.db
 *.log
+.php-cs-fixer.cache
 
 # IDE
 .vscode/
@@ -23,3 +24,14 @@ Thumbs.db
 
 __pycache__/
 *.pyc
+
+# Datos de pacientes y subidas locales (LFPDPPP: nunca al repositorio)
+privado/fotos_pacientes/
+privado/subidas/
+privado/mailoutput/
+assets/subidas/
+
+# Credenciales locales (privado/credenciales.txt) y llaves de APIs
+privado/credenciales.txt
+.env
+*.pem

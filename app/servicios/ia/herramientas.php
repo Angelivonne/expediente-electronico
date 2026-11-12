@@ -135,7 +135,7 @@ function herramientasIa(string $acceso): array
             'despues_de' => ['type' => 'string', 'description' => 'Texto del bloque o encabezado tras el cual colocarla (por defecto al final)'],
         ], 'required' => ['id', 'tipo']],
     ];
-    $escritura = array_merge($lectura, $escritura, herramientasIaAmpliadas('restringido'), $web, herramientasIaExtra('restringido'), [herramientaDatosIa(), herramientaDocumentoAnalisisIa()]);
+    $escritura = array_merge($lectura, $escritura, herramientasIaAmpliadas('restringido'), $web, herramientasIaExtra('restringido'), [herramientaDocumentoAnalisisIa()]);
     if ($acceso !== 'expediente') {
         return $escritura;
     }
@@ -170,10 +170,23 @@ function herramientasIa(string $acceso): array
     return array_merge([
         [
             'nombre' => 'buscar_pacientes',
-            'descripcion' => 'Busca pacientes registrados por nombre, CURP o folio. Devuelve datos de identificación básicos.',
+            'descripcion' => 'Busca en los expedientes de la sección Pacientes por nombre, apellidos, CURP o folio. Puedes pasar solo el dato identificador o la frase completa del usuario; ignora palabras conversacionales como «busca al paciente ... en expedientes». Devuelve datos básicos y usa el id devuelto para consultar ese expediente. No concluyas que no existe sin ejecutar esta herramienta.',
             'esquema' => ['type' => 'object', 'properties' => ['consulta' => ['type' => 'string']], 'required' => ['consulta']],
         ],
-    ], $escritura, array_slice(herramientasIaAmpliadas('expediente'), count(herramientasIaAmpliadas('restringido'))), $agenda,
+        [
+            'nombre' => 'buscar_medicamentos',
+            'descripcion' => 'Busca en el catálogo de medicamentos de la institución por nombre, clave, presentación, concentración, vía o laboratorio. Úsala siempre que pregunten si existe un medicamento o producto, también si la consulta está en plural o incluye palabras conversacionales.',
+            'esquema' => ['type' => 'object', 'properties' => ['consulta' => ['type' => 'string']], 'required' => ['consulta']],
+        ],
+        [
+            'nombre' => 'investigar_bitacora',
+            'descripcion' => 'Investiga la bitácora de auditoría (NOM-024) de un paciente: quién consultó o modificó su expediente, qué campo cambió, el valor anterior y el nuevo, la IP y la fecha y hora exacta de cada evento. Úsala cuando pregunten «quién hizo/modificó X», «qué cambió en la receta», «quién ha entrado al expediente» o en cualquier revisión forense de un caso. Solo lectura; incluye los cambios posteriores a la atención.',
+            'esquema' => ['type' => 'object', 'properties' => [
+                'paciente_id' => ['type' => 'integer', 'description' => 'Id del paciente (obténlo con buscar_pacientes).'],
+                'dias'        => ['type' => 'integer', 'description' => 'Periodo hacia atrás en días (por defecto 365, máximo 1825).'],
+            ], 'required' => ['paciente_id']],
+        ],
+    ], $escritura, [herramientaDatosIa()], array_slice(herramientasIaAmpliadas('expediente'), count(herramientasIaAmpliadas('restringido'))), $agenda,
        array_slice(herramientasIaExtra('expediente'), count(herramientasIaExtra('restringido'))));
 }
 
@@ -212,6 +225,7 @@ function ejecutarHerramientaIa(string $nombre, array $entrada, string $acceso): 
             'buscar_paginas'   => iaBuscarPaginas((string) ($entrada['consulta'] ?? '')),
             'leer_pagina'      => iaLeerPagina((int) ($entrada['id'] ?? 0)),
             'buscar_pacientes' => iaBuscarPacientes((string) ($entrada['consulta'] ?? '')),
+            'buscar_medicamentos' => iaBuscarMedicamentos((string) ($entrada['consulta'] ?? '')),
             'crear_pagina'     => iaCrearPagina($entrada),
             'escribir_nota'    => iaEscribirNota((int) ($entrada['id'] ?? 0), (string) ($entrada['contenido_markdown'] ?? ''), (string) ($entrada['modo'] ?? 'agregar')),
             'renombrar_pagina' => iaRenombrar((int) ($entrada['id'] ?? 0), (string) ($entrada['titulo'] ?? '')),
@@ -228,6 +242,8 @@ function ejecutarHerramientaIa(string $nombre, array $entrada, string $acceso): 
             'datos'                    => iaDatos($entrada),
             'crear_documento_analisis'=> iaCrearDocumentoAnalisis($entrada),
             'generar_documento_pdf'   => iaCrearDocumentoAnalisis($entrada),
+            'revisar_trazabilidad_medicamentos' => iaRevisarTrazabilidadMedicamentos($entrada),
+            'investigar_bitacora'   => iaInvestigarBitacora($entrada),
             default            => ejecutarHerramientaAmpliada($nombre, $entrada) ?? ejecutarHerramientaIaExtra($nombre, $entrada) ?? fallaIa('Herramienta desconocida.'),
         };
     } catch (Throwable $e) {
@@ -403,7 +419,7 @@ function iaBuscarPacientes(string $consulta): array
         return fallaIa('Tu rol no permite consultar expedientes.');
     }
     $consulta = trim($consulta);
-    if ($consulta === '') {
+    if ($consulta === '' || !terminosBusqueda($consulta, true)) {
         return fallaIa('Escribe un nombre, CURP o folio.');
     }
     [$filtroBusqueda, $parametrosBusqueda] = condicionBusqueda([
@@ -411,7 +427,7 @@ function iaBuscarPacientes(string $consulta): array
         'curp',
         'folio',
         "REPLACE(folio, '-', '')",
-    ], $consulta);
+    ], $consulta, true);
     $c = db()->prepare(
         "SELECT id, folio, nombre, primer_apellido, segundo_apellido, fecha_nacimiento, sexo FROM pacientes
           WHERE institucion_id = ? AND eliminado_en IS NULL AND $filtroBusqueda
@@ -426,6 +442,20 @@ function iaBuscarPacientes(string $consulta): array
         registrarBitacora('pacientes', $p['id'], 'acceso', 'asistente_ia', null, 'búsqueda');
     }
     return exitoIa(['pacientes' => $lista], count($lista) === 1 ? 'Encontró 1 paciente' : 'Encontró ' . count($lista) . ' pacientes');
+}
+
+function iaBuscarMedicamentos(string $consulta): array
+{
+    $consulta = trim($consulta);
+    if ($consulta === '') {
+        return fallaIa('Escribe el nombre, clave o algún dato del medicamento que buscas.');
+    }
+    return iaDatos([
+        'accion' => 'listar',
+        'entidad' => 'medicamentos',
+        'q' => mb_substr($consulta, 0, 120),
+        'limite' => 30,
+    ]);
 }
 
 /* ---------- Escritura ---------- */
@@ -588,40 +618,50 @@ function iaAgregarFilas(int $id, array $filas): array
     $datos = json_decode((string) $p['contenido'], true) ?: [];
     $cambioColumnas = false;
     $agregadas = 0;
-    foreach (array_slice($filas, 0, min(IA_MAX_FILAS, 5000 - $cuantas)) as $fila) {
-        if (!is_array($fila)) {
-            continue;
-        }
-        $valores = [];
-        foreach ($fila as $nombre => $valor) {
-            $col = $porNombre[mb_strtolower((string) $nombre)] ?? null;
-            if (!$col) {
+    $pdo->beginTransaction();
+    try {
+        foreach (array_slice($filas, 0, min(IA_MAX_FILAS, 5000 - $cuantas)) as $fila) {
+            if (!is_array($fila)) {
                 continue;
             }
-            $v = valorDeCelda($col['tipo'], $valor);
-            $valores[$col['id']] = $v;
-            // Opciones nuevas de selección se agregan con el siguiente color
-            if ($col['tipo'] === 'seleccion' && $v !== null && !in_array($v, array_column($col['opciones'] ?? [], 'nombre'), true)) {
-                foreach ($columnas as &$c) {
-                    if ($c['id'] === $col['id']) {
-                        $c['opciones'][] = ['nombre' => $v, 'color' => COLORES_OPCION[count($c['opciones'] ?? []) % count(COLORES_OPCION)]];
-                        $porNombre[mb_strtolower($c['nombre'])] = $c;
-                    }
+            $valores = [];
+            foreach ($fila as $nombre => $valor) {
+                $col = $porNombre[mb_strtolower((string) $nombre)] ?? null;
+                if (!$col) {
+                    continue;
                 }
-                unset($c);
-                $cambioColumnas = true;
+                $v = valorDeCelda($col['tipo'], $valor);
+                $valores[$col['id']] = $v;
+                // Opciones nuevas de selección se agregan con el siguiente color
+                if ($col['tipo'] === 'seleccion' && $v !== null && !in_array($v, array_column($col['opciones'] ?? [], 'nombre'), true)) {
+                    foreach ($columnas as &$c) {
+                        if ($c['id'] === $col['id']) {
+                            $c['opciones'][] = ['nombre' => $v, 'color' => COLORES_OPCION[count($c['opciones'] ?? []) % count(COLORES_OPCION)]];
+                            $porNombre[mb_strtolower($c['nombre'])] = $c;
+                        }
+                    }
+                    unset($c);
+                    $cambioColumnas = true;
+                }
             }
+            $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)')
+                ->execute([$id, json_encode($valores ?: new stdClass(), JSON_UNESCAPED_UNICODE), ++$orden]);
+            registrarAuditoriaFilaPagina($id, (int) $pdo->lastInsertId(), 'crear', 'fila');
+            $agregadas++;
         }
-        $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)')
-            ->execute([$id, json_encode($valores ?: new stdClass(), JSON_UNESCAPED_UNICODE), ++$orden]);
-        $agregadas++;
+        if ($cambioColumnas) {
+            $pdo->prepare('UPDATE paginas SET contenido = ? WHERE id = ?')
+                ->execute([json_encode(['columnas' => $columnas, 'siguiente' => (int) ($datos['siguiente'] ?? count($columnas) + 1)] + $datos, JSON_UNESCAPED_UNICODE), $id]);
+        }
+        $pdo->prepare('UPDATE paginas SET actualizado_en = NOW(), actualizado_por = ? WHERE id = ?')->execute([usuarioIa(), $id]);
+        registrarBitacora('paginas', $id, 'actualizar', 'fila_nueva', null, $agregadas . ' filas · asistente IA');
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
-    if ($cambioColumnas) {
-        $pdo->prepare('UPDATE paginas SET contenido = ? WHERE id = ?')
-            ->execute([json_encode(['columnas' => $columnas, 'siguiente' => (int) ($datos['siguiente'] ?? count($columnas) + 1)] + $datos, JSON_UNESCAPED_UNICODE), $id]);
-    }
-    $pdo->prepare('UPDATE paginas SET actualizado_en = NOW(), actualizado_por = ? WHERE id = ?')->execute([usuarioIa(), $id]);
-    registrarBitacora('paginas', $id, 'actualizar', 'fila_nueva', null, $agregadas . ' filas · asistente IA');
     return exitoIa(['agregadas' => $agregadas], "Agregó {$agregadas} " . ($agregadas === 1 ? 'fila' : 'filas') . ' a «' . ($p['titulo'] ?: 'Nueva base de datos') . '»', $id, true);
 }
 
@@ -694,6 +734,14 @@ function herramientasIaAmpliadas(string $acceso): array
             'descripcion' => 'Revisa a fondo el expediente de un paciente para resumirlo o detectar lo relevante: devuelve todos sus datos, el historial y alertas calculadas '
                 . '(alergias contra medicamentos, datos obligatorios faltantes, signos fuera de rango, IMC, tiempo sin consulta, próximas citas).',
             'esquema' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']], 'required' => ['id']],
+        ],
+        [
+            'nombre' => 'revisar_trazabilidad_medicamentos',
+            'descripcion' => 'Consulta en modo de solo lectura, dentro de esta institución, las recetas, indicaciones del Kardex y sus administraciones registradas para un paciente y periodo. Devuelve fechas, fuentes, prescriptor, dosis indicada y estado documental de cada administración. No determina dosis segura o insegura, no diagnostica ni atribuye responsabilidad; presenta coincidencias o discrepancias documentales como señales que el profesional debe verificar.',
+            'esquema' => ['type' => 'object', 'properties' => [
+                'id' => ['type' => 'integer', 'description' => 'Id del paciente obtenido con buscar_pacientes.'],
+                'dias' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 1825, 'description' => 'Ventana retrospectiva; por defecto 365, máximo 1825 días.'],
+            ], 'required' => ['id']],
         ],
         [
             'nombre' => 'leer_paciente',
@@ -820,24 +868,40 @@ function iaActualizarFilas(int $id, array $cambios): array
     }
     $columnas = columnasDe($p);
     $hechas = 0;
-    foreach (array_slice($cambios, 0, IA_MAX_FILAS) as $cambio) {
-        $fila = db()->prepare('SELECT id, valores FROM pagina_filas WHERE id = ? AND pagina_id = ?');
-        $fila->execute([(int) ($cambio['fila_id'] ?? 0), $id]);
-        $fila = $fila->fetch();
-        if (!$fila) {
-            continue;
-        }
-        $valores = json_decode($fila['valores'], true) ?: [];
-        foreach ((array) ($cambio['valores'] ?? []) as $nombre => $valor) {
-            if ($col = columnaPorNombre($columnas, (string) $nombre)) {
-                $valores[$col['id']] = valorDeCelda($col['tipo'], $valor);
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        foreach (array_slice($cambios, 0, IA_MAX_FILAS) as $cambio) {
+            $fila = $pdo->prepare('SELECT id, valores FROM pagina_filas WHERE id = ? AND pagina_id = ?');
+            $fila->execute([(int) ($cambio['fila_id'] ?? 0), $id]);
+            $fila = $fila->fetch();
+            if (!$fila) {
+                continue;
             }
+            $valores = json_decode($fila['valores'], true) ?: [];
+            $anteriores = $valores;
+            foreach ((array) ($cambio['valores'] ?? []) as $nombre => $valor) {
+                if ($col = columnaPorNombre($columnas, (string) $nombre)) {
+                    $valores[$col['id']] = valorDeCelda($col['tipo'], $valor);
+                }
+            }
+            $pdo->prepare('UPDATE pagina_filas SET valores = ?, actualizado_en = NOW() WHERE id = ?')->execute([json_encode($valores, JSON_UNESCAPED_UNICODE), $fila['id']]);
+            foreach (array_unique([...array_keys($anteriores), ...array_keys($valores)]) as $columnaId) {
+                if (($anteriores[$columnaId] ?? null) !== ($valores[$columnaId] ?? null)) {
+                    registrarAuditoriaFilaPagina($id, (int) $fila['id'], 'actualizar', 'celda:' . $columnaId);
+                }
+            }
+            $hechas++;
         }
-        db()->prepare('UPDATE pagina_filas SET valores = ?, actualizado_en = NOW() WHERE id = ?')->execute([json_encode($valores, JSON_UNESCAPED_UNICODE), $fila['id']]);
-        $hechas++;
+        $pdo->prepare('UPDATE paginas SET actualizado_en = NOW(), actualizado_por = ? WHERE id = ?')->execute([usuarioIa(), $id]);
+        registrarBitacora('paginas', $id, 'actualizar', 'celda', null, "$hechas filas · asistente IA");
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
-    db()->prepare('UPDATE paginas SET actualizado_en = NOW(), actualizado_por = ? WHERE id = ?')->execute([usuarioIa(), $id]);
-    registrarBitacora('paginas', $id, 'actualizar', 'celda', null, "$hechas filas · asistente IA");
     return exitoIa(['actualizadas' => $hechas], "Actualizó $hechas " . ($hechas === 1 ? 'fila' : 'filas') . ' de «' . ($p['titulo'] ?: 'Nueva base de datos') . '»', $id, true);
 }
 
@@ -852,10 +916,26 @@ function iaEliminarFilas(int $id, array $filas): array
         return fallaIa('Indica qué filas eliminar.');
     }
     $marcas = implode(',', array_fill(0, count($ids), '?'));
-    $borrar = db()->prepare("DELETE FROM pagina_filas WHERE pagina_id = ? AND id IN ($marcas)");
-    $borrar->execute([$id, ...$ids]);
-    registrarBitacora('paginas', $id, 'eliminar', 'fila', null, $borrar->rowCount() . ' filas · asistente IA');
-    return exitoIa(['eliminadas' => $borrar->rowCount()], 'Eliminó ' . $borrar->rowCount() . ' ' . ($borrar->rowCount() === 1 ? 'fila' : 'filas'), $id, true);
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        $existentes = $pdo->prepare("SELECT id FROM pagina_filas WHERE pagina_id = ? AND id IN ($marcas)");
+        $existentes->execute([$id, ...$ids]);
+        foreach ($existentes->fetchAll(PDO::FETCH_COLUMN) as $filaId) {
+            registrarAuditoriaFilaPagina($id, (int) $filaId, 'eliminar', 'fila');
+        }
+        $borrar = $pdo->prepare("DELETE FROM pagina_filas WHERE pagina_id = ? AND id IN ($marcas)");
+        $borrar->execute([$id, ...$ids]);
+        registrarBitacora('paginas', $id, 'eliminar', 'fila', null, $borrar->rowCount() . ' filas · asistente IA');
+        $eliminadas = $borrar->rowCount();
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+    return exitoIa(['eliminadas' => $eliminadas], 'Eliminó ' . $eliminadas . ' ' . ($eliminadas === 1 ? 'fila' : 'filas'), $id, true);
 }
 
 function iaEditarColumna(int $id, string $nombre, array $e): array
@@ -923,10 +1003,25 @@ function iaLeerPaciente(int $id): array
             $datos[$campo] = $p[$campo];
         }
     }
-    $h = db()->prepare('SELECT tipo, fecha, titulo, detalle, autor_nombre FROM historial_clinico WHERE paciente_id = ? ORDER BY fecha DESC LIMIT 50');
-    $h->execute([$id]);
-    $datos['historial'] = array_map(fn ($e) => ['tipo' => $e['tipo'], 'fecha' => substr($e['fecha'], 0, 10), 'titulo' => $e['titulo'],
-        'detalle' => json_decode($e['detalle'], true), 'autor' => $e['autor_nombre']], $h->fetchAll());
+    $h = db()->prepare('SELECT tipo, fecha, titulo, detalle, autor_nombre FROM historial_clinico WHERE paciente_id = ? AND institucion_id = ? ORDER BY fecha DESC LIMIT 50');
+    $h->execute([$id, institucionId()]);
+    $datos['historial'] = array_map(static function ($e) {
+        $detalle = json_decode((string) $e['detalle'], true);
+        if (!is_array($detalle)) {
+            $detalle = [];
+        }
+        if (is_array($detalle['_transcripcion'] ?? null)) {
+            unset($detalle['_transcripcion']['texto_original']);
+            $detalle['_transcripcion']['texto_original_conservado'] = true;
+        }
+        return [
+            'tipo' => $e['tipo'],
+            'fecha' => substr($e['fecha'], 0, 10),
+            'titulo' => $e['titulo'],
+            'detalle' => $detalle,
+            'autor' => $e['autor_nombre'],
+        ];
+    }, $h->fetchAll());
     registrarBitacora('pacientes', $id, 'acceso', 'asistente_ia', null, 'lectura del expediente');
     return ['ok' => true, 'resultado' => json_encode($datos, JSON_UNESCAPED_UNICODE), 'resumen' => 'Leyó el expediente ' . $p['folio'],
             'url' => URL_BASE . '/pacientes/ver.php?id=' . $id, 'cambio' => false];
@@ -1157,6 +1252,8 @@ function descripcionHerramientaIa(string $nombre): string
         'mover_a_papelera' => 'Enviando a la papelera…', 'actualizar_filas' => 'Actualizando filas…', 'eliminar_filas' => 'Eliminando filas…',
         'editar_columna' => 'Editando la propiedad…', 'leer_paciente' => 'Leyendo el expediente…', 'registrar_paciente' => 'Registrando al paciente…',
         'actualizar_paciente' => 'Actualizando el expediente…', 'agregar_historial' => 'Agregando al historial…',
+        'revisar_trazabilidad_medicamentos' => 'Revisando la trazabilidad de medicamentos…',
+        'investigar_bitacora' => 'Investigando la bitácora del expediente…',
         'buscar_en_internet' => 'Buscando en internet…', 'leer_sitio_web' => 'Leyendo el sitio…', 'insertar_imagen' => 'Agregando la imagen…', 'ajustar_imagen' => 'Ajustando el tamaño…',
         'ver_agenda' => 'Revisando la agenda…', 'agendar_cita' => 'Agendando la cita…', 'actualizar_cita' => 'Actualizando la cita…', 'crear_grafica' => 'Dibujando la gráfica…', 'revisar_expediente' => 'Revisando el expediente…', 'editar_nota' => 'Editando la nota…', 'listar_personas' => 'Consultando al equipo…', 'enviar_aviso' => 'Enviando el aviso…', 'estadisticas_pacientes' => 'Calculando estadísticas…', 'datos' => 'Consultando datos…', 'analizar_datos_clinicos' => 'Analizando datos clínicos…', 'crear_documento_analisis' => 'Generando documento formal…', 'generar_documento_pdf' => 'Generando documento PDF…',
     ][$nombre] ?? 'Trabajando…';
@@ -1356,6 +1453,182 @@ function iaRevisarExpediente(int $id): array
     return ['ok' => true, 'resultado' => json_encode($datos, JSON_UNESCAPED_UNICODE),
             'resumen' => 'Revisó el expediente ' . $datos['folio'] . ($altas ? " · {$altas} " . ($altas === 1 ? 'alerta importante' : 'alertas importantes') : ''),
             'url' => URL_BASE . '/pacientes/ver.php?id=' . $id, 'cambio' => false];
+}
+
+/**
+ * Devuelve únicamente hechos documentados de recetas y Kardex para revisión profesional.
+ * No aplica rangos terapéuticos ni infiere causalidad o responsabilidad.
+ */
+function iaRevisarTrazabilidadMedicamentos(array $entrada): array
+{
+    $id = (int) ($entrada['id'] ?? 0);
+    $dias = (int) ($entrada['dias'] ?? 365);
+    // 'kardex' no existe en la matriz PERMISOS (bug latente): la consulta es de solo lectura del expediente.
+    if (!puede('asistente') || !puede('ver_expediente')) {
+        return fallaIa('Tu rol no permite revisar expedientes y registros de administración de medicamentos.');
+    }
+    if ($id < 1 || $dias < 1 || $dias > 1825) {
+        return fallaIa('Indica un paciente válido y un periodo de 1 a 1825 días.');
+    }
+
+    $paciente = db()->prepare('SELECT id, folio FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL');
+    $paciente->execute([$id, institucionId()]);
+    $paciente = $paciente->fetch();
+    if (!$paciente) {
+        return fallaIa('El paciente no existe en esta institución o fue dado de baja.');
+    }
+
+    $diasAtras = $dias - 1;
+    $desde = date('Y-m-d', strtotime("-{$diasAtras} days"));
+    $hasta = date('Y-m-d');
+    $recetas = db()->prepare(
+        "SELECT id, fecha, titulo, detalle, autor_nombre
+         FROM historial_clinico
+         WHERE paciente_id = ? AND institucion_id = ? AND tipo = 'receta' AND fecha >= ? AND fecha < ?
+         ORDER BY fecha ASC, id ASC LIMIT 200"
+    );
+    $recetas->execute([$id, institucionId(), $desde, date('Y-m-d', strtotime($hasta . ' +1 day'))]);
+    $prescripciones = [];
+    foreach ($recetas->fetchAll() as $registro) {
+        $detalle = json_decode((string) $registro['detalle'], true);
+        foreach ((array) ((is_array($detalle) ? ($detalle['medicamentos'] ?? []) : [])) as $medicamento) {
+            if (!is_array($medicamento)) {
+                continue;
+            }
+            $prescripciones[] = [
+                'fuente' => 'receta_historial',
+                'registro_id' => (int) $registro['id'],
+                'fecha' => $registro['fecha'],
+                'titulo' => $registro['titulo'],
+                'prescriptor' => $registro['autor_nombre'],
+                'medicamento' => (string) ($medicamento['nombre'] ?? ''),
+                'presentacion' => (string) ($medicamento['presentacion'] ?? ''),
+                'dosis' => (string) ($medicamento['dosis'] ?? ''),
+                'via' => (string) ($medicamento['via'] ?? ''),
+                'frecuencia' => (string) ($medicamento['periodicidad'] ?? ''),
+                'duracion' => (string) ($medicamento['duracion'] ?? ''),
+                'fecha_inicio' => (string) ($medicamento['fecha_inicio'] ?? ''),
+                'fecha_fin' => (string) ($medicamento['fecha_fin'] ?? ''),
+            ];
+        }
+    }
+
+    $indicaciones = db()->prepare(
+        'SELECT id, medicamento, dosis, via, frecuencia, horario, fecha_inicio, fecha_fin, indicaciones, estado, medico_prescribe
+         FROM kardex_medicaciones
+         WHERE paciente_id = ? AND institucion_id = ? AND fecha_inicio <= ?
+           AND (fecha_inicio >= ? OR (estado = \'activo\' AND (fecha_fin IS NULL OR fecha_fin >= ?)))
+         ORDER BY fecha_inicio ASC, id ASC LIMIT 200'
+    );
+    $indicaciones->execute([$id, institucionId(), $hasta, $desde, $desde]);
+
+    $administraciones = db()->prepare(
+        'SELECT a.id, a.medicacion_id, a.fecha, a.hora_programada, a.hora_aplicacion, a.turno, a.estado,
+                a.enfermero_nombre, a.observaciones, m.medicamento, m.dosis, m.via, m.frecuencia, m.estado AS estado_indicacion
+         FROM kardex_administraciones a
+         INNER JOIN kardex_medicaciones m
+           ON m.id = a.medicacion_id AND m.paciente_id = a.paciente_id AND m.institucion_id = a.institucion_id
+         WHERE a.paciente_id = ? AND a.institucion_id = ? AND a.fecha BETWEEN ? AND ?
+         ORDER BY a.fecha ASC, a.hora_programada ASC, a.id ASC LIMIT 500'
+    );
+    $administraciones->execute([$id, institucionId(), $desde, $hasta]);
+
+    registrarBitacora('pacientes', $id, 'acceso', 'asistente_trazabilidad_medicamentos', null, "consulta documental · {$dias} días");
+    $datos = [
+        'paciente_folio' => $paciente['folio'],
+        'periodo' => ['dias' => $dias, 'desde' => $desde, 'hasta' => $hasta],
+        'prescripciones' => $prescripciones,
+        'indicaciones_kardex' => $indicaciones->fetchAll(),
+        'administraciones' => $administraciones->fetchAll(),
+        'limites' => 'Consulta documental de solo lectura. No se compararon dosis con guías o rangos terapéuticos ni se establecieron causalidad, error o responsabilidad. Verifica cada hallazgo contra la fuente y el contexto clínico.',
+    ];
+    return [
+        'ok' => true,
+        'resultado' => json_encode($datos, JSON_UNESCAPED_UNICODE),
+        'resumen' => 'Consultó la trazabilidad documental de medicamentos del expediente ' . $paciente['folio'] . " · {$dias} días",
+        'url' => URL_BASE . '/pacientes/ver.php?id=' . $id,
+        'cambio' => false,
+    ];
+}
+
+
+/* ---------- Herramienta de investigación forense de la bitácora (NOM-024) ---------- */
+
+/** Reconstruye la cronología de la bitácora de un expediente: quién hizo qué, qué cambió,
+ *  desde qué IP y cuándo. Solo lectura, como el resto de herramientas de consulta. */
+function iaInvestigarBitacora(array $entrada): array
+{
+    $id = (int) ($entrada['paciente_id'] ?? 0);
+    $dias = (int) ($entrada['dias'] ?? 365);
+    if (!puede('asistente') || !puede('ver_expediente')) {
+        return fallaIa('Tu rol no permite investigar bitácoras de expedientes.');
+    }
+    if ($id < 1 || $dias < 1 || $dias > 1825) {
+        return fallaIa('Indica un paciente válido y un periodo de 1 a 1825 días.');
+    }
+
+    $paciente = db()->prepare('SELECT id, folio, nombre, primer_apellido, segundo_apellido FROM pacientes WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL');
+    $paciente->execute([$id, institucionId()]);
+    $paciente = $paciente->fetch();
+    if (!$paciente) {
+        return fallaIa('El paciente no existe en esta institución o fue dado de baja.');
+    }
+
+    $desde = date('Y-m-d 00:00:00', strtotime('-' . ($dias - 1) . ' days'));
+    $eventos = db()->prepare(
+        "SELECT b.accion, b.campo, b.valor_anterior, b.valor_nuevo, b.ip, b.creado_en,
+                COALESCE(u.nombre, '—') AS usuario, u.rol,
+                CASE WHEN b.tabla = 'pacientes' THEN 'expediente'
+                     WHEN b.tabla = 'historial_clinico' THEN 'historial_clinico'
+                     ELSE b.tabla END AS origen
+         FROM bitacora b
+         LEFT JOIN usuarios u ON u.id = b.usuario_id
+         WHERE b.institucion_id = ?
+           AND b.creado_en >= ?
+           AND ((b.tabla = 'pacientes' AND b.registro_id = ?)
+             OR (b.tabla = 'historial_clinico' AND b.registro_id IN (
+                    SELECT id FROM historial_clinico WHERE paciente_id = ? AND institucion_id = ?)))
+         ORDER BY b.creado_en ASC, b.id ASC
+         LIMIT 150"
+    );
+    $eventos->execute([institucionId(), $desde, $id, $id, institucionId()]);
+
+    $corte = static fn ($v) => $v === null ? null : mb_substr((string) $v, 0, 300);
+    $cronologia = [];
+    foreach ($eventos->fetchAll() as $ev) {
+        $cronologia[] = [
+            'fecha_hora'     => $ev['creado_en'],
+            'usuario'        => $ev['usuario'],
+            'rol'            => $ev['rol'],
+            'accion'         => $ev['accion'],
+            'origen'         => $ev['origen'],
+            'campo'          => $ev['campo'],
+            'valor_anterior' => $corte($ev['valor_anterior']),
+            'valor_nuevo'    => $corte($ev['valor_nuevo']),
+            'ip'             => $ev['ip'],
+        ];
+    }
+
+    // Resumen de cambios de campos con valor anterior y nuevo (el corazón de la investigación)
+    $modificaciones = array_values(array_filter($cronologia, static fn ($e) => $e['accion'] === 'actualizar' && $e['campo'] !== null));
+
+    registrarBitacora('pacientes', $id, 'acceso', 'asistente_investigacion_bitacora', null, "consulta forense · {$dias} días");
+    $datos = [
+        'paciente_folio' => $paciente['folio'],
+        'paciente'       => trim("{$paciente['nombre']} {$paciente['primer_apellido']} {$paciente['segundo_apellido']}"),
+        'periodo'        => ['dias' => $dias, 'desde' => $desde],
+        'total_eventos'  => count($cronologia),
+        'modificaciones_de_campos' => $modificaciones,
+        'cronologia'     => $cronologia,
+        'limites'        => 'Consulta documental de solo lectura de la bitácora. Los valores provienen de los registros de auditoría; verifica cada hallazgo contra las fuentes y el contexto clínico antes de concluir responsabilidad.',
+    ];
+    return [
+        'ok' => true,
+        'resultado' => json_encode($datos, JSON_UNESCAPED_UNICODE),
+        'resumen' => 'Investigó la bitácora del expediente ' . $paciente['folio'] . ' · ' . count($cronologia) . ' eventos, ' . count($modificaciones) . ' modificaciones de campos',
+        'url' => URL_BASE . '/pacientes/ver.php?id=' . $id,
+        'cambio' => false,
+    ];
 }
 
 
@@ -1726,7 +1999,7 @@ function iaCrearDocumentoAnalisis(array $entrada): array
 <div class="firma-bloque">
   <div class="firma-linea"></div>
   <strong>Dirección Médica / Jefatura de Epidemiología y Calidad Clínica</strong><br>
-  <span style="font-size:10pt;">Expediente Clínico Electrónico FEMECI · Certificación NOM-004/NOM-024</span>
+  <span style="font-size:10pt;">Expediente Clínico Electrónico · NOM-004/NOM-024</span>
 </div>
 
 </body>
@@ -1753,4 +2026,3 @@ HTML;
         'cambio' => false
     ];
 }
-

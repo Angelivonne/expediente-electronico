@@ -52,10 +52,16 @@ window.PanelLateral = (() => {
       </div>
       <div class="panel-lateral__lista" data-panel-lista><div class="panel-lateral__esqueleto"><span></span><span></span><span></span><span></span></div></div>`);
     let elementos = [];
+    let errorCarga = '';
     try {
       const r = await fetch(`${BASE}/api/espacio/recientes.php`, { headers: { Accept: 'application/json' } });
-      elementos = (await r.json()).elementos || [];
-    } catch (e) { /* sin conexión: quedan las cerradas de la sesión */ }
+      if (!r.ok) throw new Error('No se pudo cargar la actividad reciente.');
+      const datos = await r.json();
+      if (datos.ok !== true || !Array.isArray(datos.elementos)) throw new Error('La respuesta de actividad reciente no es válida.');
+      elementos = datos.elementos;
+    } catch (e) {
+      errorCarga = e.message || 'No se pudo cargar la actividad reciente.';
+    }
     const cerradas = (leerLista?.('cerradas') || []).slice(0, 6);
     let filtro = 'todo';
     const pintar = () => {
@@ -67,10 +73,16 @@ window.PanelLateral = (() => {
       lista.forEach((x, i) => {
         const g = grupoDia(x.ultima);
         if (g !== grupo) { grupo = g; html += `<div class="panel-lateral__grupo">${g}</div>`; }
-        html += `<a class="panel-lateral__fila" href="${esc(x.url)}" role="menuitem" style="--i:${i}">
-          <span class="panel-lateral__icono">${icono(x.icono)}</span>
-          <span class="panel-lateral__texto"><span>${esc(x.titulo)}</span><small>${esc(x.detalle)}${x.editado ? ' · editado' : ''}</small></span>
-          <time title="${esc(x.ultima)}">${g === 'Hoy' ? hora(x.ultima) : hace(x.ultima)}</time></a>`;
+        const contenido = `<span class="panel-lateral__icono">${icono(x.icono)}</span>
+          <span class="panel-lateral__texto"><span>${esc(x.titulo)}</span><small>${esc(x.detalle)}</small></span>
+          <time title="${esc(x.ultima)}">${g === 'Hoy' ? hora(x.ultima) : hace(x.ultima)}</time>`;
+        html += `<div class="panel-lateral__fila panel-lateral__fila--papelera" style="--i:${i}">
+          ${x.url ? `<a class="panel-lateral__texto panel-lateral__enlace" href="${esc(x.url)}">${contenido}</a>` : `<span class="panel-lateral__texto">${contenido}</span>`}
+          <span class="panel-lateral__acciones">
+            ${x.versionUrl ? `<a class="boton-icono" href="${esc(x.versionUrl)}" title="Ver historial de versiones">${icono('reloj')}</a>` : ''}
+            ${x.restaurable ? `<button type="button" class="boton-icono" data-recientes-restaurar="${Number(x.id)}" title="Restaurar página">${icono('reabrir')}</button>` : ''}
+          </span>
+        </div>`;
       });
       if (filtro === 'todo' && cerradas.length && !q) {
         html += '<div class="panel-lateral__grupo">Pestañas cerradas</div>' + cerradas.map((x, i) => `
@@ -79,9 +91,29 @@ window.PanelLateral = (() => {
             <span class="panel-lateral__texto"><span>${esc(x.titulo)}</span><small>Reabrir en una pestaña</small></span></button>`).join('');
       }
       popover.querySelector('[data-panel-lista]').innerHTML = html
-        || `<div class="panel-lateral__vacio">${q ? 'Nada coincide con la búsqueda.' : 'Aún no hay actividad reciente. Lo que abras o edites aparecerá aquí.'}</div>`;
+        || `<div class="panel-lateral__vacio">${errorCarga ? esc(errorCarga) : q ? 'Nada coincide con la búsqueda.' : 'Aún no hay actividad reciente. Lo que abras o edites aparecerá aquí.'}</div>`;
     };
     popover.querySelector('[data-panel-buscar]').addEventListener('input', pintar);
+    popover.querySelector('[data-panel-lista]').addEventListener('click', async (ev) => {
+      const boton = ev.target.closest('[data-recientes-restaurar]');
+      if (!boton) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const id = Number(boton.dataset.recientesRestaurar);
+      try {
+        await api('paginas/paginas.php', { accion: 'restaurar', id });
+        mostrarNotificacion('exito', 'Página restaurada.');
+        const respuesta = await fetch(`${BASE}/api/espacio/recientes.php`, { headers: { Accept: 'application/json' } });
+        if (!respuesta.ok) throw new Error('La página se restauró, pero no se pudo actualizar la actividad reciente.');
+        const datos = await respuesta.json();
+        if (datos.ok !== true || !Array.isArray(datos.elementos)) throw new Error('La página se restauró, pero la respuesta de actividad reciente no es válida.');
+        elementos = datos.elementos;
+        if (typeof Arbol !== 'undefined') await Arbol.recargar();
+        pintar();
+      } catch (e) {
+        mostrarNotificacion('error', e.message);
+      }
+    });
     popover.querySelectorAll('[data-filtro]').forEach((b) => b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       filtro = b.dataset.filtro;

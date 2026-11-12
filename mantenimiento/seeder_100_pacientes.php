@@ -1,7 +1,7 @@
 <?php
 /**
  * Seeder de 100 pacientes con consultas clínicas completas.
- * Puede ejecutarse vía CLI o vía web con ?token=seeder100femeci
+ * Puede ejecutarse vía CLI o vía web con ?token=seeder100Clínica
  */
 define('PAGINA_PUBLICA', true);
 require_once __DIR__ . '/../config/config.php';
@@ -12,7 +12,7 @@ require_once __DIR__ . '/../app/datos/registros_clinicos.php';
 
 // Verificación de acceso
 $esCli = PHP_SAPI === 'cli';
-$tokenEsperado = 'seeder100femeci';
+$tokenEsperado = 'seeder100Clínica';
 
 if (!$esCli) {
     $tokenRecibido = $_GET['token'] ?? '';
@@ -74,7 +74,7 @@ if (!$autor) {
     } else {
         // Crear usuario médico por defecto
         $pdo->prepare("INSERT INTO usuarios (nombre, correo, cedula_profesional, clave_hash, rol, activo) VALUES (?, ?, ?, ?, 'medico', 1)")
-            ->execute(['Dr. Carlos Mendoza Soto', 'dr.mendoza@femeci.local', '87654321', password_hash('femeci2026', PASSWORD_DEFAULT)]);
+            ->execute(['Dr. Carlos Mendoza Soto', 'dr.mendoza@Clínica.local', '87654321', password_hash('Clínica2026', PASSWORD_DEFAULT)]);
         $autor = [
             'id' => (int) $pdo->lastInsertId(),
             'nombre' => 'Dr. Carlos Mendoza Soto',

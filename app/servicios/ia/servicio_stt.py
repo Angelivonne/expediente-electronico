@@ -9,6 +9,7 @@ VersiÃ³n expandida: conversaciÃ³n natural doctor-paciente con detecciÃ³n
 de secciones del expediente e identificaciÃ³n de hablante.
 """
 import json, os, sys, subprocess, tempfile, re, time, io, wave, threading
+from pathlib import Path
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 # Con pythonw.exe (arranque automÃ¡tico sin ventana) sys.stdout es None y print() falla.
@@ -25,7 +26,7 @@ DISPOSITIVO = "cuda"         # GPU NVIDIA; si CUDA no estÃ¡ disponible, cae a 
 TIPO_COMPUTO = "float16"     # float16 en GPU (int8 al caer a CPU)
 FFMPEG = r"C:\ffmpeg\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe"
 PUERTO = 8766
-VOCAB_PATH = r"C:\xampp\htdocs\ExpedienteFEMECI\app\servicios\ia\vocabulario_medico_es.txt"
+VOCAB_PATH = str(Path(__file__).resolve().with_name("vocabulario_medico_es.txt"))
 
 PROMPT_MEDICO = (
     "Expediente clÃ­nico mexicano. ConversaciÃ³n entre mÃ©dico y paciente. "
@@ -895,11 +896,19 @@ SINTOMAS_MEXICANOS = {
 }
 
 def normalizar_sintoma(texto):
-    t = texto.lower()
-    for jerga, clinico in SINTOMAS_MEXICANOS.items():
-        if jerga in t:
-            return clinico
-    return texto
+    """Reemplaza la jerga por su término clínico DENTRO del texto, sin borrar el resto.
+
+    Antes devolvía el término clínico y ya (si el campo mencionaba una jerga, perdía todo
+    lo demás que se había dicho). Ahora cada frase del diccionario se sustituye en su
+    lugar: "me duele la cabeza desde hace tres días" sigue diciendo desde cuándo.
+    """
+    if not texto:
+        return texto
+    resultado = texto
+    for jerga, clinico in sorted(SINTOMAS_MEXICANOS.items(), key=lambda kv: len(kv[0]), reverse=True):
+        patron = r'(?<![a-z0-9])' + re.escape(jerga) + r'(?![a-z0-9])'
+        resultado = re.sub(patron, clinico, resultado, flags=re.IGNORECASE)
+    return resultado
 
 def extraer_campos(texto):
     campos = {}
@@ -1393,4 +1402,3 @@ if __name__ == "__main__":
     print(f"Cargando modelo {MODELO}â€¦ el servicio ya escucha en 127.0.0.1:{PUERTO}", flush=True)
     print("Deja esta ventana abierta mientras uses el dictado.", flush=True)
     server.serve_forever()
-

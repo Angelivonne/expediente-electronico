@@ -257,20 +257,58 @@ $dcCuerpoHtml = $dcCuerpo
   <?= $dcBloque('Observaciones', $dcD['observaciones'] ?? '') ?>
 <?php break;
 
-    default: ?>
-  <?php
-    $dcEtiquetas = ['fecha_cirugia' => 'Fecha de cirugía', 'procedimiento' => 'Procedimiento', 'tipo_intervencion' => 'Tipo de intervención',
-        'riesgo_quirurgico' => 'Riesgo quirúrgico', 'plan_quirurgico' => 'Plan quirúrgico', 'cuidados' => 'Cuidados',
-        'hallazgos' => 'Hallazgos', 'tecnica' => 'Técnica', 'sangrado' => 'Sangrado', 'complicaciones' => 'Complicaciones',
-        'estado_final' => 'Estado final', 'evolucion' => 'Evolución', 'plan' => 'Plan', 'pronostico' => 'Pronóstico',
-        'valoracion' => 'Valoración', 'medicamentos' => 'Medicamentos', 'observaciones' => 'Observaciones',
-        'inicio' => 'Hora de inicio', 'fin' => 'Hora de fin', 'diagnostico' => 'Diagnóstico'];
-    foreach (($dcD ?? []) as $dcClave => $dcValor) {
-        if ($dcClave === 'diagnosticos' || is_array($dcValor) || $dcValor === '') continue;
-        echo $dcBloque($dcEtiquetas[$dcClave] ?? ucfirst(str_replace('_', ' ', $dcClave)), (string) $dcValor);
-    }
-    if (!empty($dcD['diagnosticos'])) echo $dcDiagnosticos($dcD, 'Diagnósticos');
-  ?>
+    case 'preoperatoria': ?>
+  <?= $dcDatos([
+      'Fecha de la cirugía' => $dcFecha($dcD['fecha_cirugia'] ?? null),
+      'Tipo de intervención' => $dcD['tipo_intervencion'] ?? '',
+      'Riesgo quirúrgico' => $dcD['riesgo_quirurgico'] ?? '',
+      'Fecha de la nota' => $dcFecha($registro['fecha'] ?? null),
+  ]) ?>
+  <?= $dcDiagnosticos($dcD, 'Diagnóstico preoperatorio') ?>
+  <?= $dcBloque('Plan quirúrgico', $dcD['plan_quirurgico'] ?? '') ?>
+  <?= $dcBloque('Cuidados preoperatorios', $dcD['cuidados'] ?? '') ?>
+<?php break;
+
+    case 'transoperatoria': ?>
+  <?= $dcDatos([
+      'Procedimiento' => $dcD['procedimiento'] ?? '', 'Hora de inicio' => $dcD['inicio'] ?? '',
+      'Hora de fin' => $dcD['fin'] ?? '', 'Sangrado' => $dcD['sangrado'] ?? '',
+      'Fecha de la nota' => $dcFecha($registro['fecha'] ?? null),
+  ]) ?>
+  <?= $dcDiagnosticos($dcD, 'Diagnósticos operatorios') ?>
+  <?= $dcBloque('Hallazgos', $dcD['hallazgos'] ?? '') ?>
+  <?= $dcBloque('Técnica quirúrgica', $dcD['tecnica'] ?? '') ?>
+  <?= $dcBloque('Complicaciones', $dcD['complicaciones'] ?? '', 'detalle-clinico__bloque--alerta') ?>
+  <?= $dcBloque('Estado final del paciente', $dcD['estado_final'] ?? '') ?>
+<?php break;
+
+    case 'postoperatoria': ?>
+  <?= $dcDatos(['Procedimiento' => $dcD['procedimiento'] ?? '', 'Fecha de la nota' => $dcFecha($registro['fecha'] ?? null)]) ?>
+  <?= $dcDiagnosticos($dcD, 'Diagnóstico postoperatorio') ?>
+  <?= $dcBloque('Evolución postoperatoria', $dcD['evolucion'] ?? '') ?>
+  <?= $dcBloque('Plan', $dcD['plan'] ?? '') ?>
+  <?= $dcBloque('Complicaciones', $dcD['complicaciones'] ?? '', 'detalle-clinico__bloque--alerta') ?>
+  <?= $dcBloque('Pronóstico', $dcD['pronostico'] ?? '') ?>
+<?php break;
+
+    case 'enfermeria': ?>
+  <?= $dcDatos(['Fecha de la nota' => $dcFecha($registro['fecha'] ?? null)]) ?>
+  <?= $dcSignos($dcD['signos'] ?? []) ?>
+  <?= $dcBloque('Valoración', $dcD['valoracion'] ?? '') ?>
+  <?= $dcBloque('Cuidados realizados', $dcD['cuidados'] ?? '') ?>
+  <?= $dcDiagnosticos($dcD) ?>
+  <?= $dcBloque('Medicamentos administrados', $dcD['medicamentos'] ?? '') ?>
+  <?= $dcBloque('Observaciones', $dcD['observaciones'] ?? '') ?>
+<?php break;
+
+    case 'resumen_clinico': ?>
+  <?= $dcDatos(['Fecha del resumen' => $dcFecha($registro['fecha'] ?? null)]) ?>
+  <?= $dcBloque('Padecimiento actual', $dcD['padecimiento_actual'] ?? '') ?>
+  <?= $dcDiagnosticos($dcD) ?>
+  <?= $dcBloque('Tratamientos', $dcD['tratamiento'] ?? '') ?>
+  <?= $dcBloque('Evolución', $dcD['evolucion'] ?? '') ?>
+  <?= $dcBloque('Pronóstico', $dcD['pronostico'] ?? '') ?>
+  <?= $dcBloque('Estudios de laboratorio y gabinete', $dcD['estudios'] ?? '') ?>
 <?php endswitch; ?>
 </div>
 <?php unset($dcModo, $dcDocumento, $dcD, $dcTipo, $dcH, $dcBloque, $dcBloquesCampo, $dcDatos, $dcSignos, $dcDiagnosticos, $dcDias, $dcFecha, $dcM, $dcCuerpo, $dcCuerpoHtml); ?>

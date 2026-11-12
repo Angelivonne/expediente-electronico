@@ -7,7 +7,7 @@
 -- Repetirlo no duplica (INSERT IGNORE por uq_medicamentos_clave).
 -- ==========================================================================
 
-USE expediente_expediente;
+USE clinica;
 
 -- Sustituye @INST por el id de tu institución antes de ejecutar.
 SET @INST := NULL;  -- ejemplo: SET @INST := 1;

@@ -8,6 +8,14 @@
  * Espera: $catalogoSistema (catálogo), $catalogoDatos (filasDeCatalogo), $busquedaCatalogo (texto),
  *         $id (id de la página) y $pagina (fila de `paginas`).
  */
+if (!isset($id, $catalogoSistema, $catalogoDatos, $busquedaCatalogo)
+    || !is_int($id)
+    || !is_array($catalogoSistema)
+    || !is_array($catalogoDatos)
+    || !is_string($busquedaCatalogo)) {
+    throw new LogicException('Faltan los datos requeridos para mostrar el catálogo.');
+}
+
 $filas      = $catalogoDatos['filas'] ?? [];
 $total      = (int) ($catalogoDatos['total'] ?? 0);
 $numero     = (int) ($catalogoDatos['pagina'] ?? 1);

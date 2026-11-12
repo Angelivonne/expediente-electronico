@@ -636,16 +636,27 @@ function iaPlantillaBaseDatos(int $id, string $clave): array
         }
         $columnas[] = $col;
     }
-    guardarContenidoBdIa($p, ['columnas' => $columnas, 'siguiente' => count($columnas) + 1, 'vistas' => [['id' => 'v1', 'tipo' => 'tabla', 'nombre' => 'Tabla']]], 'plantilla', $plantilla[0]);
+    $pdo = db();
     $n = 0;
-    if ($clave === 'expedientes' && puede('ver_expediente')) {
-        $pac = db()->prepare('SELECT id, folio FROM pacientes WHERE institucion_id = ? AND eliminado_en IS NULL ORDER BY nombre LIMIT 5000');
-        $pac->execute([institucionId()]);
-        $ins = db()->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)');
-        foreach ($pac->fetchAll() as $k => $x) {
-            $ins->execute([$id, json_encode(['c1' => $x['folio'], 'c2' => (int) $x['id'], 'c3' => 'Activo']), $k + 1]);
-            $n++;
+    $pdo->beginTransaction();
+    try {
+        guardarContenidoBdIa($p, ['columnas' => $columnas, 'siguiente' => count($columnas) + 1, 'vistas' => [['id' => 'v1', 'tipo' => 'tabla', 'nombre' => 'Tabla']]], 'plantilla', $plantilla[0]);
+        if ($clave === 'expedientes' && puede('ver_expediente')) {
+            $pac = $pdo->prepare('SELECT id, folio FROM pacientes WHERE institucion_id = ? AND eliminado_en IS NULL ORDER BY nombre LIMIT 5000');
+            $pac->execute([institucionId()]);
+            $ins = $pdo->prepare('INSERT INTO pagina_filas (pagina_id, valores, orden) VALUES (?, ?, ?)');
+            foreach ($pac->fetchAll() as $k => $x) {
+                $ins->execute([$id, json_encode(['c1' => $x['folio'], 'c2' => (int) $x['id'], 'c3' => 'Activo']), $k + 1]);
+                registrarAuditoriaFilaPagina($id, (int) $pdo->lastInsertId(), 'crear', 'fila');
+                $n++;
+            }
         }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
     return exitoIa(['columnas' => array_column($columnas, 'nombre'), 'filas' => $n], "Aplicó la plantilla «{$plantilla[0]}»" . ($n ? " con {$n} pacientes" : ''), $id, true);
 }

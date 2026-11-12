@@ -18,6 +18,11 @@ $camposExtraPaciente = [
 
 $datos   = array_fill_keys(array_merge($campos, $camposExtraPaciente), '');
 $errores = [];
+$consultaNacionalidades = db()->prepare(
+    'SELECT nombre FROM catalogo_nacionalidades WHERE activo = 1 ORDER BY nombre'
+);
+$consultaNacionalidades->execute();
+$nacionalidadesCatalogo = array_values(array_unique(array_map('strval', $consultaNacionalidades->fetchAll(PDO::FETCH_COLUMN))));
 
 // Propiedades que el administrador agregó a la base de pacientes: forman parte del formato de registro
 $propiedadesExtra = json_decode((string) config('pacientes_propiedades'), true) ?: [];
@@ -185,6 +190,10 @@ if ($original) {
 $notificacion  = $errores
     ? ['tipo' => 'error', 'texto' => $errores['general'] ?? 'Revisa los campos marcados en rojo.']
     : null;
+$nacionalidadActual = trim($datos['nacionalidad']);
+if ($nacionalidadActual !== '' && !in_array($nacionalidadActual, $nacionalidadesCatalogo, true)) {
+    $nacionalidadesCatalogo[] = $nacionalidadActual;
+}
 
 // Ayudas para pintar valores y errores
 $valorCampo = fn (string $c): string => e($datos[$c]);
@@ -277,7 +286,11 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 
       <div class="campo col-3">
         <label class="campo__etiqueta" for="nacionalidad">Nacionalidad</label>
-        <div class="campo__control"><input id="nacionalidad" name="nacionalidad" value="<?= $valorCampo('nacionalidad') ?>" maxlength="40" autocomplete="off"></div>
+        <div class="campo__control"><input id="nacionalidad" name="nacionalidad" value="<?= $valorCampo('nacionalidad') ?>" maxlength="40" list="catalogo-nacionalidades" placeholder="Buscar nacionalidad" autocomplete="off"></div>
+        <datalist id="catalogo-nacionalidades">
+          <?php foreach ($nacionalidadesCatalogo as $nacionalidad): ?><option value="<?= e($nacionalidad) ?>"><?php endforeach; ?>
+        </datalist>
+        <span class="campo__ayuda">Sugerencias del catálogo; los datos históricos se conservan.</span>
       </div>
 
       <div class="campo col-3"><label class="campo__etiqueta" for="estado_civil">Estado civil</label><div class="campo__control"><input id="estado_civil" name="estado_civil" value="<?= $valorCampo('estado_civil') ?>" maxlength="40"></div></div>

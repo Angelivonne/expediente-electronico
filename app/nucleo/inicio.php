@@ -38,6 +38,7 @@ if (!usuarioActual() && (defined('ACCESO_AUTOMATICO') && ACCESO_AUTOMATICO) && !
         session_regenerate_id(true);
         $_SESSION['usuario']    = ['id' => (int) $cuentaAuto['id'], 'nombre' => $cuentaAuto['nombre'], 'rol' => $cuentaAuto['rol']];
         $_SESSION['inicio']     = time();
+        $_SESSION['sesion_anuncio'] = bin2hex(random_bytes(16));
         $_SESSION['regenerada'] = time();
         $_SESSION['ultimo_uso'] = time();
         db()->prepare('UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?')->execute([(int) $cuentaAuto['id']]);
@@ -47,6 +48,9 @@ if (!usuarioActual() && (defined('ACCESO_AUTOMATICO') && ACCESO_AUTOMATICO) && !
 // En cada petición se confirma que la cuenta sigue activa y se toma su rol actual:
 // si el administrador la desactiva o le cambia el rol, la sesión abierta lo refleja de inmediato.
 if (usuarioActual()) {
+    if (empty($_SESSION['sesion_anuncio'])) {
+        $_SESSION['sesion_anuncio'] = bin2hex(random_bytes(16));
+    }
     // Defensivo: solo pedir institucion_id si la columna ya existe (evita crash en BD sin migrar)
     $colsUsuario = 'nombre, rol, foto, paciente_id';
     if (function_exists('columnaExiste') && columnaExiste('usuarios', 'institucion_id')) {
@@ -96,5 +100,3 @@ if (defined('RESPUESTA_JSON') && usuarioActual() && ($_SERVER['REQUEST_METHOD'] 
     && isset($_SERVER['HTTP_X_IDEMPOTENCIA'])) {
     atenderIdempotencia();
 }
-
-

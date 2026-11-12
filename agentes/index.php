@@ -172,5 +172,3 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 <script nonce="<?= nonceCsp() ?>" src="<?= recurso("js/modulos/agentes.js") ?>"></script>
 
 <?php require __DIR__ . '/../app/vistas/plantilla/pie.php'; ?>
-
-

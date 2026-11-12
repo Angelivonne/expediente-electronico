@@ -69,6 +69,7 @@ $catalogoNoDisponible = $catalogoCandidato !== null && !catalogoConTabla($catalo
 $catalogoSistema = $catalogoNoDisponible ? null : $catalogoCandidato;
 $busquedaCatalogo = '';
 $catalogoDatos    = null;
+$datosBd          = null;
 if ($catalogoSistema) {
     $busquedaCatalogo = trim((string) ($_GET['q'] ?? ''));
     $catalogoDatos    = filasDeCatalogo($catalogoSistema, $busquedaCatalogo, (int) ($_GET['p'] ?? 1));
@@ -129,6 +130,9 @@ $json = fn ($v) => json_encode($v, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_
     </div>
   <?php endif; ?>
   <h1 class="hoja__titulo" data-hoja-titulo data-placeholder="<?= e($sinTitulo) ?>"<?= $editable ? ' contenteditable="plaintext-only" spellcheck="true"' : '' ?>><?= e($pagina['titulo']) ?></h1>
+  <?php if ($pagina['tipo'] === 'base_datos' && !$catalogoSistema && !$catalogoNoDisponible): ?>
+    <p><a href="<?= e(URL_BASE . '/paginas/auditoria.php?id=' . $id) ?>">Historial de cambios y evidencia</a></p>
+  <?php endif; ?>
   <?php if ($pagina['tipo'] === 'base_datos' && !$catalogoSistema && !$catalogoNoDisponible && puede('importar_exportar')): ?>
     <div class="bd__herramientas hoja__herramientas">
       <button type="button" class="boton-icono" data-herramientas-datos-pagina data-pagina="<?= $id ?>" aria-haspopup="menu" title="Herramientas de datos" aria-label="Herramientas de datos"><?= icono('tabla') ?></button>

@@ -2,24 +2,25 @@
 /**
  * Respaldos de la base de datos (NOM-024 6.6: disponibilidad e integridad).
  *
- *   - mysqldump de expediente_expediente (solo esta base, sin CREATE DATABASE) comprimido en
+ *   - mysqldump de clinica (solo esta base, sin CREATE DATABASE) comprimido en
  *     privado/respaldos/respaldo-AAAAMMDD-HHMMSS-motivo.sql.gz, con su suma SHA-256 al lado (.sha256).
  *   - Se conservan los 14 más recientes.
  *   - Automático y perezoso: la primera petición del día lanza en segundo plano mantenimiento/respaldar.php;
  *     un candado (flock) evita que se repita. El Programador de tareas de Windows puede llamar al mismo
  *     script con mantenimiento/respaldo_diario.bat (docs/respaldos.md).
  *   - Restaurar es destructivo: solo administrador, con confirmación escrita y un respaldo previo automático.
- *     Necesita el usuario de MySQL expediente_respaldo (privado/respaldo_bd.php); la app normal no puede borrar tablas.
+ *     Necesita el usuario de MySQL clinica_respaldo (privado/respaldo_bd.php); la app normal no puede borrar tablas.
  */
 
 const CARPETA_RESPALDOS   = __DIR__ . '/../../../privado/respaldos';
 const RESPALDOS_CONSERVAR = 14;
-const RESPALDO_PATRON     = '/^respaldo-(\d{8})-(\d{6})-(automatico|manual|programado|antes_de_restaurar)\.sql\.gz$/';
+const RESPALDO_PATRON     = '/^respaldo-(\d{8})-(\d{6})-(automatico|manual|programado|antes_de_restaurar|antes_de_migracion)\.sql\.gz$/';
 const MOTIVOS_RESPALDO    = [
     'automatico'         => 'Automático',
     'programado'         => 'Programado',
     'manual'             => 'Manual',
     'antes_de_restaurar' => 'Antes de restaurar',
+    'antes_de_migracion' => 'Antes de actualizar el esquema',
 ];
 
 /**
@@ -108,7 +109,7 @@ function soltarCandado($candado): void
  * Crea un respaldo. Devuelve ['ok' => true, 'archivo', 'bytes', 'sha256'] o ['ok' => false, 'error'].
  * $candado: el que ya tiene quien llama (restaurar), para no esperarse a sí mismo.
  */
-function crearRespaldo(string $motivo, $candado = null): array
+function crearRespaldo(string $motivo, $candado = null, ?array $credencialesForzadas = null): array
 {
     if (!isset(MOTIVOS_RESPALDO[$motivo])) {
         return ['ok' => false, 'error' => 'Motivo de respaldo no válido.'];
@@ -134,7 +135,7 @@ function crearRespaldo(string $motivo, $candado = null): array
         if (!is_file($mysqldump)) {
             throw new RuntimeException('No se encontró mysqldump en ' . MYSQL_BIN . '.');
         }
-        $credenciales = credencialesRespaldo();
+        $credenciales = $credencialesForzadas ?? credencialesRespaldo();
         $opciones = archivoOpcionesMysql($credenciales);
         // Los triggers (cola de sincronización) solo se pueden leer con el usuario de respaldos; con el de la app
         // se omiten y, al restaurar, se vuelven a generar (regenerarTriggers)
@@ -301,7 +302,7 @@ function verificarIntegridadBd(): array
 }
 
 /**
- * Restaura un respaldo sobre expediente_expediente. Antes hace un respaldo automático del estado actual.
+ * Restaura un respaldo sobre clinica. Antes hace un respaldo automático del estado actual.
  * Devuelve ['ok' => true, 'previo' => archivo] o ['ok' => false, 'error'].
  */
 function restaurarRespaldo(string $nombre): array
@@ -377,6 +378,21 @@ function regenerarTriggers(string $opciones): ?string
     if (!is_string($sql) || !str_contains($sql, 'TRIGGER')) {
         return 'No se pudieron regenerar los triggers de sincronización: ejecuta database/sincronizacion_triggers.php como root.';
     }
+    $tablaBusqueda = db()->prepare(
+        'SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?'
+    );
+    $tablaBusqueda->execute(['historial_clinico_busqueda']);
+    if ($tablaBusqueda->fetchColumn()) {
+        $generadorBusqueda = realpath(__DIR__ . '/../../../database/busqueda_historial_triggers.php');
+        if (!$generadorBusqueda) {
+            return 'No se pudieron regenerar los triggers de búsqueda clínica: falta database/busqueda_historial_triggers.php.';
+        }
+        $sqlBusqueda = shell_exec('"' . str_replace('/', DIRECTORY_SEPARATOR, PHP_CLI) . '" -f "' . $generadorBusqueda . '"');
+        if (!is_string($sqlBusqueda) || !str_contains($sqlBusqueda, 'CREATE TRIGGER historial_busqueda_ai')) {
+            return 'No se pudieron regenerar los triggers de búsqueda clínica.';
+        }
+        $sql .= "\n" . $sqlBusqueda;
+    }
     $proceso = proc_open([MYSQL_BIN . '/mysql.exe', '--defaults-extra-file=' . $opciones, DB_NOMBRE],
         [0 => ['pipe', 'r'], 1 => ['file', 'NUL', 'w'], 2 => ['file', 'NUL', 'w']], $tuberias, null, null, ['bypass_shell' => true]);
     if (!is_resource($proceso)) {
@@ -384,7 +400,9 @@ function regenerarTriggers(string $opciones): ?string
     }
     fwrite($tuberias[0], $sql);
     fclose($tuberias[0]);
-    return proc_close($proceso) === 0 ? null : 'No se pudieron regenerar los triggers de sincronización: ejecuta database/sincronizacion_triggers.php como root.';
+    return proc_close($proceso) === 0
+        ? null
+        : 'No se pudieron regenerar los triggers de sincronización o búsqueda clínica; revisa database/sincronizacion_triggers.php y database/busqueda_historial_triggers.php.';
 }
 
 /* ---------- Respaldo diario perezoso ---------- */

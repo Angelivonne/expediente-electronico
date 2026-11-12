@@ -7,7 +7,7 @@
  *
  * Programarla cada minuto en el Programador de tareas de Windows:
  *   Programa: C:\xampp\php\php.exe
- *   Argumentos: C:\xampp\htdocs\ExpedienteExpediente\app\tareas\push.php
+ *   Argumentos: C:\xampp\htdocs\clinica\app\tareas\push.php
  * O en Linux (cron):  * * * * * php /ruta/app/tareas/push.php
  */
 if (PHP_SAPI !== 'cli') {

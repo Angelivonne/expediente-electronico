@@ -265,7 +265,7 @@ function entidadesMotor(): array
                 'monto'       => ['texto' => 'Monto', 'tipo' => 'numero', 'req' => true, 'min' => 0.01, 'max' => 9999999999.99, 'ancho' => 120],
                 'metodo'      => ['texto' => 'Método', 'tipo' => 'opcion', 'opciones' => ['efectivo' => 'Efectivo', 'tarjeta' => 'Tarjeta', 'transferencia' => 'Transferencia', 'cheque' => 'Cheque', 'otro' => 'Otro'], 'ancho' => 130],
                 'estado'      => ['texto' => 'Estado', 'tipo' => 'opcion', 'opciones' => ['pagado' => 'Pagado', 'pendiente' => 'Pendiente', 'cancelado' => 'Cancelado'], 'ancho' => 120],
-                'paciente_id' => ['texto' => 'Paciente', 'tipo' => 'numero', 'ancho' => 90],
+                'paciente_id' => ['texto' => 'Paciente', 'tipo' => 'opcion', 'opciones' => [], 'relacion_dinamica' => true, 'ancho' => 220],
                 'profesional_id' => ['texto' => 'Profesional', 'tipo' => 'opcion', 'opciones' => $opcionesProfesionales, 'ancho' => 180],
                 'establecimiento_id' => ['texto' => 'Establecimiento', 'tipo' => 'opcion', 'opciones' => $opcionesEstablecimientos, 'ancho' => 220],
                 'factura_id'  => ['texto' => 'Factura', 'tipo' => 'opcion', 'opciones' => $opcionesFacturas, 'ancho' => 180],

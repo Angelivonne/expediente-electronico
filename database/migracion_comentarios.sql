@@ -1,6 +1,6 @@
 -- Comentarios por registro del expediente (notas breves del equipo, con autor y fecha).
 -- Un comentario no sustituye una nota clínica: sirve para pendientes y avisos entre el personal.
--- Ejecutar como root una sola vez:  mysql -u root -p expediente_expediente < database/migracion_comentarios.sql
+-- Ejecutar como root una sola vez:  mysql -u root -p clinica < database/migracion_comentarios.sql
 
 CREATE TABLE IF NOT EXISTS comentarios (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -17,5 +17,5 @@ CREATE TABLE IF NOT EXISTS comentarios (
   KEY idx_comentarios_creado (creado_en)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-GRANT SELECT, INSERT, UPDATE ON expediente_expediente.comentarios TO 'expediente_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON clinica.comentarios TO 'clinica_app'@'localhost';
 FLUSH PRIVILEGES;

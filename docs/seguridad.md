@@ -12,6 +12,10 @@ Archivo: `app/nucleo/seguridad.php`, `app/nucleo/inicio.php`
 - **Nunca se muestran errores al usuario**: `display_errors=0`, `log_errors=1`; todo va a
   `privado/registros/php-errores.log`. Un `set_exception_handler` responde 500 con un mensaje
   genérico ("Ocurrió un error interno") en HTML o JSON.
+- El BAT principal de arranque y el instalador ejecutan `mantenimiento/validar_fuentes.php`;
+  detienen el proceso si los archivos PHP esenciales faltan, están vacíos, tienen bytes nulos,
+  fallan al analizarse o `seguridad.php` ya no define `configurarErrores()`. El arranque también
+  permite ejecutarlo sin iniciar servicios con `iniciar_clinica.bat validar`.
 - **HTTPS obligatorio** fuera de loopback: si la petición no es HTTPS y no viene de
   `127.0.0.1`/`::1`, responde 403.
 - **CSP con nonce** por petición (`script-src 'self' 'nonce-…'`), `object-src 'none'`,
@@ -35,6 +39,23 @@ Archivo: `app/nucleo/seguridad.php` (`iniciarSesionSegura`)
 - **Duración máxima: 12 h** (`HORAS_SESION_MAXIMA`).
 - **Regeneración del ID cada 15 min** y al iniciar/cerrar sesión (evita fijación de sesión).
 - Sesión vacía y regenerada al vencer; aviso "Tu sesión se cerró por inactividad".
+
+### Actividad del personal
+
+- `api/equipo/tiempo.php` registra segundos activos aproximados de la sesión autenticada mientras la
+  pestaña está visible y el usuario tuvo interacción reciente. No recibe pulsaciones ni contenido.
+- El dato se limita a la cuenta actual, la clínica y el día; el hash de sesión no permite recuperar
+  el identificador de sesión. El perfil lo etiqueta como estimación, no como asistencia.
+- Cada usuario puede consultar su propio detalle. El detalle de otras personas requiere el permiso
+  `auditoria_equipo`, concedido solo a administración de forma predeterminada.
+- La cuadrícula del perfil cuenta acciones de crear, actualizar y eliminar que estén presentes en
+  `bitacora`; no afirma que todas las escrituras posibles del sistema estén auditadas.
+- Los cursores colaborativos solo se envían a personas que comparten la misma sección o página,
+  requieren `ver_expediente`, se validan como coordenadas normalizadas y vencen a los 12 segundos.
+  Cada usuario puede ocultarlos localmente; no se guarda un historial de posiciones.
+- La retroalimentación del equipo se guarda separada de los comentarios clínicos. Autor y personal
+  con `auditoria_equipo` pueden verla; el destinatario solo ve notas compartidas explícitamente por
+  un revisor. La interfaz advierte no incluir datos de pacientes y no publica conteos ni calificaciones.
 
 ---
 
@@ -78,6 +99,9 @@ Archivo: `app/nucleo/funciones.php`, endpoints en `api/`
   `json_decode` y verificación de tipos; se rechaza lo que no cumple.
 - **Saneado de texto** (mojibake): `sanoTexto` / `saneaProfundo`.
 - **Redirecciones** con `URL_BASE` (no con `Host`).
+- El CSV agregado de Morbilidad para compartir omite diagnósticos con menos de cinco personas y
+  no exporta edades, sexo ni identificadores. Las gráficas se generan en un directorio temporal
+  por solicitud y se incrustan en la respuesta; no se guardan como imágenes públicas compartidas.
 
 ---
 
@@ -87,15 +111,17 @@ Archivos: `config/db.php`, `database/usuario_aplicacion.sql`, `database/esquema.
 
 - **PDO con consultas preparadas** (`ATTR_EMULATE_PREPARES = false`), modo excepción,
   `utf8mb4`.
-- **Usuario MySQL de privilegios mínimos** `expediente_app` (nunca `root`); credenciales en
+- **Usuario MySQL de privilegios mínimos** `clinica_app` (nunca `root`); credenciales en
   `privado/bd.php` (fuera de la web). Permisos por tabla:
   - `SELECT, INSERT, UPDATE` en datos operativos,
   - **`historial_clinico` y `bitacora`: solo `SELECT, INSERT`** (no se pueden modificar ni borrar),
   - `limites`/espacio de trabajo: también `DELETE`.
-- **Usuario aparte para respaldos** `expediente_respaldo` (`privado/respaldo_bd.php`); la app normal
+- **Usuario aparte para respaldos** `clinica_respaldo` (`privado/respaldo_bd.php`); la app normal
   no puede borrar tablas.
 - **Multitenencia**: casi todas las consultas filtran por `institucion_id`; `puedeVerExpediente()`
   comprueba que el paciente sea de la institución de la sesión.
+- `database/migracion_equipo.sql` concede únicamente SELECT/INSERT/UPDATE en las tablas nuevas
+  de actividad y retroalimentación; no concede borrado desde la aplicación.
 - **Respaldos**: `.sql.gz` + suma **SHA-256** al lado, rotación, verificación de integridad,
   candado para evitar respaldos simultáneos (`app/servicios/sistema/respaldos.php`).
 - **Secretos cifrados**: `configuracion` guarda valores sensibles con **AES-256-GCM**
@@ -224,11 +250,32 @@ Archivos: `app/servicios/sincronizacion/*`, `api/sincronizacion/*`
 
 ## 13. Auditoría y trazabilidad (NOM-024)
 
+- **Almacenamientos separados lógicamente** (tablas distintas dentro del mismo esquema MySQL):
+  `asistente_memoria` guarda recuerdos del asistente por usuario; `agentes_memoria` y
+  `agentes_conversaciones` guardan memoria e historial por agente; `notificaciones` conserva la
+  bandeja y su `actor_id` cuando se conoce quién originó el aviso; `paginas`/`pagina_filas` contienen
+  el espacio de trabajo. No se mezclan esos datos en una misma tabla ni son bases MySQL físicas
+  independientes.
 - Tabla **`bitacora`**: tabla, registro, acción, campo, valor anterior/nuevo, usuario, institución,
   IP y fecha.
 - Registro inmutable a nivel MySQL (solo `INSERT`).
+- Las filas de bases de datos del espacio de trabajo guardan eventos por fila/celda, con usuario,
+  hora del servidor, página, fila y campo. No se copian valores de celdas a la bitácora; la persona
+  con acceso a la página puede revisar el historial y exportarlo a CSV. Si no se puede escribir la
+  evidencia de una mutación de fila, la operación se revierte. Este seguimiento no reconstruye
+  cambios anteriores a su instalación.
+- Este historial es evidencia técnica de actividad, no una firma digital ni una certificación legal.
 - Se registra: accesos, altas/cambios/bajas, firmas y revocaciones, creación/uso/revocación de
   códigos, autorizaciones entre clínicas, subida/consulta de imágenes, respaldos.
+- Las notas dictadas conservan, con revisión expresa, el texto reconocido, el autor, la hora del
+  servidor y huellas SHA-256 del texto y de los campos finales. La sesión vincula la transcripción
+  pendiente a un formulario, paciente y tipo de nota por un máximo de 24 horas; no se almacena el
+  audio. Las huellas ayudan a detectar cambios, pero no son una firma electrónica ni una garantía
+  legal. La IA no recibe el texto fuente al leer el expediente; la vista de trazabilidad queda
+  disponible al personal autorizado.
+- La herramienta de trazabilidad de medicamentos de la IA es de solo lectura y limita sus consultas
+  a los registros de la institución. Informa hechos documentados de recetas y Kardex; no decide si
+  una dosis es segura, no diagnostica y no atribuye causalidad o responsabilidad.
 
 ---
 

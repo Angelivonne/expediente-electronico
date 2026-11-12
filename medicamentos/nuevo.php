@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'via'              => trim((string) ($_POST['via'] ?? '')),
             'laboratorio'      => trim((string) ($_POST['laboratorio'] ?? '')),
             'activo'           => isset($_POST['activo']) ? 1 : 0,
+            'foto'             => (string) ($m['foto'] ?? ''),
         ];
 
         if ($datos['clave'] === '')     $errores['clave'] = 'Escribe una clave.';

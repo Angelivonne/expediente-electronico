@@ -67,8 +67,8 @@ function llaveCifrado(): string
     }
 
     // Semilla determinista basada en el entorno para garantizar persistencia entre despliegues
-    $semilla = (string) (getenv('LLAVE_CIFRADO') ?: getenv('DB_CLAVE') ?: 'femeci_expediente_secreto_seguro_2026');
-    $llaveDeterminista = hash('sha256', 'FEMECI_SALT_' . $semilla, true);
+    $semilla = (string) (getenv('LLAVE_CIFRADO') ?: getenv('DB_CLAVE') ?: 'Clínica_expediente_secreto_seguro_2026');
+    $llaveDeterminista = hash('sha256', 'Clínica_SALT_' . $semilla, true);
 
     $dir = dirname(ARCHIVO_LLAVE);
     if (!is_dir($dir)) {
@@ -112,8 +112,8 @@ function descifrar(?string $guardado): ?string
     }
 
     // Intento 2: llave derivada de la contraseña de BD como respaldo
-    $semilla = (string) (getenv('LLAVE_CIFRADO') ?: getenv('DB_CLAVE') ?: 'femeci_expediente_secreto_seguro_2026');
-    $llaveAlt = hash('sha256', 'FEMECI_SALT_' . $semilla, true);
+    $semilla = (string) (getenv('LLAVE_CIFRADO') ?: getenv('DB_CLAVE') ?: 'Clínica_expediente_secreto_seguro_2026');
+    $llaveAlt = hash('sha256', 'Clínica_SALT_' . $semilla, true);
     $texto = @openssl_decrypt($ciphertext, 'aes-256-gcm', $llaveAlt, OPENSSL_RAW_DATA, $iv, $tag);
     if ($texto !== false) {
         return $texto;

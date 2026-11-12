@@ -1,10 +1,10 @@
 -- ==========================================================================
 -- Expediente Expediente — Migración: catálogo de medicamentos, CIE-10 e incapacidades
--- Ejecutar en la base de datos expediente_expediente existente.
+-- Ejecutar en la base de datos clinica existente.
 -- Repetirlo no cambia nada (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
 -- ==========================================================================
 
-USE expediente_expediente;
+USE clinica;
 
 -- --------------------------------------------------------
 -- Catálogo de medicamentos de la institución

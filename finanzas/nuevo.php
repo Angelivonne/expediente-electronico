@@ -22,15 +22,20 @@ try {
     // La migración es opcional para conservar el registro manual de movimientos.
 }
 $servicioId = 0;
+$tipoInicial = (string) ($_GET['tipo'] ?? '');
+if (!in_array($tipoInicial, ['ingreso', 'gasto'], true)) {
+    $tipoInicial = 'ingreso';
+}
 
 $datos   = array_fill_keys($campos, '');
 $errores = [];
 
 $datos['fecha']   = date('Y-m-d');
 $datos['profesional_id'] = (string) (usuarioActual()['id'] ?? '');
-$datos['tipo']    = 'ingreso';
+$datos['tipo']    = $tipoInicial;
 $datos['estado']  = 'pagado';
 $datos['metodo']  = 'efectivo';
+$pacienteSeleccionado = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $datosEnviados = is_array($_POST['datos'] ?? null) ? $_POST['datos'] : [];
@@ -63,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($datos['fecha'] === '') {
         $errores['fecha'] = 'La fecha es obligatoria.';
-    } elseif (!DateTime::createFromFormat('!Y-m-d', $datos['fecha'])) {
+    } elseif (($fechaMovimiento = DateTime::createFromFormat('!Y-m-d', $datos['fecha'])) === false || $fechaMovimiento->format('Y-m-d') !== $datos['fecha']) {
         $errores['fecha'] = 'Fecha no valida.';
     }
     if ($datos['concepto'] === '') {
@@ -97,21 +102,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $alta = motorCrear('finanzas_movimientos', $entrada);
         if (!empty($alta['ok'])) {
             mensajeFlash('exito', 'Movimiento registrado.');
-            redirigir('/finanzas/');
+            redirigir('/finanzas/?' . http_build_query([
+                'tipo' => $datos['tipo'],
+                'mes' => substr($datos['fecha'], 0, 7),
+            ]));
         }
         $errores = array_merge($errores, $alta['errores'] ?? []);
     }
 }
 
-$tituloPagina   = 'Nuevo movimiento';
+$pacienteSeleccionadoId = filter_var($datos['paciente_id'] ?? null, FILTER_VALIDATE_INT);
+if ($pacienteSeleccionadoId !== false && $pacienteSeleccionadoId !== null && $pacienteSeleccionadoId > 0) {
+    $consultaPaciente = db()->prepare(
+        'SELECT id, folio, nombre, primer_apellido, segundo_apellido
+           FROM pacientes
+          WHERE id = ? AND institucion_id = ? AND eliminado_en IS NULL
+          LIMIT 1'
+    );
+    $consultaPaciente->execute([$pacienteSeleccionadoId, institucionId()]);
+    $pacienteSeleccionado = $consultaPaciente->fetch(PDO::FETCH_ASSOC) ?: null;
+    if (!$pacienteSeleccionado && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $datos['paciente_id'] = '';
+        $errores['paciente_id'] = 'El paciente ya no está disponible en esta clínica.';
+    }
+}
+
+$tituloMovimiento = ($datos['tipo'] ?? $tipoInicial) === 'gasto' ? 'Registrar gasto' : 'Registrar ingreso';
+$tituloPagina   = $tituloMovimiento;
 $seccionActiva  = 'finanzas';
 $claseContenido = 'pagina--ancha';
-$migas          = [['texto' => 'Finanzas', 'url' => URL_BASE . '/finanzas/'], ['texto' => 'Nuevo movimiento']];
+$migas          = [['texto' => 'Finanzas', 'url' => URL_BASE . '/finanzas/'], ['texto' => $tituloMovimiento]];
 
 require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
 ?>
 <div class="pagina__cabecera">
-  <h1 class="pagina__titulo">Nuevo movimiento</h1>
+  <h1 class="pagina__titulo"><?= e($tituloMovimiento) ?></h1>
 </div>
 
 <?php require __DIR__ . '/_nav.php'; ?>
@@ -124,8 +149,7 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
   <?= campoCsrf() ?>
   <input type="hidden" name="accion_nueva" value="1">
 
-  <section class="seccion">
-    <h2 class="seccion__titulo"><?= icono('documento') ?> Datos del movimiento</h2>
+  <section class="seccion finanzas__formulario">
     <div class="seccion__cuerpo">
       <?php if ($serviciosClinicos): ?>
         <div class="campo col-6<?= isset($errores['servicio_id']) ? ' campo--error' : '' ?>">
@@ -157,10 +181,31 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
           <div class="campo<?= $error !== '' ? ' campo--error' : '' ?>">
             <label class="campo__etiqueta" for="<?= e($nombre) ?>"><?= e($texto) ?><?= $requerido ? ' *' : '' ?></label>
             <div class="campo__control">
-              <?php if ($tipo === 'casilla'): ?>
+              <?php if ($nombre === 'paciente_id'): ?>
+                <div class="finanzas__pacientes" data-finanzas-pacientes>
+                  <select id="paciente_id" name="datos[paciente_id]" data-paciente-seleccion aria-describedby="paciente-ayuda<?= $error !== '' ? ' paciente-error' : '' ?>">
+                    <option value=""<?= $valor === '' ? ' selected' : '' ?>>Sin paciente asociado</option>
+                    <?php if ($pacienteSeleccionado): ?>
+                      <?php $nombrePaciente = trim(implode(' ', array_filter([$pacienteSeleccionado['nombre'], $pacienteSeleccionado['primer_apellido'], $pacienteSeleccionado['segundo_apellido']]))); ?>
+                      <option value="<?= (int) $pacienteSeleccionado['id'] ?>" selected><?= e(trim($pacienteSeleccionado['folio'] . ' · ' . $nombrePaciente, ' ·')) ?></option>
+                    <?php endif; ?>
+                  </select>
+                  <label class="finanzas__pacientes-buscar" for="buscar-paciente-finanzas">Buscar paciente</label>
+                  <input id="buscar-paciente-finanzas" type="search" data-paciente-buscar placeholder="Nombre, folio o CURP" autocomplete="off">
+                  <div class="finanzas__pacientes-resultados" data-paciente-resultados role="region" aria-label="Resultados de pacientes">
+                    <p class="finanzas__pacientes-mensaje">Cargando pacientes…</p>
+                  </div>
+                  <div class="finanzas__pacientes-paginacion" data-paciente-paginacion hidden>
+                    <button type="button" data-paciente-anterior disabled>Anterior</button>
+                    <span data-paciente-pagina></span>
+                    <button type="button" data-paciente-siguiente disabled>Siguiente</button>
+                  </div>
+                  <p class="finanzas__pacientes-estado" id="paciente-ayuda" data-paciente-estado role="status" aria-live="polite"></p>
+                </div>
+              <?php elseif ($tipo === 'casilla'): ?>
                 <input id="<?= e($nombre) ?>" type="checkbox" name="datos[<?= e($nombre) ?>]" value="1"<?= $valor !== '' ? ' checked' : '' ?>>
               <?php elseif ($tipo === 'opcion' && !empty($opciones)): ?>
-                <select id="<?= e($nombre) ?>" name="datos[<?= e($nombre) ?>]">
+                <select id="<?= e($nombre) ?>" name="datos[<?= e($nombre) ?>]"<?= $requerido ? ' required' : '' ?>>
                   <option value="">—</option>
                   <?php foreach ($opciones as $claveOpcion => $textoOpcion): ?>
                     <option value="<?= e((string) $claveOpcion) ?>"<?= $valor === (string) $claveOpcion ? ' selected' : '' ?>><?= e((string) $textoOpcion) ?></option>
@@ -169,12 +214,12 @@ require __DIR__ . '/../app/vistas/plantilla/encabezado.php';
               <?php elseif ($tipo === 'fecha'): ?>
                 <input id="<?= e($nombre) ?>" type="date" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= $requerido ? ' required' : '' ?>>
               <?php elseif ($tipo === 'numero'): ?>
-                <input id="<?= e($nombre) ?>" type="number" step="0.01" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= $nombre === 'monto' ? ' data-finanzas-monto' : '' ?><?= $requerido ? ' required' : '' ?>>
+                <input id="<?= e($nombre) ?>" type="number" step="<?= !empty($def['entero']) || str_ends_with($nombre, '_id') ? '1' : '0.01' ?>" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= isset($def['min']) ? ' min="' . e((string) $def['min']) . '"' : '' ?><?= isset($def['max']) ? ' max="' . e((string) $def['max']) . '"' : '' ?><?= $nombre === 'monto' ? ' data-finanzas-monto' : '' ?><?= $requerido ? ' required' : '' ?>>
               <?php else: ?>
                 <input id="<?= e($nombre) ?>" type="text" name="datos[<?= e($nombre) ?>]" value="<?= e($valor) ?>"<?= $nombre === 'concepto' ? ' data-finanzas-concepto' : '' ?><?= !empty($def['max']) ? ' maxlength="' . (int) $def['max'] . '"' : '' ?><?= $requerido ? ' required' : '' ?>>
               <?php endif; ?>
             </div>
-            <?php if ($error !== ''): ?><span class="campo__ayuda"><?= e($error) ?></span><?php endif; ?>
+            <?php if ($error !== ''): ?><span class="campo__ayuda"<?= $nombre === 'paciente_id' ? ' id="paciente-error"' : '' ?>><?= e($error) ?></span><?php endif; ?>
           </div>
         <?php endforeach; ?>
       </div>

@@ -1,0 +1,28 @@
+.vistas-tabla { position: relative; }
+.vistas-tabla__panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  gap: 10px;
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio);
+  background: var(--bg-elevado);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
+}
+.vistas-tabla__panel label { display: grid; gap: 5px; color: var(--texto-suave); font-size: var(--fs-sm); }
+.vistas-tabla__panel input,
+.vistas-tabla__panel select { width: 100%; min-width: 0; }
+.vistas-tabla__acciones { display: flex; gap: 8px; }
+.vistas-tabla__acciones .boton { flex: 1; }
+.vistas-tabla__columnas > div { display: grid; gap: 5px; max-height: 180px; overflow: auto; padding: 8px 0; }
+.vistas-tabla__columnas label { display: flex; align-items: center; gap: 8px; }
+.vistas-tabla__columnas input { width: auto; }
+.vistas-tabla__panel [data-vistas-mensaje] { min-height: 1.4em; margin: 0; font-size: var(--fs-sm); }
+.vistas-tabla__panel [data-error="1"] { color: var(--peligro); }
+.bd-tabla [hidden] { display: none !important; }
