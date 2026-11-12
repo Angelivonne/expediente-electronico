@@ -182,3 +182,22 @@ central (otra instalación de este mismo código) cuando hay conexión.
   integridad de catálogos y estado de la base. `mantenimiento/tareas_diarias.bat` hace respaldo y
   verificación programados.
 - Detalle técnico y pendientes en `docs/motor-unico.md`.
+
+## Créditos
+
+Este sistema fue diseñado y desarrollado por su equipo, de la idea a la última línea de código:
+
+- **Ángel Arnulfo Zamora Adame** — desarrollo y arquitectura
+- **Vania Gail Delgado Ortega** — desarrollo
+- **Danna Sofía García Hernández** — desarrollo
+
+Del expediente clínico (NOM-004) y la auditoría (NOM-024) a la protección de datos (LFPDPPP),
+el asistente de inteligencia artificial, la transcripción por voz y la interoperabilidad
+entre clínicas: hecho en México, para las clínicas de México. 🇲🇽
+
+Si usas, adaptas o construyes sobre este sistema, la licencia MIT obliga a conservar
+este aviso de autoría en tu copia. ¡Gracias por respetar el trabajo de su equipo!
+
+## Licencia
+
+[MIT](LICENSE) © 2026 Ángel Arnulfo Zamora Adame, Vania Gail Delgado Ortega y Danna Sofía García Hernández.
