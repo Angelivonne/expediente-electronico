@@ -183,6 +183,18 @@ central (otra instalación de este mismo código) cuando hay conexión.
   verificación programados.
 - Detalle técnico y pendientes en `docs/motor-unico.md`.
 
+## Aviso legal y responsabilidad
+
+Este sistema es una **herramienta de gestión de información clínica**; quien lo use asume lo siguiente:
+
+- **Cada profesional es responsable de los datos que consulta, captura, modifica y firma.** Si un dato del expediente se capturó mal, se modificó indebidamente o se usó de forma incorrecta, la responsabilidad es de quien lo hizo — no de quienes desarrollamos el software.
+- El sistema **no sustituye el juicio clínico** ni garantiza diagnóstico, tratamiento o resultado médico alguno. Toda decisión clínica corresponde al profesional de la salud que atiende.
+- El equipo de desarrollo **no se hace responsable** por errores u omisiones en la información registrada, por el uso que se dé al expediente, por interpretaciones de sus datos ni por las consecuencias derivadas de su uso.
+- La veracidad, exactitud y legalidad del expediente clínico son responsabilidad del establecimiento de salud y del profesional que lo emite, conforme a la NOM-004-SSA3-2012.
+- El sistema deja registro de auditoría (bitácora NOM-024) precisamente para que cada acción sea rastreable y atribuible a su autor.
+
+El software se distribuye bajo la licencia MIT, **"AS IS"** (tal cual, sin garantía de ningún tipo). Al instalarlo o usarlo, el establecimiento acepta estas condiciones.
+
 ## Créditos
 
 Este sistema fue diseñado y desarrollado por su equipo, de la idea a la última línea de código:
